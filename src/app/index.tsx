@@ -3,11 +3,12 @@ import { StatusBar } from "expo-status-bar";
 import {
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors } from "../theme";
 
@@ -59,7 +60,7 @@ export default function SplashScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Continue to JusticeNow onboarding"
-          onPress={() => router.push("/onboarding/1")}
+          onPress={() => router.push("/onboarding")}
           style={({ pressed }) => [
             styles.continueButton,
             pressed && styles.continueButtonPressed,
