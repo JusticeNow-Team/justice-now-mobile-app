@@ -1,98 +1,174 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import {
+  Image,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { colors } from "../theme";
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function SplashScreen() {
+  const router = useRouter();
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      <View style={styles.content}>
+        <Image
+          source={require("../../assets/images/justicenow-logo-mark.png")}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="JusticeNow logo"
+        />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <Text style={styles.brand}>
+          Justice<Text style={styles.brandAccent}>Now</Text>
+        </Text>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        <Text style={styles.tagline}>
+          Report Safely. Track Transparently.
+          {"\n"}
+          Seek Justice.
+        </Text>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        <View
+          style={styles.loadingContainer}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Establishing a secure connection"
+        >
+          <View style={styles.loadingTrack}>
+            <View style={styles.loadingProgress} />
+          </View>
+
+          <Text style={styles.loadingText}>
+            🔒 Establishing a secure connection…
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.sdgText}>
+          Supporting SDG 16 · Peace, Justice and Strong Institutions
+        </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Continue to JusticeNow onboarding"
+          onPress={() => router.push("/onboarding/1")}
+          style={({ pressed }) => [
+            styles.continueButton,
+            pressed && styles.continueButtonPressed,
+          ]}
+        >
+          <Text style={styles.continueText}>Continue</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: colors.navy[900],
   },
-  safeArea: {
+
+  content: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+
+  logo: {
+    width: 92,
+    height: 92,
   },
-  title: {
-    textAlign: 'center',
+
+  brand: {
+    marginTop: 24,
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: "700",
+    color: colors.textInverse,
   },
-  code: {
-    textTransform: 'uppercase',
+
+  brandAccent: {
+    color: colors.teal[300],
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+
+  tagline: {
+    marginTop: 12,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontWeight: "500",
+    textAlign: "center",
+    color: colors.navy[200],
+  },
+
+  loadingContainer: {
+    marginTop: 40,
+    width: 180,
+    alignItems: "center",
+  },
+
+  loadingTrack: {
+    width: 160,
+    height: 4,
+    overflow: "hidden",
+    borderRadius: 999,
+    backgroundColor: colors.navy[800],
+  },
+
+  loadingProgress: {
+    width: "66%",
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: colors.teal[400],
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 11.5,
+    fontWeight: "500",
+    textAlign: "center",
+    color: colors.navy[300],
+  },
+
+  footer: {
+    paddingHorizontal: 32,
+    paddingBottom: 24,
+  },
+
+  sdgText: {
+    textAlign: "center",
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.navy[400],
+  },
+
+  continueButton: {
+    minHeight: 40,
+    marginTop: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.navy[700],
+    borderRadius: 12,
+  },
+
+  continueButtonPressed: {
+    backgroundColor: colors.navy[800],
+  },
+
+  continueText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.navy[200],
   },
 });

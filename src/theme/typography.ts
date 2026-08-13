@@ -1,6 +1,11 @@
 export const typography = {
+  display: {
+    fontSize: 30,
+    fontWeight: "700" as const,
+  },
+
   h1: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "700" as const,
   },
 
@@ -15,12 +20,17 @@ export const typography = {
   },
 
   body: {
+    fontSize: 14,
+    fontWeight: "400" as const,
+  },
+
+  bodyLarge: {
     fontSize: 16,
     fontWeight: "400" as const,
   },
 
   small: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "400" as const,
   },
 
