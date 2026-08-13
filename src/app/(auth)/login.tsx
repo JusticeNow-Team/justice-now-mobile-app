@@ -1,6 +1,9 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
+
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -10,10 +13,11 @@ import {
   Text,
   TextInput,
   View,
-  Alert,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
 export default function LoginScreen() {
@@ -21,36 +25,210 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
 
-  const handleSignIn = () => {
-    // Temporary navigation.
-    // Supabase authentication will be connected later.
-    router.navigate("/two-factor");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // -------------------------------------------------------
+  // Sign In
+  // -------------------------------------------------------
+
+  const handleSignIn = async () => {
+    setErrorMessage("");
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setErrorMessage("Please enter your email address.");
+      return;
+    }
+
+    if (!password) {
+      setErrorMessage("Please enter your password.");
+      return;
+    }
+
+    if (loading) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      console.log("Attempting login:", cleanEmail);
+
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+      console.log("LOGIN USER:", data.user?.id);
+      console.log("LOGIN ERROR:", error);
+
+      if (error) {
+        setErrorMessage(error.message);
+
+        Alert.alert(
+          "Sign in failed",
+          error.message
+        );
+
+        return;
+      }
+
+      if (!data.user) {
+        setErrorMessage(
+          "JusticeNow could not sign you in."
+        );
+
+        return;
+      }
+
+      // ---------------------------------------------------
+      // Load profile role
+      // ---------------------------------------------------
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      console.log("PROFILE:", profile);
+      console.log("PROFILE ERROR:", profileError);
+
+      if (profileError) {
+        await supabase.auth.signOut();
+
+        setErrorMessage(
+          "Your account was authenticated, but JusticeNow could not load your profile."
+        );
+
+        Alert.alert(
+          "Profile error",
+          "Your account was authenticated, but JusticeNow could not load your profile."
+        );
+
+        return;
+      }
+
+      if (!profile) {
+        await supabase.auth.signOut();
+
+        setErrorMessage(
+          "JusticeNow could not find your user profile."
+        );
+
+        return;
+      }
+
+      console.log(
+        "SIGNED IN ROLE:",
+        profile.role
+      );
+
+      // ---------------------------------------------------
+      // Reporter
+      // ---------------------------------------------------
+
+      if (profile.role === "reporter") {
+        console.log(
+          "Reporter successfully authenticated."
+        );
+
+        router.replace("/reporter");
+
+        return;
+      }
+
+      // ---------------------------------------------------
+      // Staff users
+      // ---------------------------------------------------
+
+      await supabase.auth.signOut();
+
+      Alert.alert(
+        "Staff account detected",
+        "Please use Staff access to sign in with your JusticeNow staff account.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Staff access",
+            onPress: () =>
+              router.push("/secure-role"),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error(
+        "Unexpected login error:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to sign in. Please try again.";
+
+      setErrorMessage(message);
+
+      Alert.alert(
+        "Connection error",
+        message
+      );
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // -------------------------------------------------------
+  // Anonymous Reporter
+  // -------------------------------------------------------
 
   const handleAnonymous = () => {
     Alert.alert(
       "Anonymous reporting",
-      "The anonymous reporter flow will be connected when we implement the Reporter module."
+      "Anonymous reporting will be connected when we implement the case reporting flow."
     );
   };
+
+  // -------------------------------------------------------
+  // UI
+  // -------------------------------------------------------
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
+        }
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={
+            styles.scrollContent
+          }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Brand */}
+
           <View style={styles.brandSection}>
             <Image
-              source={require("../../../assets/images/justicenow-logo-mark.png")}
+              source={require(
+                "../../../assets/images/justicenow-logo-mark.png"
+              )}
               style={styles.logo}
               resizeMode="contain"
               accessibilityLabel="JusticeNow logo"
@@ -58,68 +236,99 @@ export default function LoginScreen() {
 
             <Text style={styles.welcomeTitle}>
               Welcome to Justice
-              <Text style={styles.nowText}>Now</Text>
+              <Text style={styles.nowText}>
+                Now
+              </Text>
             </Text>
 
             <Text style={styles.tagline}>
-              Report Safely. Track Transparently. Seek Justice.
+              Report Safely. Track Transparently.
+              Seek Justice.
             </Text>
           </View>
 
           {/* Login Card */}
+
           <View style={styles.card}>
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>
-                Email or username
+                Email
               </Text>
 
               <TextInput
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setErrorMessage("");
+                }}
                 placeholder="you@example.com"
-                placeholderTextColor={colors.textSoft}
+                placeholderTextColor={
+                  colors.textSoft
+                }
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                accessibilityLabel="Email or username"
+                autoComplete="email"
+                textContentType="emailAddress"
+                editable={!loading}
                 style={styles.input}
               />
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>
+                Password
+              </Text>
 
               <TextInput
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setErrorMessage("");
+                }}
                 placeholder="Enter your password"
-                placeholderTextColor={colors.textSoft}
+                placeholderTextColor={
+                  colors.textSoft
+                }
                 secureTextEntry
                 autoCapitalize="none"
-                accessibilityLabel="Password"
+                autoCorrect={false}
+                autoComplete="password"
+                textContentType="password"
+                editable={!loading}
+                onSubmitEditing={handleSignIn}
                 style={styles.input}
               />
             </View>
 
+            {errorMessage !== "" && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>
+                  {errorMessage}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.optionsRow}>
               <Pressable
                 onPress={() =>
-                  setRememberMe((current) => !current)
+                  setRememberMe(
+                    (current) => !current
+                  )
                 }
-                accessibilityRole="checkbox"
-                accessibilityState={{
-                  checked: rememberMe,
-                }}
                 style={styles.rememberRow}
               >
                 <View
                   style={[
                     styles.checkbox,
-                    rememberMe && styles.checkboxChecked,
+                    rememberMe &&
+                      styles.checkboxChecked,
                   ]}
                 >
                   {rememberMe && (
-                    <Text style={styles.checkmark}>✓</Text>
+                    <Text style={styles.checkmark}>
+                      ✓
+                    </Text>
                   )}
                 </View>
 
@@ -130,9 +339,10 @@ export default function LoginScreen() {
 
               <Pressable
                 onPress={() =>
-                  router.navigate("/forgot-password")
+                  router.push(
+                    "/forgot-password"
+                  )
                 }
-                accessibilityRole="button"
               >
                 <Text style={styles.linkText}>
                   Forgot password?
@@ -142,16 +352,22 @@ export default function LoginScreen() {
 
             <Pressable
               onPress={handleSignIn}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in"
-              style={({ pressed }) => [
+              disabled={loading}
+              style={[
                 styles.signInButton,
-                pressed && styles.buttonPressed,
+                loading &&
+                  styles.buttonDisabled,
               ]}
             >
-              <Text style={styles.signInText}>
-                Sign in
-              </Text>
+              {loading ? (
+                <ActivityIndicator
+                  color={colors.textInverse}
+                />
+              ) : (
+                <Text style={styles.signInText}>
+                  Sign in
+                </Text>
+              )}
             </Pressable>
 
             <View style={styles.registerRow}>
@@ -161,7 +377,7 @@ export default function LoginScreen() {
 
               <Pressable
                 onPress={() =>
-                  router.navigate("/register")
+                  router.push("/register")
                 }
               >
                 <Text style={styles.linkText}>
@@ -171,54 +387,58 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* OR divider */}
+          {/* Divider */}
+
           <View style={styles.dividerRow}>
             <View style={styles.divider} />
 
-            <Text style={styles.orText}>OR</Text>
+            <Text style={styles.orText}>
+              OR
+            </Text>
 
             <View style={styles.divider} />
           </View>
 
-          {/* Anonymous reporting */}
+          {/* Anonymous */}
+
           <Pressable
             onPress={handleAnonymous}
-            accessibilityRole="button"
-            accessibilityLabel="Continue as anonymous reporter"
-            style={({ pressed }) => [
-              styles.anonymousButton,
-              pressed && styles.anonymousPressed,
-            ]}
+            style={styles.anonymousButton}
           >
-            <Text style={styles.anonymousIcon}>◯</Text>
+            <Text style={styles.anonymousIcon}>
+              ◯
+            </Text>
 
             <Text style={styles.anonymousText}>
               Continue as anonymous reporter
             </Text>
           </Pressable>
 
-          {/* Privacy notice */}
+          {/* Privacy */}
+
           <View style={styles.privacyNotice}>
-            <Text style={styles.lockIcon}>🔒</Text>
+            <Text style={styles.lockIcon}>
+              🔒
+            </Text>
 
             <Text style={styles.privacyText}>
               Anonymous reports are accepted and
-              investigated. Your name, contact details and
-              device information are never attached to the
-              case.
+              investigated. Your name, contact
+              details and device information are
+              never attached to the case.
             </Text>
           </View>
 
-          {/* Staff access */}
+          {/* Staff */}
+
           <View style={styles.staffSection}>
             <Text style={styles.staffText}>
-              Signing in as staff? Your role is verified
-              after two-factor authentication.{" "}
+              Signing in as staff?{" "}
             </Text>
 
             <Pressable
               onPress={() =>
-                router.navigate("/secure-role")
+                router.push("/secure-role")
               }
             >
               <Text style={styles.linkText}>
@@ -279,21 +499,11 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: colors.surface,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
-    padding: 16,
-
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-
-    elevation: 2,
+    backgroundColor: colors.surface,
   },
 
   fieldGroup: {
@@ -309,16 +519,29 @@ const styles = StyleSheet.create({
 
   input: {
     minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.navy[200],
     borderRadius: 12,
-    backgroundColor: colors.surface,
-
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-
     fontSize: 14,
     color: colors.navy[800],
+    backgroundColor: colors.surface,
+  },
+
+  errorBox: {
+    marginBottom: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 10,
+    backgroundColor: "#FFF2F1",
+  },
+
+  errorText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.error,
   },
 
   optionsRow: {
@@ -338,14 +561,11 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginRight: 8,
-
     borderRadius: 5,
     borderWidth: 1.5,
     borderColor: colors.navy[300],
-
     alignItems: "center",
     justifyContent: "center",
-
     backgroundColor: colors.surface,
   },
 
@@ -355,9 +575,9 @@ const styles = StyleSheet.create({
   },
 
   checkmark: {
-    color: colors.textInverse,
     fontSize: 13,
     fontWeight: "700",
+    color: colors.textInverse,
   },
 
   rememberText: {
@@ -380,14 +600,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.royal[700],
   },
 
-  buttonPressed: {
-    backgroundColor: colors.royal[800],
+  buttonDisabled: {
+    opacity: 0.6,
   },
 
   signInText: {
-    color: colors.textInverse,
     fontSize: 15,
     fontWeight: "600",
+    color: colors.textInverse,
   },
 
   registerRow: {
@@ -423,22 +643,14 @@ const styles = StyleSheet.create({
 
   anonymousButton: {
     minHeight: 48,
-
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-
     gap: 8,
-
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.navy[200],
-
     backgroundColor: colors.surface,
-  },
-
-  anonymousPressed: {
-    backgroundColor: colors.navy[50],
   },
 
   anonymousIcon: {
@@ -454,16 +666,12 @@ const styles = StyleSheet.create({
 
   privacyNotice: {
     marginTop: 16,
-
     flexDirection: "row",
     alignItems: "flex-start",
-
     padding: 14,
-
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.teal[100],
-
     backgroundColor: colors.teal[50],
   },
 
@@ -474,27 +682,19 @@ const styles = StyleSheet.create({
 
   privacyText: {
     flex: 1,
-
     fontSize: 12,
     lineHeight: 18,
-
     color: colors.teal[800],
   },
 
   staffSection: {
     marginTop: 18,
-
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "center",
-
-    paddingHorizontal: 10,
   },
 
   staffText: {
-    textAlign: "center",
     fontSize: 11.5,
-    lineHeight: 17,
     color: colors.textSoft,
   },
 });
