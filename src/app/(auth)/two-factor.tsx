@@ -179,7 +179,7 @@ export default function TwoFactorScreen() {
 
           <Text style={styles.helpText}>
             Check your mobile connection or request a new
-            code. Never share your verification code with
+            code. Never share your verification link with
             another person.
           </Text>
         </View>
