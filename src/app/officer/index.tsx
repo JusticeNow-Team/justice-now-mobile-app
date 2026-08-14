@@ -268,7 +268,7 @@ export default function OfficerDashboard() {
         {/* Evidence */}
 
         <Pressable
-          onPress={() => showComingSoon("Evidence Review")}
+          onPress={() => router.push("/officer/evidence")}
           accessibilityRole="button"
           style={styles.actionCard}
         >

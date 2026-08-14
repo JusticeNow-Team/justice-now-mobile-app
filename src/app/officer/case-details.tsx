@@ -1,27 +1,22 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-
 import { useCallback, useEffect, useState } from "react";
 
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
-
-// ---------------------------------------------------------
-// Types
-// ---------------------------------------------------------
 
 type CaseStatus =
   | "submitted"
@@ -64,10 +59,6 @@ type StatusHistory = {
   changed_at: string;
 };
 
-// ---------------------------------------------------------
-// Status options Case Officer is allowed to choose
-// ---------------------------------------------------------
-
 const STATUS_OPTIONS: {
   value: CaseStatus;
   label: string;
@@ -85,10 +76,6 @@ const STATUS_OPTIONS: {
     label: "Resolved",
   },
 ];
-
-// ---------------------------------------------------------
-// Screen
-// ---------------------------------------------------------
 
 export default function CaseDetailsScreen() {
   const router = useRouter();
@@ -118,7 +105,7 @@ export default function CaseDetailsScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   // -------------------------------------------------------
-  // Verify Staff MFA
+  // Verify MFA
   // -------------------------------------------------------
 
   const verifySecureSession = useCallback(async () => {
@@ -126,7 +113,7 @@ export default function CaseDetailsScreen() {
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
     if (error) {
-      console.error("AAL error:", error);
+      console.error("AAL ERROR:", error);
 
       return false;
     }
@@ -141,14 +128,13 @@ export default function CaseDetailsScreen() {
   }, [router]);
 
   // -------------------------------------------------------
-  // Load Workspace
+  // Load Case Workspace
   // -------------------------------------------------------
 
   const loadWorkspace = useCallback(
     async (showLoader = true) => {
       if (!caseId) {
         setErrorMessage("Case ID is missing.");
-
         setLoading(false);
 
         return;
@@ -161,37 +147,33 @@ export default function CaseDetailsScreen() {
 
         setErrorMessage("");
 
-        // -----------------------------------------------
-        // Verify MFA first
-        // -----------------------------------------------
-
         const secure = await verifySecureSession();
 
         if (!secure) {
           return;
         }
 
-        // -----------------------------------------------
+        // -------------------------------------------------
         // Load Case
-        // -----------------------------------------------
+        // -------------------------------------------------
 
         const { data: loadedCase, error: caseError } = await supabase
           .from("cases")
           .select(
             `
-                id,
-                case_reference,
-                title,
-                description,
-                category,
-                incident_date,
-                district,
-                status,
-                priority,
-                is_anonymous,
-                created_at,
-                updated_at
-              `,
+              id,
+              case_reference,
+              title,
+              description,
+              category,
+              incident_date,
+              district,
+              status,
+              priority,
+              is_anonymous,
+              created_at,
+              updated_at
+            `,
           )
           .eq("id", caseId)
           .single();
@@ -208,20 +190,20 @@ export default function CaseDetailsScreen() {
 
         setCaseData(loadedCase as JusticeCase);
 
-        // -----------------------------------------------
+        // -------------------------------------------------
         // Investigation Notes
-        // -----------------------------------------------
+        // -------------------------------------------------
 
         const { data: noteData, error: notesError } = await supabase
           .from("investigation_notes")
           .select(
             `
-                id,
-                case_id,
-                officer_id,
-                note_text,
-                created_at
-              `,
+              id,
+              case_id,
+              officer_id,
+              note_text,
+              created_at
+            `,
           )
           .eq("case_id", caseId)
           .order("created_at", {
@@ -229,24 +211,24 @@ export default function CaseDetailsScreen() {
           });
 
         if (notesError) {
-          console.error("Notes error:", notesError);
+          console.error("NOTES ERROR:", notesError);
         } else {
           setNotes((noteData ?? []) as InvestigationNote[]);
         }
 
-        // -----------------------------------------------
+        // -------------------------------------------------
         // Status History
-        // -----------------------------------------------
+        // -------------------------------------------------
 
         const { data: historyData, error: historyError } = await supabase
           .from("case_status_history")
           .select(
             `
-                id,
-                old_status,
-                new_status,
-                changed_at
-              `,
+              id,
+              old_status,
+              new_status,
+              changed_at
+            `,
           )
           .eq("case_id", caseId)
           .order("changed_at", {
@@ -254,12 +236,12 @@ export default function CaseDetailsScreen() {
           });
 
         if (historyError) {
-          console.error("History error:", historyError);
+          console.error("HISTORY ERROR:", historyError);
         } else {
           setHistory((historyData ?? []) as StatusHistory[]);
         }
       } catch (error) {
-        console.error("Load case workspace error:", error);
+        console.error("LOAD CASE WORKSPACE ERROR:", error);
 
         setErrorMessage(
           error instanceof Error
@@ -349,7 +331,7 @@ export default function CaseDetailsScreen() {
         "The investigation note has been added to the case.",
       );
     } catch (error) {
-      console.error("Add note error:", error);
+      console.error("ADD NOTE ERROR:", error);
 
       Alert.alert(
         "Unable to save note",
@@ -383,6 +365,7 @@ export default function CaseDetailsScreen() {
           text: "Cancel",
           style: "cancel",
         },
+
         {
           text: "Update",
 
@@ -412,7 +395,7 @@ export default function CaseDetailsScreen() {
                 `Case status changed to ${formatStatus(nextStatus)}.`,
               );
             } catch (error) {
-              console.error("Status update error:", error);
+              console.error("STATUS UPDATE ERROR:", error);
 
               Alert.alert(
                 "Update failed",
@@ -449,7 +432,12 @@ export default function CaseDetailsScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={styles.backButton}
+          >
             <Text style={styles.backText}>‹</Text>
           </Pressable>
 
@@ -465,7 +453,11 @@ export default function CaseDetailsScreen() {
             {errorMessage || "This case is unavailable."}
           </Text>
 
-          <Pressable onPress={() => loadWorkspace()} style={styles.retryButton}>
+          <Pressable
+            onPress={() => loadWorkspace()}
+            accessibilityRole="button"
+            style={styles.retryButton}
+          >
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
@@ -494,7 +486,9 @@ export default function CaseDetailsScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Case Details</Text>
 
-          <Text style={styles.headerSubtitle}>{caseData.case_reference}</Text>
+          <Text style={styles.headerSubtitle}>
+            {caseData.case_reference}
+          </Text>
         </View>
       </View>
 
@@ -510,7 +504,7 @@ export default function CaseDetailsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Case Overview */}
+        {/* Case Header */}
 
         <View style={styles.caseHeaderCard}>
           <View style={styles.caseTopRow}>
@@ -524,7 +518,7 @@ export default function CaseDetailsScreen() {
           <StatusBadge status={caseData.status} />
         </View>
 
-        {/* Incident Information */}
+        {/* Case Information */}
 
         <Text style={styles.sectionTitle}>Case information</Text>
 
@@ -574,7 +568,47 @@ export default function CaseDetailsScreen() {
           </Text>
         </View>
 
-        {/* Update Status */}
+        {/* =================================================
+            CASE EVIDENCE
+        ================================================= */}
+
+        <Text style={styles.sectionTitle}>Case evidence</Text>
+
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/officer/evidence",
+
+              params: {
+                caseId: caseData.id,
+              },
+            })
+          }
+          accessibilityRole="button"
+          accessibilityLabel="Review case evidence"
+          style={({ pressed }) => [
+            styles.evidenceButton,
+
+            pressed && styles.evidenceButtonPressed,
+          ]}
+        >
+          <View style={styles.evidenceIconBox}>
+            <Text style={styles.evidenceIcon}>🔎</Text>
+          </View>
+
+          <View style={styles.evidenceContent}>
+            <Text style={styles.evidenceButtonTitle}>Review Evidence</Text>
+
+            <Text style={styles.evidenceButtonText}>
+              View evidence submitted for this case and record your
+              investigation findings.
+            </Text>
+          </View>
+
+          <Text style={styles.evidenceArrow}>›</Text>
+        </Pressable>
+
+        {/* Investigation Status */}
 
         <Text style={styles.sectionTitle}>Investigation status</Text>
 
@@ -592,6 +626,11 @@ export default function CaseDetailsScreen() {
                   key={option.value}
                   disabled={updatingStatus}
                   onPress={() => updateStatus(option.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    selected: active,
+                    disabled: updatingStatus,
+                  }}
                   style={[
                     styles.statusOption,
 
@@ -614,9 +653,7 @@ export default function CaseDetailsScreen() {
 
           {updatingStatus && (
             <ActivityIndicator
-              style={{
-                marginTop: 12,
-              }}
+              style={styles.statusLoading}
               color={colors.royal[700]}
             />
           )}
@@ -647,6 +684,8 @@ export default function CaseDetailsScreen() {
             <Pressable
               onPress={addNote}
               disabled={savingNote}
+              accessibilityRole="button"
+              accessibilityLabel="Save investigation note"
               style={[
                 styles.saveNoteButton,
 
@@ -690,7 +729,7 @@ export default function CaseDetailsScreen() {
           ))
         )}
 
-        {/* Status Timeline */}
+        {/* Status History */}
 
         <Text style={styles.sectionTitle}>Status history</Text>
 
@@ -730,11 +769,7 @@ export default function CaseDetailsScreen() {
         <View style={styles.securityNotice}>
           <Text style={styles.securityIcon}>🔒</Text>
 
-          <View
-            style={{
-              flex: 1,
-            }}
-          >
+          <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>
               Confidential investigation workspace
             </Text>
@@ -754,7 +789,13 @@ export default function CaseDetailsScreen() {
 // Components
 // ---------------------------------------------------------
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -768,7 +809,11 @@ function Divider() {
   return <View style={styles.divider} />;
 }
 
-function StatusBadge({ status }: { status: CaseStatus }) {
+function StatusBadge({
+  status,
+}: {
+  status: CaseStatus;
+}) {
   return (
     <View style={styles.currentStatus}>
       <View style={styles.statusDot} />
@@ -778,7 +823,11 @@ function StatusBadge({ status }: { status: CaseStatus }) {
   );
 }
 
-function PriorityBadge({ priority }: { priority: CasePriority }) {
+function PriorityBadge({
+  priority,
+}: {
+  priority: CasePriority;
+}) {
   return (
     <View
       style={[
@@ -878,9 +927,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // -----------------------------------------------------
+  // -------------------------------------------------------
   // Header
-  // -----------------------------------------------------
+  // -------------------------------------------------------
 
   header: {
     minHeight: 66,
@@ -891,7 +940,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
 
     borderBottomWidth: 1,
-
     borderBottomColor: colors.border,
 
     backgroundColor: colors.surface,
@@ -937,9 +985,9 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // -----------------------------------------------------
+  // -------------------------------------------------------
   // Case Header
-  // -----------------------------------------------------
+  // -------------------------------------------------------
 
   caseHeaderCard: {
     padding: 18,
@@ -984,7 +1032,6 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
 
     flexDirection: "row",
-
     alignItems: "center",
 
     paddingHorizontal: 10,
@@ -1043,9 +1090,9 @@ const styles = StyleSheet.create({
     color: colors.error,
   },
 
-  // -----------------------------------------------------
+  // -------------------------------------------------------
   // Sections
-  // -----------------------------------------------------
+  // -------------------------------------------------------
 
   sectionTitle: {
     marginTop: 23,
@@ -1113,9 +1160,81 @@ const styles = StyleSheet.create({
     color: colors.navy[700],
   },
 
-  // -----------------------------------------------------
+  // -------------------------------------------------------
+  // Evidence
+  // -------------------------------------------------------
+
+  evidenceButton: {
+    minHeight: 82,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    padding: 14,
+
+    borderWidth: 1,
+    borderColor: colors.royal[100],
+
+    borderRadius: 14,
+
+    backgroundColor: colors.royal[50],
+  },
+
+  evidenceButtonPressed: {
+    opacity: 0.82,
+  },
+
+  evidenceIconBox: {
+    width: 44,
+    height: 44,
+
+    marginRight: 12,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    borderRadius: 12,
+
+    backgroundColor: colors.surface,
+  },
+
+  evidenceIcon: {
+    fontSize: 19,
+  },
+
+  evidenceContent: {
+    flex: 1,
+  },
+
+  evidenceButtonTitle: {
+    fontSize: 13.5,
+
+    fontWeight: "700",
+
+    color: colors.navy[800],
+  },
+
+  evidenceButtonText: {
+    marginTop: 3,
+
+    fontSize: 11,
+
+    lineHeight: 16,
+
+    color: colors.textSecondary,
+  },
+
+  evidenceArrow: {
+    marginLeft: 8,
+
+    fontSize: 27,
+
+    color: colors.royal[700],
+  },
+
+  // -------------------------------------------------------
   // Status
-  // -----------------------------------------------------
+  // -------------------------------------------------------
 
   statusHelp: {
     fontSize: 11.5,
@@ -1142,7 +1261,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
 
     borderWidth: 1,
-
     borderColor: colors.border,
 
     borderRadius: 10,
@@ -1168,15 +1286,18 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
 
-  // -----------------------------------------------------
-  // Notes
-  // -----------------------------------------------------
+  statusLoading: {
+    marginTop: 12,
+  },
+
+  // -------------------------------------------------------
+  // Investigation Notes
+  // -------------------------------------------------------
 
   noteComposer: {
     padding: 15,
 
     borderWidth: 1,
-
     borderColor: colors.border,
 
     borderRadius: 14,
@@ -1200,7 +1321,6 @@ const styles = StyleSheet.create({
     padding: 12,
 
     borderWidth: 1,
-
     borderColor: colors.navy[200],
 
     borderRadius: 11,
@@ -1218,7 +1338,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
 
     justifyContent: "space-between",
-
     alignItems: "center",
 
     marginTop: 10,
@@ -1263,7 +1382,6 @@ const styles = StyleSheet.create({
     padding: 14,
 
     borderWidth: 1,
-
     borderColor: colors.border,
 
     borderRadius: 13,
@@ -1275,7 +1393,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
 
     justifyContent: "space-between",
-
     alignItems: "center",
 
     gap: 10,
@@ -1311,7 +1428,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
 
     borderWidth: 1,
-
     borderColor: colors.border,
 
     borderRadius: 14,
@@ -1345,9 +1461,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // -----------------------------------------------------
-  // History
-  // -----------------------------------------------------
+  // -------------------------------------------------------
+  // Status History
+  // -------------------------------------------------------
 
   historyRow: {
     flexDirection: "row",
@@ -1403,9 +1519,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // -----------------------------------------------------
+  // -------------------------------------------------------
   // Security
-  // -----------------------------------------------------
+  // -------------------------------------------------------
 
   securityNotice: {
     flexDirection: "row",
@@ -1415,7 +1531,6 @@ const styles = StyleSheet.create({
     padding: 14,
 
     borderWidth: 1,
-
     borderColor: colors.teal[100],
 
     borderRadius: 14,
@@ -1425,6 +1540,10 @@ const styles = StyleSheet.create({
 
   securityIcon: {
     marginRight: 9,
+  },
+
+  securityContent: {
+    flex: 1,
   },
 
   securityTitle: {
@@ -1445,9 +1564,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // -----------------------------------------------------
+  // -------------------------------------------------------
   // Error
-  // -----------------------------------------------------
+  // -------------------------------------------------------
 
   errorContainer: {
     flex: 1,
