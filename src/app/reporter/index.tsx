@@ -205,7 +205,7 @@ export default function ReporterDashboard() {
 
         {/* My Cases */}
 
-        <Pressable onPress={() => comingSoon("My Cases")} style={styles.card}>
+        <Pressable onPress={() => router.push("/reporter/cases")} style={styles.card}>
           <View style={styles.cardIconBlue}>
             <Text style={styles.cardIconText}>📄</Text>
           </View>

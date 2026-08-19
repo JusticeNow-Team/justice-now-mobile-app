@@ -13,5 +13,6 @@ export { default as SettingsRow } from "./SettingsRow";
 export { default as SectionCard, DataRow } from "./SectionCard";
 export { default as ChoiceCard } from "./ChoiceCard";
 export { default as StepProgress } from "./StepProgress";
+export { default as EmptyState } from "./EmptyState";
 
 export type { StatusType } from "./StatusBadge";
