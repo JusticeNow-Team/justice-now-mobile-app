@@ -9,5 +9,7 @@ export { default as AuthScreen } from "./AuthScreen";
 export { default as CheckboxRow } from "./CheckboxRow";
 export { default as Notice } from "./Notice";
 export { Field, AppTextInput, SelectInput } from "./Field";
+export { default as SettingsRow } from "./SettingsRow";
+export { default as SectionCard, DataRow } from "./SectionCard";
 
 export type { StatusType } from "./StatusBadge";

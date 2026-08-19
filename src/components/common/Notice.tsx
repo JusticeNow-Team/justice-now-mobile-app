@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../../theme";
 
-type NoticeTone = "privacy" | "info" | "caution" | "error" | "success";
+type NoticeTone = "privacy" | "info" | "caution" | "error" | "success" | "safety";
 
 interface NoticeProps {
   tone?: NoticeTone;
@@ -54,6 +54,14 @@ const toneStyles: Record<
     },
     icon: "✓",
     text: { color: colors.success },
+  },
+  safety: {
+    box: {
+      borderColor: colors.navy[100],
+      backgroundColor: colors.navy[50],
+    },
+    icon: "🛡",
+    text: { color: colors.navy[700] },
   },
 };
 
