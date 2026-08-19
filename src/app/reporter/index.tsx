@@ -150,9 +150,19 @@ export default function ReporterDashboard() {
             </Text>
           </View>
 
-          <Pressable onPress={() => setShowLogoutConfirm(true)} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>Sign out</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.push("/reporter/profile")}
+              style={styles.logoutButton}
+              accessibilityRole="button"
+              accessibilityLabel="Your profile"
+            >
+              <Text style={styles.logoutText}>Profile</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowLogoutConfirm(true)} style={styles.logoutButton}>
+              <Text style={styles.logoutText}>Sign out</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Welcome */}
@@ -324,6 +334,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
 
     marginBottom: 20,
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 
   brand: {
