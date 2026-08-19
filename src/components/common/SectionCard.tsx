@@ -6,6 +6,7 @@ import { colors } from "../../theme";
 interface SectionCardProps {
   title: string;
   description?: string;
+  action?: ReactNode;
   children: ReactNode;
   padded?: boolean;
 }
@@ -13,16 +14,20 @@ interface SectionCardProps {
 export default function SectionCard({
   title,
   description,
+  action,
   children,
   padded = true,
 }: SectionCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        {description ? (
-          <Text style={styles.description}>{description}</Text>
-        ) : null}
+        <View style={styles.headerText}>
+          <Text style={styles.title}>{title}</Text>
+          {description ? (
+            <Text style={styles.description}>{description}</Text>
+          ) : null}
+        </View>
+        {action}
       </View>
       <View style={padded ? styles.body : undefined}>{children}</View>
     </View>
@@ -58,10 +63,18 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 14,
