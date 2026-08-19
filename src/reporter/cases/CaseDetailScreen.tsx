@@ -316,6 +316,17 @@ export default function CaseDetailScreen() {
                   </View>
                 ))
               )}
+              <PrimaryButton
+                title="Add more evidence"
+                variant="outline"
+                icon="⬆"
+                onPress={() =>
+                  router.push({
+                    pathname: "/reporter/cases/upload",
+                    params: { caseId: detail.id },
+                  })
+                }
+              />
               <Notice tone="privacy">
                 Evidence is checked by a validator before it becomes part of the
                 case record. You will be told if a replacement is needed.

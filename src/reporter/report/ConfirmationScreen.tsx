@@ -81,6 +81,14 @@ export default function ConfirmationScreen() {
           </View>
         </View>
 
+        {submitted.evidenceWarning ? (
+          <View style={styles.notice}>
+            <Notice tone="caution" title="Evidence needs another try">
+              {submitted.evidenceWarning}
+            </Notice>
+          </View>
+        ) : null}
+
         <View style={styles.notice}>
           <Notice tone="privacy" title="Keep your reference safe">
             You will need {submitted.caseReference} to follow this case. It is

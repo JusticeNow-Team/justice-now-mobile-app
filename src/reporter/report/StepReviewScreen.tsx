@@ -17,6 +17,7 @@ import {
   StepProgress,
 } from "../../components/common";
 import { colors } from "../../theme";
+import { uploadPendingEvidence } from "../evidence/uploadEvidence";
 import { logoutReporter } from "../login";
 import { incidentCategories, reportSteps } from "./options";
 import { useReport } from "./ReportContext";
@@ -82,7 +83,16 @@ export default function StepReviewScreen() {
     {
       title: "Evidence",
       path: "/reporter/report/evidence",
-      rows: [["Files attached", "None in this submission"]],
+      rows: [
+        [
+          "Files attached",
+          draft.pendingEvidence.length === 0
+            ? "None in this submission"
+            : `${draft.pendingEvidence.length} file${
+                draft.pendingEvidence.length === 1 ? "" : "s"
+              } ready to upload`,
+        ],
+      ],
     },
     {
       title: "Privacy preferences",
@@ -139,11 +149,29 @@ export default function StepReviewScreen() {
         return;
       }
 
+      let evidenceWarning: string | undefined;
+
+      if (draft.pendingEvidence.length > 0) {
+        const upload = await uploadPendingEvidence(
+          result.id,
+          draft.pendingEvidence
+        );
+
+        if (upload.failed > 0) {
+          evidenceWarning =
+            upload.uploaded > 0
+              ? "Your case was submitted, but some files could not be uploaded. You can add them from the case page."
+              : upload.lastError ||
+                "Your case was submitted, but the files could not be uploaded. You can add them from the case page.";
+        }
+      }
+
       setSubmitted({
         id: result.id,
         caseReference: result.caseReference,
         submittedAt: result.submittedAt,
         reportingMode: draft.reportingMode,
+        evidenceWarning,
       });
       setConfirming(false);
       router.replace("/reporter/report/confirmation");
@@ -216,7 +244,11 @@ export default function StepReviewScreen() {
         cancelLabel="Keep editing"
         loading={saving}
         onConfirm={handleSubmit}
-        onClose={() => setConfirming(false)}
+        onClose={() => {
+          if (!saving) {
+            setConfirming(false);
+          }
+        }}
       />
     </SafeAreaView>
   );
