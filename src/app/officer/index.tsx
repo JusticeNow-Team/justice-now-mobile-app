@@ -1,14 +1,16 @@
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+
+import { useCallback, useState } from "react";
 
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,133 +18,447 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
-export default function OfficerDashboard() {
-  const router = useRouter();
+// ---------------------------------------------------------
+// Types
+// ---------------------------------------------------------
 
-  const [loading, setLoading] = useState(true);
+type CaseStatus =
+  | "submitted"
+  | "under_review"
+  | "assigned"
+  | "investigating"
+  | "awaiting_evidence"
+  | "resolved"
+  | "closed";
+
+type CasePriority = "low" | "medium" | "high" | "urgent";
+
+type DashboardCase = {
+  id: string;
+  case_reference: string;
+  title: string;
+  status: CaseStatus;
+  priority: CasePriority;
+  updated_at: string;
+};
+
+type EvidenceReview = {
+  id: string;
+  review_state: "reviewed" | "follow_up_required";
+};
+
+type EvidenceRecord = {
+  id: string;
+  case_id: string;
+
+  officer_evidence_reviews: EvidenceReview[];
+};
+
+type StatusHistoryItem = {
+  id: string;
+  case_id: string;
+  old_status: CaseStatus | null;
+  new_status: CaseStatus;
+  changed_at: string;
+};
+
+type DashboardStats = {
+  assigned: number;
+  investigating: number;
+  awaitingEvidence: number;
+  urgent: number;
+  evidenceToReview: number;
+  followUps: number;
+};
+
+const INITIAL_STATS: DashboardStats = {
+  assigned: 0,
+  investigating: 0,
+  awaitingEvidence: 0,
+  urgent: 0,
+  evidenceToReview: 0,
+  followUps: 0,
+};
+
+// ---------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------
+
+export default function OfficerDashboardScreen() {
+  const router = useRouter();
 
   const [officerName, setOfficerName] = useState("Case Officer");
 
+  const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
+
+  const [recentUpdates, setRecentUpdates] = useState<StatusHistoryItem[]>([]);
+
+  const [caseMap, setCaseMap] = useState<Record<string, DashboardCase>>({});
+
+  const [loading, setLoading] = useState(true);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState("");
+
   // -------------------------------------------------------
-  // Load and validate officer
+  // Load Dashboard
   // -------------------------------------------------------
 
-  useEffect(() => {
-    loadOfficer();
-  }, []);
+  const loadDashboard = useCallback(
+    async (showLoader = true) => {
+      try {
+        if (showLoader) {
+          setLoading(true);
+        }
 
-  const loadOfficer = async () => {
-    try {
-      setLoading(true);
+        setErrorMessage("");
 
-      // Get currently authenticated Supabase user
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+        // -------------------------------------------------
+        // Get authenticated user
+        // -------------------------------------------------
 
-      if (userError || !user) {
-        console.log("Officer authentication error:", userError);
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-        await supabase.auth.signOut();
+        if (userError || !user) {
+          await supabase.auth.signOut();
 
-        router.replace("/login");
+          router.replace("/login");
 
-        return;
-      }
+          return;
+        }
 
-      console.log("OFFICER USER:", user.id);
+        // -------------------------------------------------
+        // Load profile + verify role
+        // -------------------------------------------------
 
-      // Load JusticeNow profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("full_name, role")
-        .eq("id", user.id)
-        .single();
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("full_name, role")
+          .eq("id", user.id)
+          .single();
 
-      if (profileError) {
-        console.error("Officer profile error:", profileError);
+        console.log("OFFICER DASHBOARD PROFILE:", profile);
 
-        Alert.alert(
-          "Profile error",
-          "JusticeNow could not load your staff profile.",
+        console.log("OFFICER PROFILE ERROR:", profileError);
+
+        if (profileError || !profile) {
+          await supabase.auth.signOut();
+
+          Alert.alert(
+            "Profile error",
+            "JusticeNow could not load your staff profile.",
+          );
+
+          router.replace("/login");
+
+          return;
+        }
+
+        if (profile.role !== "case_officer") {
+          await supabase.auth.signOut();
+
+          Alert.alert(
+            "Access denied",
+            "This workspace is restricted to authorized Case Officers.",
+          );
+
+          router.replace("/login");
+
+          return;
+        }
+
+        if (profile.full_name) {
+          setOfficerName(profile.full_name);
+        } else {
+          setOfficerName("Case Officer");
+        }
+
+        // -------------------------------------------------
+        // Verify MFA / AAL2
+        // -------------------------------------------------
+
+        const { data: aal, error: aalError } =
+          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        console.log("DASHBOARD AAL:", aal);
+
+        if (aalError) {
+          setErrorMessage(aalError.message);
+
+          return;
+        }
+
+        if (aal.currentLevel !== "aal2") {
+          router.replace("/two-factor");
+
+          return;
+        }
+
+        // -------------------------------------------------
+        // Get active case assignments
+        // -------------------------------------------------
+
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from("case_assignments")
+          .select("case_id")
+          .eq("assigned_officer_id", user.id)
+          .eq("is_active", true);
+
+        console.log("DASHBOARD ASSIGNMENTS:", assignments);
+
+        if (assignmentsError) {
+          setErrorMessage(assignmentsError.message);
+
+          return;
+        }
+
+        const caseIds = [
+          ...new Set(
+            (assignments ?? []).map((assignment) => assignment.case_id),
+          ),
+        ];
+
+        // -------------------------------------------------
+        // No assigned cases
+        // -------------------------------------------------
+
+        if (caseIds.length === 0) {
+          setStats(INITIAL_STATS);
+
+          setRecentUpdates([]);
+
+          setCaseMap({});
+
+          return;
+        }
+
+        // -------------------------------------------------
+        // Load assigned cases
+        // -------------------------------------------------
+
+        const { data: casesData, error: casesError } = await supabase
+          .from("cases")
+          .select(
+            `
+              id,
+              case_reference,
+              title,
+              status,
+              priority,
+              updated_at
+            `,
+          )
+          .in("id", caseIds);
+
+        console.log("DASHBOARD CASES:", casesData);
+
+        if (casesError) {
+          setErrorMessage(casesError.message);
+
+          return;
+        }
+
+        const officerCases = (casesData ?? []) as DashboardCase[];
+
+        // -------------------------------------------------
+        // Build quick case lookup
+        // -------------------------------------------------
+
+        const nextCaseMap: Record<string, DashboardCase> = {};
+
+        officerCases.forEach((caseItem) => {
+          nextCaseMap[caseItem.id] = caseItem;
+        });
+
+        setCaseMap(nextCaseMap);
+
+        // -------------------------------------------------
+        // Load evidence for assigned cases
+        //
+        // officer_evidence_reviews is filtered by RLS,
+        // so this officer only receives their own reviews.
+        // -------------------------------------------------
+
+        const { data: evidenceData, error: evidenceError } = await supabase
+          .from("case_evidence")
+          .select(
+            `
+              id,
+              case_id,
+
+              officer_evidence_reviews (
+                id,
+                review_state
+              )
+            `,
+          )
+          .in("case_id", caseIds);
+
+        console.log("DASHBOARD EVIDENCE:", evidenceData);
+
+        if (evidenceError) {
+          console.error("DASHBOARD EVIDENCE ERROR:", evidenceError);
+        }
+
+        const evidenceRecords = (evidenceData ??
+          []) as unknown as EvidenceRecord[];
+
+        // -------------------------------------------------
+        // Calculate live statistics
+        // -------------------------------------------------
+
+        const assignedCount = officerCases.length;
+
+        const investigatingCount = officerCases.filter(
+          (caseItem) => caseItem.status === "investigating",
+        ).length;
+
+        const awaitingEvidenceCount = officerCases.filter(
+          (caseItem) => caseItem.status === "awaiting_evidence",
+        ).length;
+
+        const urgentCount = officerCases.filter(
+          (caseItem) => caseItem.priority === "urgent",
+        ).length;
+
+        // -------------------------------------------------
+        // Evidence without an Officer review
+        // -------------------------------------------------
+
+        const evidenceToReviewCount = evidenceRecords.filter(
+          (evidenceItem) =>
+            !evidenceItem.officer_evidence_reviews ||
+            evidenceItem.officer_evidence_reviews.length === 0,
+        ).length;
+
+        // -------------------------------------------------
+        // Officer marked follow-up required
+        // -------------------------------------------------
+
+        const followUpCount = evidenceRecords.filter((evidenceItem) =>
+          evidenceItem.officer_evidence_reviews?.some(
+            (review) => review.review_state === "follow_up_required",
+          ),
+        ).length;
+
+        setStats({
+          assigned: assignedCount,
+
+          investigating: investigatingCount,
+
+          awaitingEvidence: awaitingEvidenceCount,
+
+          urgent: urgentCount,
+
+          evidenceToReview: evidenceToReviewCount,
+
+          followUps: followUpCount,
+        });
+
+        // -------------------------------------------------
+        // Recent Case Status Changes
+        // -------------------------------------------------
+
+        const { data: historyData, error: historyError } = await supabase
+          .from("case_status_history")
+          .select(
+            `
+              id,
+              case_id,
+              old_status,
+              new_status,
+              changed_at
+            `,
+          )
+          .in("case_id", caseIds)
+          .order("changed_at", {
+            ascending: false,
+          })
+          .limit(5);
+
+        console.log("DASHBOARD HISTORY:", historyData);
+
+        if (historyError) {
+          console.error("DASHBOARD HISTORY ERROR:", historyError);
+
+          setRecentUpdates([]);
+        } else {
+          setRecentUpdates((historyData ?? []) as StatusHistoryItem[]);
+        }
+      } catch (error) {
+        console.error("LOAD OFFICER DASHBOARD ERROR:", error);
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "JusticeNow could not load the Case Officer dashboard.",
         );
-
-        await supabase.auth.signOut();
-
-        router.replace("/login");
-
-        return;
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
+    },
+    [router],
+  );
 
-      if (!profile || profile.role !== "case_officer") {
-        console.log("Unauthorized officer access:", profile?.role);
+  // -------------------------------------------------------
+  // Refresh whenever dashboard becomes active
+  // -------------------------------------------------------
 
-        Alert.alert(
-          "Access denied",
-          "This area is available only to authorized Case Officers.",
-        );
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard();
 
-        await supabase.auth.signOut();
+      return undefined;
+    }, [loadDashboard]),
+  );
 
-        router.replace("/login");
+  // -------------------------------------------------------
+  // Pull to Refresh
+  // -------------------------------------------------------
 
-        return;
-      }
+  const handleRefresh = () => {
+    setRefreshing(true);
 
-      // Use officer full name
-      if (profile.full_name && profile.full_name.trim() !== "") {
-        setOfficerName(profile.full_name);
-      }
-
-      console.log("CASE OFFICER VERIFIED:", profile);
-    } catch (error) {
-      console.error("Officer dashboard error:", error);
-
-      Alert.alert(
-        "Connection error",
-        "JusticeNow could not verify your staff account.",
-      );
-    } finally {
-      setLoading(false);
-    }
+    loadDashboard(false);
   };
 
   // -------------------------------------------------------
   // Sign Out
   // -------------------------------------------------------
 
-  const handleSignOut = () => {
+  const signOut = () => {
     Alert.alert(
       "Sign out",
-      "Are you sure you want to sign out of JusticeNow?",
+      "Do you want to sign out of the JusticeNow staff workspace?",
       [
         {
           text: "Cancel",
           style: "cancel",
         },
+
         {
           text: "Sign out",
+
           style: "destructive",
 
           onPress: async () => {
-            await supabase.auth.signOut();
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+              Alert.alert("Unable to sign out", error.message);
+
+              return;
+            }
 
             router.replace("/login");
           },
         },
       ],
-    );
-  };
-
-  // -------------------------------------------------------
-  // Temporary actions
-  // -------------------------------------------------------
-
-  const showComingSoon = (feature: string) => {
-    Alert.alert(
-      feature,
-      `${feature} will be connected in the next Case Officer implementation step.`,
     );
   };
 
@@ -155,195 +471,282 @@ export default function OfficerDashboard() {
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.royal[700]} />
 
-        <Text style={styles.loadingText}>Loading officer workspace...</Text>
+        <Text style={styles.loadingText}>
+          Loading Case Officer workspace...
+        </Text>
       </SafeAreaView>
     );
   }
 
   // -------------------------------------------------------
-  // Dashboard
+  // UI
   // -------------------------------------------------------
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
+      {/* Header */}
 
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.brand}>
-              Justice
-              <Text style={styles.brandNow}>Now</Text>
-            </Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.brandName}>JusticeNow</Text>
 
-            <Text style={styles.roleText}>Case Officer Workspace</Text>
-          </View>
-
-          <Pressable
-            onPress={handleSignOut}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
-            style={styles.signOutButton}
-          >
-            <Text style={styles.signOutText}>Sign out</Text>
-          </Pressable>
+          <Text style={styles.workspaceLabel}>Case Officer Workspace</Text>
         </View>
 
+        <Pressable
+          onPress={signOut}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          style={({ pressed }) => [
+            styles.signOutButton,
+
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.royal[700]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         {/* Welcome */}
 
         <View style={styles.welcomeCard}>
-          <Text style={styles.welcomeLabel}>Welcome back</Text>
+          <Text style={styles.welcomeLabel}>CASE OFFICER</Text>
 
-          <Text style={styles.welcomeName}>{officerName}</Text>
+          <Text style={styles.welcomeTitle}>Welcome, {officerName}</Text>
 
-          <Text style={styles.welcomeDescription}>
-            Review assigned cases, investigate reported incidents, manage
-            evidence and keep case progress up to date.
+          <Text style={styles.welcomeText}>
+            Review assigned cases, examine evidence and record investigation
+            progress securely.
           </Text>
         </View>
 
-        {/* Overview */}
+        {/* Error */}
+
+        {errorMessage !== "" && (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>Dashboard update failed</Text>
+
+            <Text style={styles.errorText}>{errorMessage}</Text>
+
+            <Pressable
+              onPress={() => loadDashboard()}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* =================================================
+            LIVE STATISTICS
+        ================================================= */}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Case overview</Text>
+          <View>
+            <Text style={styles.sectionTitle}>Case overview</Text>
 
-          <Text style={styles.sectionSubtitle}>Your current workload</Text>
+            <Text style={styles.sectionSubtitle}>
+              Live data from your assigned investigations
+            </Text>
+          </View>
+
+          <Pressable onPress={handleRefresh} accessibilityRole="button">
+            <Text style={styles.refreshText}>Refresh</Text>
+          </Pressable>
         </View>
 
-        {/* Statistics */}
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon="📁"
+            value={stats.assigned}
+            label="Assigned Cases"
+            tone="blue"
+          />
 
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>—</Text>
+          <StatCard
+            icon="🔎"
+            value={stats.investigating}
+            label="Investigating"
+            tone="teal"
+          />
 
-            <Text style={styles.statLabel}>Assigned</Text>
-          </View>
+          <StatCard
+            icon="📎"
+            value={stats.awaitingEvidence}
+            label="Awaiting Evidence"
+            tone="gold"
+          />
 
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>—</Text>
+          <StatCard
+            icon="⚠️"
+            value={stats.urgent}
+            label="Urgent Cases"
+            tone="red"
+          />
 
-            <Text style={styles.statLabel}>In progress</Text>
-          </View>
+          <StatCard
+            icon="📄"
+            value={stats.evidenceToReview}
+            label="Evidence to Review"
+            tone="blue"
+          />
 
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>—</Text>
-
-            <Text style={styles.statLabel}>Priority</Text>
-          </View>
+          <StatCard
+            icon="↻"
+            value={stats.followUps}
+            label="Follow-ups"
+            tone="gold"
+          />
         </View>
 
-        <Text style={styles.statHint}>
-          Live case statistics will appear after the cases database is
-          connected.
-        </Text>
+        {/* =================================================
+            QUICK ACTIONS
+        ================================================= */}
 
-        {/* Assigned Cases */}
+        <Text style={styles.actionsSectionTitle}>Quick actions</Text>
 
-        <Text style={styles.sectionTitleStandalone}>Workspace</Text>
-
-        <Pressable
+        <ActionCard
+          icon="📁"
+          title="Assigned Cases"
+          description="Review cases currently assigned to your officer account."
           onPress={() => router.push("/officer/cases")}
-          accessibilityRole="button"
-          accessibilityLabel="View assigned cases"
-          style={styles.primaryAction}
-        >
-          <View style={styles.primaryIconBox}>
-            <Text style={styles.primaryIcon}>📁</Text>
-          </View>
+          badge={stats.assigned}
+        />
 
-          <View style={styles.actionContent}>
-            <Text style={styles.primaryActionTitle}>Assigned Cases</Text>
-
-            <Text style={styles.primaryActionText}>
-              View cases assigned to you and continue active investigations.
-            </Text>
-          </View>
-
-          <Text style={styles.primaryArrow}>›</Text>
-        </Pressable>
-
-        {/* Evidence */}
-
-        <Pressable
+        <ActionCard
+          icon="🔎"
+          title="Evidence Review"
+          description="View case evidence and record investigation findings."
           onPress={() => router.push("/officer/evidence")}
-          accessibilityRole="button"
-          style={styles.actionCard}
-        >
-          <View style={styles.blueIconBox}>
-            <Text style={styles.actionIcon}>🔎</Text>
-          </View>
+          badge={stats.evidenceToReview}
+        />
 
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>Evidence Review</Text>
+        <ActionCard
+          icon="📝"
+          title="Case Updates"
+          description="Review the latest investigation status changes."
+          onPress={() =>
+            Alert.alert(
+              "Recent Case Updates",
+              "Your latest case updates are displayed below on this dashboard.",
+            )
+          }
+        />
 
-            <Text style={styles.actionText}>
-              Review evidence attached to cases and record your investigation
-              findings.
+        <ActionCard
+          icon="🔔"
+          title="Notifications"
+          description="Review case assignments, evidence activity and officer alerts."
+          onPress={() => router.push("/officer/notifications")}
+        />
+
+        {/* =================================================
+            RECENT ACTIVITY
+        ================================================= */}
+
+        <View style={styles.activityHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Recent case activity</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Latest status changes from assigned cases
             </Text>
           </View>
+        </View>
 
-          <Text style={styles.actionArrow}>›</Text>
-        </Pressable>
+        {recentUpdates.length === 0 ? (
+          <View style={styles.emptyActivity}>
+            <Text style={styles.emptyActivityIcon}>🕘</Text>
 
-        {/* Status Updates */}
+            <Text style={styles.emptyActivityTitle}>No recent updates</Text>
 
-        <Pressable
-          onPress={() => showComingSoon("Case Updates")}
-          accessibilityRole="button"
-          style={styles.actionCard}
-        >
-          <View style={styles.tealIconBox}>
-            <Text style={styles.actionIcon}>✓</Text>
-          </View>
-
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>Case Updates</Text>
-
-            <Text style={styles.actionText}>
-              Record progress and update the investigation status of assigned
-              cases.
+            <Text style={styles.emptyActivityText}>
+              Status changes from your assigned cases will appear here.
             </Text>
           </View>
+        ) : (
+          <View style={styles.activityCard}>
+            {recentUpdates.map((update, index) => {
+              const caseItem = caseMap[update.case_id];
 
-          <Text style={styles.actionArrow}>›</Text>
-        </Pressable>
+              return (
+                <View key={update.id}>
+                  <Pressable
+                    disabled={!caseItem}
+                    onPress={() => {
+                      if (!caseItem) {
+                        return;
+                      }
 
-        {/* Notifications */}
+                      router.push({
+                        pathname: "/officer/case-details",
 
-        <Pressable
-          onPress={() => showComingSoon("Notifications")}
-          accessibilityRole="button"
-          style={styles.actionCard}
-        >
-          <View style={styles.goldIconBox}>
-            <Text style={styles.actionIcon}>🔔</Text>
+                        params: {
+                          id: caseItem.id,
+                        },
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      styles.activityRow,
+
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View style={styles.activityDotContainer}>
+                      <View style={styles.activityDot} />
+                    </View>
+
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityReference}>
+                        {caseItem?.case_reference ?? "Case"}
+                      </Text>
+
+                      <Text style={styles.activityTitle}>
+                        {formatStatus(update.old_status)} →{" "}
+                        {formatStatus(update.new_status)}
+                      </Text>
+
+                      <Text style={styles.activityDate}>
+                        {formatDateTime(update.changed_at)}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.activityArrow}>›</Text>
+                  </Pressable>
+
+                  {index < recentUpdates.length - 1 && (
+                    <View style={styles.activityDivider} />
+                  )}
+                </View>
+              );
+            })}
           </View>
+        )}
 
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>Notifications</Text>
+        {/* =================================================
+            SECURITY
+        ================================================= */}
 
-            <Text style={styles.actionText}>
-              View assignment alerts, evidence updates and case activity.
-            </Text>
-          </View>
-
-          <Text style={styles.actionArrow}>›</Text>
-        </Pressable>
-
-        {/* Security */}
-
-        <View style={styles.securityNotice}>
+        <View style={styles.securityCard}>
           <Text style={styles.securityIcon}>🔒</Text>
 
-          <View style={{ flex: 1 }}>
-            <Text style={styles.securityTitle}>Restricted workspace</Text>
+          <View style={styles.securityContent}>
+            <Text style={styles.securityTitle}>Protected staff workspace</Text>
 
             <Text style={styles.securityText}>
-              Case information is confidential. Access only cases required for
-              your assigned investigation duties.
+              JusticeNow restricts this workspace to your authenticated Case
+              Officer account and actively assigned cases.
             </Text>
           </View>
         </View>
@@ -353,17 +756,146 @@ export default function OfficerDashboard() {
 }
 
 // ---------------------------------------------------------
+// Stat Card
+// ---------------------------------------------------------
+
+function StatCard({
+  icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: string;
+  value: number;
+  label: string;
+  tone: "blue" | "teal" | "gold" | "red";
+}) {
+  return (
+    <View style={styles.statCard}>
+      <View
+        style={[
+          styles.statIconBox,
+
+          tone === "blue" && styles.statBlue,
+
+          tone === "teal" && styles.statTeal,
+
+          tone === "gold" && styles.statGold,
+
+          tone === "red" && styles.statRed,
+        ]}
+      >
+        <Text style={styles.statIcon}>{icon}</Text>
+      </View>
+
+      <Text style={styles.statValue}>{value}</Text>
+
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------
+// Action Card
+// ---------------------------------------------------------
+
+function ActionCard({
+  icon,
+  title,
+  description,
+  onPress,
+  badge,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  onPress: () => void;
+  badge?: number;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
+    >
+      <View style={styles.actionIconBox}>
+        <Text style={styles.actionIcon}>{icon}</Text>
+      </View>
+
+      <View style={styles.actionContent}>
+        <View style={styles.actionTitleRow}>
+          <Text style={styles.actionTitle}>{title}</Text>
+
+          {badge !== undefined && badge > 0 && (
+            <View style={styles.actionBadge}>
+              <Text style={styles.actionBadgeText}>{badge}</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.actionDescription}>{description}</Text>
+      </View>
+
+      <Text style={styles.actionArrow}>›</Text>
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------
+
+function formatStatus(status: CaseStatus | null) {
+  if (!status) {
+    return "Unknown";
+  }
+
+  switch (status) {
+    case "under_review":
+      return "Under review";
+
+    case "awaiting_evidence":
+      return "Awaiting evidence";
+
+    case "investigating":
+      return "Investigating";
+
+    case "submitted":
+      return "Submitted";
+
+    case "assigned":
+      return "Assigned";
+
+    case "resolved":
+      return "Resolved";
+
+    case "closed":
+      return "Closed";
+
+    default:
+      return status;
+  }
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+// ---------------------------------------------------------
 // Styles
 // ---------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+
     backgroundColor: colors.background,
   },
 
   loadingContainer: {
     flex: 1,
+
     alignItems: "center",
     justifyContent: "center",
 
@@ -378,54 +910,52 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 36,
-  },
-
-  // -------------------------------------------------------
+  // -----------------------------------------------------
   // Header
-  // -------------------------------------------------------
+  // -----------------------------------------------------
 
   header: {
+    minHeight: 68,
+
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
 
-    marginBottom: 18,
+    paddingHorizontal: 16,
+
+    borderBottomWidth: 1,
+
+    borderBottomColor: colors.border,
+
+    backgroundColor: colors.surface,
   },
 
-  headerLeft: {
-    flex: 1,
-  },
+  brandName: {
+    fontSize: 19,
 
-  brand: {
-    fontSize: 23,
     fontWeight: "800",
 
     color: colors.navy[800],
   },
 
-  brandNow: {
-    color: colors.royal[600],
-  },
-
-  roleText: {
+  workspaceLabel: {
     marginTop: 2,
 
-    fontSize: 11.5,
+    fontSize: 10.5,
 
     color: colors.textSecondary,
   },
 
   signOutButton: {
-    minHeight: 40,
+    minHeight: 38,
 
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
 
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
 
     borderWidth: 1,
+
     borderColor: colors.border,
 
     borderRadius: 10,
@@ -434,15 +964,26 @@ const styles = StyleSheet.create({
   },
 
   signOutText: {
-    fontSize: 12.5,
+    fontSize: 11.5,
+
     fontWeight: "600",
 
     color: colors.navy[700],
   },
 
-  // -------------------------------------------------------
+  pressed: {
+    opacity: 0.75,
+  },
+
+  content: {
+    padding: 16,
+
+    paddingBottom: 42,
+  },
+
+  // -----------------------------------------------------
   // Welcome
-  // -------------------------------------------------------
+  // -----------------------------------------------------
 
   welcomeCard: {
     padding: 20,
@@ -453,191 +994,187 @@ const styles = StyleSheet.create({
   },
 
   welcomeLabel: {
-    fontSize: 12,
+    fontSize: 10,
 
-    color: "#BED0E5",
+    fontWeight: "700",
+
+    letterSpacing: 0.8,
+
+    color: "#AFC5DE",
   },
 
-  welcomeName: {
-    marginTop: 3,
+  welcomeTitle: {
+    marginTop: 6,
 
-    fontSize: 23,
+    fontSize: 21,
+
     fontWeight: "800",
 
     color: colors.textInverse,
   },
 
-  welcomeDescription: {
-    marginTop: 8,
+  welcomeText: {
+    marginTop: 7,
 
-    fontSize: 13,
-    lineHeight: 19,
+    maxWidth: 320,
+
+    fontSize: 12,
+
+    lineHeight: 18,
 
     color: "#DCE5EF",
   },
 
-  // -------------------------------------------------------
+  // -----------------------------------------------------
   // Section
-  // -------------------------------------------------------
+  // -----------------------------------------------------
 
   sectionHeader: {
-    marginTop: 25,
-    marginBottom: 10,
+    marginTop: 23,
+
+    flexDirection: "row",
+
+    alignItems: "flex-end",
+
+    justifyContent: "space-between",
   },
 
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
+
     fontWeight: "700",
 
     color: colors.navy[800],
   },
 
   sectionSubtitle: {
-    marginTop: 2,
+    marginTop: 3,
 
-    fontSize: 11.5,
+    fontSize: 10.5,
 
     color: colors.textSecondary,
   },
 
-  sectionTitleStandalone: {
-    marginTop: 24,
-    marginBottom: 10,
+  refreshText: {
+    padding: 5,
 
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 11,
 
-    color: colors.navy[800],
+    fontWeight: "600",
+
+    color: colors.royal[700],
   },
 
-  // -------------------------------------------------------
-  // Stats
-  // -------------------------------------------------------
+  // -----------------------------------------------------
+  // Statistics
+  // -----------------------------------------------------
 
-  statsRow: {
+  statsGrid: {
     flexDirection: "row",
 
-    gap: 8,
+    flexWrap: "wrap",
+
+    gap: 10,
+
+    marginTop: 12,
   },
 
   statCard: {
-    flex: 1,
+    flexGrow: 1,
 
-    minHeight: 88,
+    flexBasis: "47%",
 
-    padding: 12,
+    minHeight: 126,
 
-    alignItems: "center",
-    justifyContent: "center",
+    padding: 14,
 
     borderWidth: 1,
+
     borderColor: colors.border,
 
-    borderRadius: 14,
+    borderRadius: 15,
 
     backgroundColor: colors.surface,
   },
 
-  statNumber: {
-    fontSize: 22,
+  statIconBox: {
+    width: 38,
+    height: 38,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    borderRadius: 11,
+  },
+
+  statBlue: {
+    backgroundColor: colors.royal[50],
+  },
+
+  statTeal: {
+    backgroundColor: colors.teal[50],
+  },
+
+  statGold: {
+    backgroundColor: colors.gold[50],
+  },
+
+  statRed: {
+    backgroundColor: "#FFF0EF",
+  },
+
+  statIcon: {
+    fontSize: 16,
+  },
+
+  statValue: {
+    marginTop: 10,
+
+    fontSize: 23,
+
     fontWeight: "800",
 
     color: colors.navy[800],
   },
 
   statLabel: {
-    marginTop: 4,
+    marginTop: 2,
 
-    textAlign: "center",
+    fontSize: 10.5,
 
-    fontSize: 11,
+    lineHeight: 14,
 
     color: colors.textSecondary,
   },
 
-  statHint: {
-    marginTop: 8,
+  // -----------------------------------------------------
+  // Actions
+  // -----------------------------------------------------
 
-    fontSize: 10.5,
-    lineHeight: 15,
+  actionsSectionTitle: {
+    marginTop: 25,
+    marginBottom: 10,
 
-    color: colors.textSoft,
-  },
-
-  // -------------------------------------------------------
-  // Primary Action
-  // -------------------------------------------------------
-
-  primaryAction: {
-    minHeight: 92,
-
-    flexDirection: "row",
-    alignItems: "center",
-
-    padding: 15,
-
-    borderRadius: 16,
-
-    backgroundColor: colors.royal[700],
-  },
-
-  primaryIconBox: {
-    width: 46,
-    height: 46,
-
-    marginRight: 12,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    borderRadius: 13,
-
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
-
-  primaryIcon: {
-    fontSize: 20,
-  },
-
-  primaryActionTitle: {
     fontSize: 15,
+
     fontWeight: "700",
 
-    color: colors.textInverse,
+    color: colors.navy[800],
   },
-
-  primaryActionText: {
-    marginTop: 3,
-
-    fontSize: 11.5,
-    lineHeight: 16,
-
-    color: "#DCE7FF",
-  },
-
-  primaryArrow: {
-    marginLeft: 8,
-
-    fontSize: 28,
-
-    color: colors.textInverse,
-  },
-
-  // -------------------------------------------------------
-  // Action Cards
-  // -------------------------------------------------------
 
   actionCard: {
-    minHeight: 86,
+    minHeight: 83,
+
+    marginBottom: 9,
 
     flexDirection: "row",
+
     alignItems: "center",
 
-    marginTop: 10,
-
-    padding: 14,
+    padding: 13,
 
     borderWidth: 1,
+
     borderColor: colors.border,
 
     borderRadius: 14,
@@ -645,11 +1182,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
 
-  actionContent: {
-    flex: 1,
-  },
-
-  blueIconBox: {
+  actionIconBox: {
     width: 44,
     height: 44,
 
@@ -663,50 +1196,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.royal[50],
   },
 
-  tealIconBox: {
-    width: 44,
-    height: 44,
-
-    marginRight: 12,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    borderRadius: 12,
-
-    backgroundColor: colors.teal[50],
-  },
-
-  goldIconBox: {
-    width: 44,
-    height: 44,
-
-    marginRight: 12,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    borderRadius: 12,
-
-    backgroundColor: colors.gold[50],
-  },
-
   actionIcon: {
     fontSize: 18,
   },
 
+  actionContent: {
+    flex: 1,
+  },
+
+  actionTitleRow: {
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    gap: 7,
+  },
+
   actionTitle: {
-    fontSize: 14,
+    fontSize: 13,
+
     fontWeight: "700",
 
     color: colors.navy[800],
   },
 
-  actionText: {
+  actionDescription: {
     marginTop: 3,
 
-    fontSize: 11.5,
-    lineHeight: 16,
+    fontSize: 10.5,
+
+    lineHeight: 15,
 
     color: colors.textSecondary,
   },
@@ -714,19 +1233,169 @@ const styles = StyleSheet.create({
   actionArrow: {
     marginLeft: 8,
 
-    fontSize: 27,
+    fontSize: 26,
 
-    color: colors.navy[400],
+    color: colors.royal[700],
   },
 
-  // -------------------------------------------------------
-  // Security
-  // -------------------------------------------------------
+  actionBadge: {
+    minWidth: 20,
+    height: 20,
 
-  securityNotice: {
+    paddingHorizontal: 6,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    borderRadius: 10,
+
+    backgroundColor: colors.royal[700],
+  },
+
+  actionBadgeText: {
+    fontSize: 9,
+
+    fontWeight: "700",
+
+    color: colors.textInverse,
+  },
+
+  // -----------------------------------------------------
+  // Activity
+  // -----------------------------------------------------
+
+  activityHeader: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  activityCard: {
+    paddingHorizontal: 14,
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 14,
+
+    backgroundColor: colors.surface,
+  },
+
+  activityRow: {
+    minHeight: 75,
+
     flexDirection: "row",
 
+    alignItems: "center",
+
+    paddingVertical: 12,
+  },
+
+  activityDotContainer: {
+    width: 25,
+
+    alignItems: "flex-start",
+  },
+
+  activityDot: {
+    width: 9,
+    height: 9,
+
+    borderRadius: 5,
+
+    backgroundColor: colors.royal[600],
+  },
+
+  activityContent: {
+    flex: 1,
+  },
+
+  activityReference: {
+    fontSize: 9.5,
+
+    fontWeight: "700",
+
+    color: colors.royal[700],
+  },
+
+  activityTitle: {
+    marginTop: 3,
+
+    fontSize: 11.5,
+
+    fontWeight: "600",
+
+    color: colors.navy[800],
+  },
+
+  activityDate: {
+    marginTop: 3,
+
+    fontSize: 9.5,
+
+    color: colors.textSoft,
+  },
+
+  activityArrow: {
+    fontSize: 24,
+
+    color: colors.royal[700],
+  },
+
+  activityDivider: {
+    height: 1,
+
+    backgroundColor: colors.border,
+  },
+
+  emptyActivity: {
+    alignItems: "center",
+
+    padding: 22,
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 14,
+
+    backgroundColor: colors.surface,
+  },
+
+  emptyActivityIcon: {
+    fontSize: 22,
+  },
+
+  emptyActivityTitle: {
+    marginTop: 7,
+
+    fontSize: 12.5,
+
+    fontWeight: "700",
+
+    color: colors.navy[800],
+  },
+
+  emptyActivityText: {
+    marginTop: 4,
+
+    textAlign: "center",
+
+    fontSize: 10.5,
+
+    lineHeight: 15,
+
+    color: colors.textSecondary,
+  },
+
+  // -----------------------------------------------------
+  // Security
+  // -----------------------------------------------------
+
+  securityCard: {
     marginTop: 18,
+
+    flexDirection: "row",
 
     padding: 14,
 
@@ -741,12 +1410,15 @@ const styles = StyleSheet.create({
 
   securityIcon: {
     marginRight: 9,
+  },
 
-    fontSize: 16,
+  securityContent: {
+    flex: 1,
   },
 
   securityTitle: {
-    fontSize: 12.5,
+    fontSize: 11.5,
+
     fontWeight: "700",
 
     color: colors.teal[800],
@@ -755,9 +1427,67 @@ const styles = StyleSheet.create({
   securityText: {
     marginTop: 3,
 
-    fontSize: 11.5,
-    lineHeight: 17,
+    fontSize: 10.5,
+
+    lineHeight: 15,
 
     color: colors.textSecondary,
+  },
+
+  // -----------------------------------------------------
+  // Errors
+  // -----------------------------------------------------
+
+  errorCard: {
+    marginTop: 14,
+
+    padding: 14,
+
+    borderWidth: 1,
+
+    borderColor: colors.error,
+
+    borderRadius: 13,
+
+    backgroundColor: "#FFF2F1",
+  },
+
+  errorTitle: {
+    fontSize: 12,
+
+    fontWeight: "700",
+
+    color: colors.error,
+  },
+
+  errorText: {
+    marginTop: 4,
+
+    fontSize: 10.5,
+
+    lineHeight: 15,
+
+    color: colors.textSecondary,
+  },
+
+  retryButton: {
+    alignSelf: "flex-start",
+
+    marginTop: 9,
+
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+
+    borderRadius: 8,
+
+    backgroundColor: colors.error,
+  },
+
+  retryText: {
+    fontSize: 10.5,
+
+    fontWeight: "700",
+
+    color: colors.textInverse,
   },
 });
