@@ -15,13 +15,17 @@ interface FieldProps {
   label: string;
   hint?: string;
   error?: string;
+  optional?: boolean;
   children: ReactNode;
 }
 
-export function Field({ label, hint, error, children }: FieldProps) {
+export function Field({ label, hint, error, optional, children }: FieldProps) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {optional ? <Text style={styles.optional}> · optional</Text> : null}
+      </Text>
       {hint ? <Text style={styles.hint}>{hint}</Text> : <View style={styles.hintSpacer} />}
       {children}
       {error ? (
@@ -60,6 +64,40 @@ export function AppTextInput({
       }}
       style={[
         styles.textInput,
+        focused && !invalid && styles.inputFocused,
+        invalid && styles.inputInvalid,
+        style,
+      ]}
+    />
+  );
+}
+
+export function AppTextArea({
+  invalid,
+  style,
+  onFocus,
+  onBlur,
+  ...props
+}: AppTextInputProps) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <TextInput
+      {...props}
+      multiline
+      textAlignVertical="top"
+      placeholderTextColor={colors.textSoft}
+      onFocus={(event) => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
+      style={[
+        styles.textInput,
+        styles.textArea,
         focused && !invalid && styles.inputFocused,
         invalid && styles.inputInvalid,
         style,
@@ -151,6 +189,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.navy[800],
   },
+  optional: {
+    fontWeight: "500",
+    color: colors.textSoft,
+  },
   hint: {
     marginTop: 2,
     marginBottom: 6,
@@ -177,6 +219,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.navy[800],
     backgroundColor: colors.surface,
+  },
+  textArea: {
+    minHeight: 140,
+    paddingTop: 12,
   },
   select: {
     minHeight: 48,

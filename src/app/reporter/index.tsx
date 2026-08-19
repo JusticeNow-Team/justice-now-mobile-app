@@ -181,7 +181,7 @@ export default function ReporterDashboard() {
         {/* Primary Action */}
 
         <Pressable
-          onPress={() => comingSoon("Report a Case")}
+          onPress={() => router.push("/reporter/report/preference")}
           style={styles.reportButton}
         >
           <View style={styles.reportIcon}>
