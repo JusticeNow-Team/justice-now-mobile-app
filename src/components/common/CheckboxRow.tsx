@@ -7,6 +7,7 @@ interface CheckboxRowProps {
   onPress: () => void;
   label: string;
   hint?: string;
+  compact?: boolean;
 }
 
 export default function CheckboxRow({
@@ -14,19 +15,20 @@ export default function CheckboxRow({
   onPress,
   label,
   hint,
+  compact = false,
 }: CheckboxRowProps) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
-      style={styles.row}
+      style={[styles.row, compact && styles.rowCompact]}
     >
       <View style={[styles.box, checked && styles.boxChecked]}>
         {checked ? <Text style={styles.checkmark}>✓</Text> : null}
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, compact && styles.contentCompact]}>
         <Text style={styles.label}>{label}</Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       </View>
@@ -61,8 +63,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textInverse,
   },
+  rowCompact: {
+    paddingVertical: 0,
+    flexShrink: 1,
+  },
   content: {
     flex: 1,
+  },
+  contentCompact: {
+    flex: 0,
   },
   label: {
     fontSize: 13,
