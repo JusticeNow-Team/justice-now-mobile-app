@@ -8,8 +8,10 @@ export { default as AppHeader } from "./AppHeader";
 export { default as AuthScreen } from "./AuthScreen";
 export { default as CheckboxRow } from "./CheckboxRow";
 export { default as Notice } from "./Notice";
-export { Field, AppTextInput, SelectInput } from "./Field";
+export { Field, AppTextInput, AppTextArea, SelectInput } from "./Field";
 export { default as SettingsRow } from "./SettingsRow";
 export { default as SectionCard, DataRow } from "./SectionCard";
+export { default as ChoiceCard } from "./ChoiceCard";
+export { default as StepProgress } from "./StepProgress";
 
 export type { StatusType } from "./StatusBadge";
