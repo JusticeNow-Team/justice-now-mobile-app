@@ -13,7 +13,9 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ConfirmDialog } from "../../components/common";
 import { supabase } from "../../lib/supabase";
+import { logoutReporter } from "../../reporter/login";
 import { colors } from "../../theme";
 
 export default function ReporterDashboard() {
@@ -22,6 +24,8 @@ export default function ReporterDashboard() {
   const [name, setName] = useState("Reporter");
 
   const [loading, setLoading] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // -------------------------------------------------------
   // Load User
@@ -76,27 +80,25 @@ export default function ReporterDashboard() {
   // Logout
   // -------------------------------------------------------
 
-  const handleLogout = () => {
-    Alert.alert(
-      "Sign out",
-      "Are you sure you want to sign out of JusticeNow?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Sign out",
-          style: "destructive",
+  const handleLogout = async () => {
+    if (loggingOut) {
+      return;
+    }
 
-          onPress: async () => {
-            await supabase.auth.signOut();
-
-            router.replace("/login");
-          },
-        },
-      ],
-    );
+    try {
+      setLoggingOut(true);
+      await logoutReporter();
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      setShowLogoutConfirm(false);
+      Alert.alert(
+        "Sign out failed",
+        "We could not sign you out. Please try again.",
+      );
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   // -------------------------------------------------------
@@ -148,7 +150,7 @@ export default function ReporterDashboard() {
             </Text>
           </View>
 
-          <Pressable onPress={handleLogout} style={styles.logoutButton}>
+          <Pressable onPress={() => setShowLogoutConfirm(true)} style={styles.logoutButton}>
             <Text style={styles.logoutText}>Sign out</Text>
           </Pressable>
         </View>
@@ -267,6 +269,17 @@ export default function ReporterDashboard() {
           </View>
         </View>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="Sign out of JusticeNow?"
+        body="Your cases and drafts stay saved. You will need your password to sign back in."
+        confirmLabel="Sign out"
+        danger
+        loading={loggingOut}
+        onConfirm={handleLogout}
+        onClose={() => setShowLogoutConfirm(false)}
+      />
     </SafeAreaView>
   );
 }

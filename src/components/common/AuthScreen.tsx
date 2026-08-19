@@ -12,7 +12,7 @@ import { colors } from "../../theme";
 import AppHeader from "./AppHeader";
 
 interface AuthScreenProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   onBack?: () => void;
   footer?: ReactNode;
@@ -32,7 +32,9 @@ export default function AuthScreen({
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <AppHeader title={title} subtitle={subtitle} onBack={onBack} />
+        {title ? (
+          <AppHeader title={title} subtitle={subtitle} onBack={onBack} />
+        ) : null}
 
         <ScrollView
           contentContainerStyle={styles.content}
