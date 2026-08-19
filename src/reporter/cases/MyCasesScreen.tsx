@@ -22,7 +22,7 @@ import { colors } from "../../theme";
 import { logoutReporter } from "../login";
 import { filterReporterCases } from "./filterReporterCases";
 import { getReporterCases } from "./getReporterCases";
-import ReporterCaseCard from "./ReporterCaseCard";
+import { PressableReporterCaseCard } from "./ReporterCaseCard";
 import {
   ACTIVE_STATUSES,
   CaseListTab,
@@ -224,7 +224,15 @@ export default function MyCasesScreen() {
         {!loading && !errorMessage
           ? visibleCases.map((item) => (
               <View key={item.id} style={styles.cardWrap}>
-                <ReporterCaseCard record={item} />
+                <PressableReporterCaseCard
+                  record={item}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/reporter/cases/[id]",
+                      params: { id: item.id },
+                    })
+                  }
+                />
               </View>
             ))
           : null}

@@ -25,6 +25,8 @@ function asStatus(value: string): ReporterCaseStatus {
     : "submitted";
 }
 
+export { asStatus };
+
 export async function getReporterCases(): Promise<GetReporterCasesResult> {
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getUser();
