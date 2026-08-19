@@ -1,3 +1,5 @@
+import { PendingEvidenceFile } from "../evidence/types";
+
 export type ReportingMode = "identified" | "anonymous";
 export type OngoingStatus = "yes" | "no" | "unsure";
 export type VictimRelation = "self" | "other";
@@ -34,6 +36,7 @@ export interface CaseDraft {
   discreetNotifications: boolean;
   stripLocationData: boolean;
   contactMethod: ContactMethod;
+  pendingEvidence: PendingEvidenceFile[];
 }
 
 export const initialCaseDraft: CaseDraft = {
@@ -61,6 +64,7 @@ export const initialCaseDraft: CaseDraft = {
   discreetNotifications: true,
   stripLocationData: false,
   contactMethod: "app",
+  pendingEvidence: [],
 };
 
 export interface SubmittedCase {
@@ -68,4 +72,5 @@ export interface SubmittedCase {
   caseReference: string;
   submittedAt: string;
   reportingMode: ReportingMode;
+  evidenceWarning?: string;
 }
