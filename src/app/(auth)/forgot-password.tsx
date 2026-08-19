@@ -1,6 +1,8 @@
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,15 +14,67 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
 
-  const [recoveryValue, setRecoveryValue] =
-    useState("");
-  const [method, setMethod] =
-    useState<"email" | "sms">("email");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const handleSendResetLink = async () => {
+    if (loading) {
+      return;
+    }
+
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setErrorMessage("Please enter your email address.");
+      return;
+    }
+
+    if (!EMAIL_PATTERN.test(cleanEmail)) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const redirectTo = Linking.createURL("reset-password");
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSuccessMessage(
+        "If an account exists for this email, a secure password-recovery link has been sent. Check your inbox and spam folder.",
+      );
+    } catch (error) {
+      console.error("Password recovery request failed:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to send the recovery email. Please try again.";
+
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -32,13 +86,13 @@ export default function ForgotPasswordScreen() {
           <Pressable
             onPress={() => router.back()}
             style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <Text style={styles.backText}>‹</Text>
           </Pressable>
 
-          <Text style={styles.headerTitle}>
-            Reset your password
-          </Text>
+          <Text style={styles.headerTitle}>Reset your password</Text>
         </View>
 
         <ScrollView
@@ -50,115 +104,98 @@ export default function ForgotPasswordScreen() {
               <Text style={styles.icon}>🔑</Text>
             </View>
 
-            <Text style={styles.title}>
-              We will help you get back in
-            </Text>
+            <Text style={styles.title}>We will help you get back in</Text>
 
             <Text style={styles.description}>
-              Enter the email or mobile number linked to
-              your account. Your cases and evidence stay
-              secure while you reset.
+              Enter the email linked to your account. Your cases and evidence
+              stay secure while you reset your password.
             </Text>
 
-            <Text style={styles.label}>
-              Email or mobile number
-            </Text>
+            <Text style={styles.label}>Email address</Text>
 
             <TextInput
-              value={recoveryValue}
-              onChangeText={setRecoveryValue}
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                setErrorMessage("");
+                setSuccessMessage("");
+              }}
               placeholder="you@example.com"
               placeholderTextColor={colors.textSoft}
+              keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              editable={!loading}
+              onSubmitEditing={handleSendResetLink}
+              returnKeyType="send"
               style={styles.input}
             />
+
+            {errorMessage !== "" && (
+              <View style={styles.errorBox} accessibilityRole="alert">
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+
+            {successMessage !== "" && (
+              <View style={styles.successBox} accessibilityRole="alert">
+                <Text style={styles.successText}>{successMessage}</Text>
+              </View>
+            )}
           </View>
 
-          <Text style={styles.sectionTitle}>
-            Where should we send the reset link?
-          </Text>
+          <View style={styles.deliveryCard}>
+            <View style={styles.deliveryIconBox}>
+              <Text style={styles.deliveryIcon}>✉</Text>
+            </View>
 
-          <ChoiceCard
-            selected={method === "email"}
-            title="Email"
-            description="a•••••a@example.org"
-            onPress={() => setMethod("email")}
-          />
+            <View style={styles.deliveryText}>
+              <Text style={styles.deliveryTitle}>Recovery by email</Text>
 
-          <ChoiceCard
-            selected={method === "sms"}
-            title="SMS"
-            description="+94 7X XXX 4412"
-            onPress={() => setMethod("sms")}
-          />
+              <Text style={styles.deliveryDescription}>
+                Open the link in the email on this device to create your new
+                password.
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.notice}>
             <Text style={styles.noticeIcon}>🔒</Text>
 
             <Text style={styles.noticeText}>
-              For your safety, the reset link expires after
-              15 minutes and can be used once.
+              For your safety, recovery links expire and cannot be reused after
+              the password is changed.
             </Text>
           </View>
+
+          <Pressable
+            onPress={() => router.replace("/login")}
+            style={styles.signInLink}
+            accessibilityRole="button"
+          >
+            <Text style={styles.signInLinkText}>Back to sign in</Text>
+          </Pressable>
         </ScrollView>
 
         <View style={styles.footer}>
           <Pressable
-            onPress={() =>
-              router.push("/reset-password")
-            }
-            style={styles.primaryButton}
+            onPress={handleSendResetLink}
+            disabled={loading}
+            style={[styles.primaryButton, loading && styles.disabled]}
           >
-            <Text style={styles.primaryText}>
-              Send reset link
-            </Text>
+            {loading ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text style={styles.primaryText}>
+                {successMessage ? "Send another link" : "Send reset link"}
+              </Text>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
-function ChoiceCard({
-  selected,
-  title,
-  description,
-  onPress,
-}: {
-  selected: boolean;
-  title: string;
-  description: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      style={[
-        styles.choiceCard,
-        selected && styles.choiceCardSelected,
-      ]}
-    >
-      <View style={styles.choiceText}>
-        <Text style={styles.choiceTitle}>
-          {title}
-        </Text>
-
-        <Text style={styles.choiceDescription}>
-          {description}
-        </Text>
-      </View>
-
-      <View
-        style={[
-          styles.radio,
-          selected && styles.radioSelected,
-        ]}
-      >
-        {selected && <View style={styles.radioDot} />}
-      </View>
-    </Pressable>
   );
 }
 
@@ -176,12 +213,9 @@ const styles = StyleSheet.create({
     minHeight: 62,
     flexDirection: "row",
     alignItems: "center",
-
     paddingHorizontal: 14,
-
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-
     backgroundColor: colors.surface,
   },
 
@@ -205,6 +239,7 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 16,
+    paddingBottom: 28,
   },
 
   card: {
@@ -219,10 +254,8 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-
     alignItems: "center",
     justifyContent: "center",
-
     backgroundColor: colors.royal[50],
   },
 
@@ -247,107 +280,104 @@ const styles = StyleSheet.create({
   label: {
     marginTop: 18,
     marginBottom: 6,
-
     fontSize: 13,
     fontWeight: "600",
-
     color: colors.navy[800],
   },
 
   input: {
     minHeight: 48,
     paddingHorizontal: 14,
-
     borderWidth: 1,
     borderColor: colors.navy[200],
     borderRadius: 12,
-
     fontSize: 14,
     color: colors.navy[800],
-
     backgroundColor: colors.surface,
   },
 
-  sectionTitle: {
-    marginTop: 18,
-    marginBottom: 8,
-
-    fontSize: 13,
-    fontWeight: "600",
-
-    color: colors.navy[800],
+  errorBox: {
+    marginTop: 12,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 10,
+    backgroundColor: "#FFF2F1",
   },
 
-  choiceCard: {
-    minHeight: 68,
+  errorText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.error,
+  },
 
+  successBox: {
+    marginTop: 12,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: colors.teal[200],
+    borderRadius: 10,
+    backgroundColor: colors.teal[50],
+  },
+
+  successText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.success,
+  },
+
+  deliveryCard: {
+    minHeight: 76,
     flexDirection: "row",
     alignItems: "center",
-
-    marginBottom: 9,
+    marginTop: 16,
     paddingHorizontal: 14,
-
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.royal[300],
     borderRadius: 14,
-
-    backgroundColor: colors.surface,
-  },
-
-  choiceCardSelected: {
-    borderColor: colors.royal[500],
     backgroundColor: colors.royal[50],
   },
 
-  choiceText: {
-    flex: 1,
+  deliveryIconBox: {
+    width: 36,
+    height: 36,
+    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: colors.surface,
   },
 
-  choiceTitle: {
+  deliveryIcon: {
+    fontSize: 18,
+    color: colors.royal[700],
+  },
+
+  deliveryText: {
+    flex: 1,
+    paddingVertical: 12,
+  },
+
+  deliveryTitle: {
     fontSize: 13.5,
     fontWeight: "600",
     color: colors.navy[800],
   },
 
-  choiceDescription: {
-    marginTop: 2,
+  deliveryDescription: {
+    marginTop: 3,
     fontSize: 12,
+    lineHeight: 17,
     color: colors.textSecondary,
-  },
-
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    borderWidth: 2,
-    borderColor: colors.navy[300],
-  },
-
-  radioSelected: {
-    borderColor: colors.royal[700],
-  },
-
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.royal[700],
   },
 
   notice: {
     marginTop: 10,
     flexDirection: "row",
-
     padding: 14,
-
     borderWidth: 1,
     borderColor: colors.teal[100],
     borderRadius: 14,
-
     backgroundColor: colors.teal[50],
   },
 
@@ -362,24 +392,36 @@ const styles = StyleSheet.create({
     color: colors.teal[800],
   },
 
+  signInLink: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+
+  signInLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.royal[700],
+  },
+
   footer: {
     padding: 14,
-
     borderTopWidth: 1,
     borderTopColor: colors.border,
-
     backgroundColor: colors.surface,
   },
 
   primaryButton: {
     minHeight: 50,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderRadius: 12,
-
     backgroundColor: colors.royal[700],
+  },
+
+  disabled: {
+    opacity: 0.6,
   },
 
   primaryText: {
