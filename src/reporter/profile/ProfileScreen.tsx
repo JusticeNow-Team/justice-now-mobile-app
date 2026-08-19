@@ -156,7 +156,7 @@ export default function ProfileScreen() {
                 label="Security & sessions"
                 hint="Password, two-factor, active devices"
                 last
-                onPress={() => comingSoon("Security & sessions")}
+                onPress={() => router.push("/reporter/profile/security")}
               />
             </View>
 
