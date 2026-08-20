@@ -60,14 +60,6 @@ type StatusHistory = {
   changed_at: string;
 };
 
-type CaseTimelineEvent = {
-  id: string;
-  event_type: string;
-  title: string;
-  description: string | null;
-  created_at: string;
-};
-
 type InformationAnswer = {
   question: string;
   answer: string;
@@ -145,16 +137,11 @@ export default function CaseDetailsScreen() {
   const caseId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [caseData, setCaseData] = useState<JusticeCase | null>(null);
-
   const [notes, setNotes] = useState<InvestigationNote[]>([]);
   const [history, setHistory] = useState<StatusHistory[]>([]);
-
-  const [timelineEvents, setTimelineEvents] = useState<CaseTimelineEvent[]>([]);
-
   const [informationRequests, setInformationRequests] = useState<
     InformationRequestRecord[]
   >([]);
-
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -204,20 +191,20 @@ export default function CaseDetailsScreen() {
           .from("cases")
           .select(
             `
-                id,
-                case_reference,
-                reporter_id,
-                title,
-                description,
-                category,
-                incident_date,
-                district,
-                status,
-                priority,
-                is_anonymous,
-                created_at,
-                updated_at
-              `,
+              id,
+              case_reference,
+              reporter_id,
+              title,
+              description,
+              category,
+              incident_date,
+              district,
+              status,
+              priority,
+              is_anonymous,
+              created_at,
+              updated_at
+            `,
           )
           .eq("id", caseId)
           .single();
@@ -233,12 +220,12 @@ export default function CaseDetailsScreen() {
           .from("investigation_notes")
           .select(
             `
-                id,
-                case_id,
-                officer_id,
-                note_text,
-                created_at
-              `,
+              id,
+              case_id,
+              officer_id,
+              note_text,
+              created_at
+            `,
           )
           .eq("case_id", caseId)
           .order("created_at", {
@@ -255,11 +242,11 @@ export default function CaseDetailsScreen() {
           .from("case_status_history")
           .select(
             `
-                id,
-                old_status,
-                new_status,
-                changed_at
-              `,
+              id,
+              old_status,
+              new_status,
+              changed_at
+            `,
           )
           .eq("case_id", caseId)
           .order("changed_at", {
@@ -272,42 +259,26 @@ export default function CaseDetailsScreen() {
           setHistory((historyData ?? []) as StatusHistory[]);
         }
 
-        const { data: timelineData, error: timelineError } = await supabase
-          .from("case_timeline_events")
-          .select("id, event_type, title, description, created_at")
-          .eq("case_id", caseId)
-          .order("created_at", {
-            ascending: false,
-          });
-
-        if (timelineError) {
-          console.error("CASE TIMELINE ERROR:", timelineError);
-
-          setTimelineEvents([]);
-        } else {
-          setTimelineEvents((timelineData ?? []) as CaseTimelineEvent[]);
-        }
-
         const { data: requestData, error: requestError } = await supabase
           .from("case_information_requests")
           .select(
             `
+              id,
+              title,
+              message,
+              requested_items,
+              requires_evidence,
+              due_date,
+              status,
+              sent_at,
+              responded_at,
+              case_information_responses (
                 id,
-                title,
-                message,
-                requested_items,
-                requires_evidence,
-                due_date,
-                status,
-                sent_at,
-                responded_at,
-                case_information_responses (
-                  id,
-                  answers,
-                  additional_message,
-                  submitted_at
-                )
-              `,
+                answers,
+                additional_message,
+                submitted_at
+              )
+            `,
           )
           .eq("case_id", caseId)
           .order("created_at", {
@@ -316,7 +287,6 @@ export default function CaseDetailsScreen() {
 
         if (requestError) {
           console.error("INFORMATION REQUEST HISTORY ERROR:", requestError);
-
           setInformationRequests([]);
         } else {
           const records: InformationRequestRecord[] = (requestData ?? []).map(
@@ -392,7 +362,6 @@ export default function CaseDetailsScreen() {
         "Note required",
         "Enter an investigation note before saving.",
       );
-
       return;
     }
 
@@ -878,8 +847,8 @@ export default function CaseDetailsScreen() {
             <Text style={styles.evidenceButtonTitle}>Review Evidence</Text>
 
             <Text style={styles.evidenceButtonText}>
-              View evidence submitted for this case, assign pending evidence to
-              an Evidence Checker, and record investigation findings.
+              View evidence submitted for this case and record your
+              investigation findings.
             </Text>
           </View>
 
@@ -1031,46 +1000,6 @@ export default function CaseDetailsScreen() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Case timeline</Text>
-
-        <View style={styles.sectionCard}>
-          {timelineEvents.length === 0 ? (
-            <Text style={styles.emptyHistoryText}>
-              No additional case events have been recorded yet.
-            </Text>
-          ) : (
-            timelineEvents.map((event, index) => (
-              <View key={event.id}>
-                <View style={styles.historyRow}>
-                  <View style={styles.timelineEventDot} />
-
-                  <View style={styles.historyContent}>
-                    <Text style={styles.timelineEventType}>
-                      {formatTimelineType(event.event_type)}
-                    </Text>
-
-                    <Text style={styles.historyTitle}>{event.title}</Text>
-
-                    {event.description ? (
-                      <Text style={styles.timelineEventDescription}>
-                        {event.description}
-                      </Text>
-                    ) : null}
-
-                    <Text style={styles.historyDate}>
-                      {formatDateTime(event.created_at)}
-                    </Text>
-                  </View>
-                </View>
-
-                {index < timelineEvents.length - 1 ? (
-                  <View style={styles.historyDivider} />
-                ) : null}
-              </View>
-            ))
-          )}
-        </View>
-
         <View style={styles.securityNotice}>
           <Text style={styles.securityIcon}>🔒</Text>
 
@@ -1101,13 +1030,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function Divider() {
   return <View style={styles.divider} />;
-}
-
-function formatTimelineType(value: string) {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function StatusBadge({ status }: { status: CaseStatus }) {
@@ -1149,28 +1071,20 @@ function formatStatus(status: CaseStatus | null) {
   switch (status) {
     case "under_review":
       return "Under review";
-
     case "awaiting_evidence":
       return "Awaiting evidence";
-
     case "awaiting_information":
       return "Awaiting information";
-
     case "investigating":
       return "Investigating";
-
     case "submitted":
       return "Submitted";
-
     case "assigned":
       return "Assigned";
-
     case "resolved":
       return "Resolved";
-
     case "closed":
       return "Closed";
-
     default:
       return status;
   }
@@ -1193,20 +1107,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-
   loadingContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.background,
   },
-
   loadingText: {
     marginTop: 12,
     fontSize: 13,
     color: colors.textSecondary,
   },
-
   header: {
     minHeight: 66,
     flexDirection: "row",
@@ -1216,59 +1127,49 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-
   backButton: {
     width: 42,
     height: 42,
     alignItems: "center",
     justifyContent: "center",
   },
-
   backText: {
     fontSize: 32,
     color: colors.navy[700],
   },
-
   headerContent: {
     flex: 1,
   },
-
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   headerSubtitle: {
     marginTop: 2,
     fontSize: 11.5,
     color: colors.textSecondary,
   },
-
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
   },
-
   caseHeaderCard: {
     padding: 18,
     borderRadius: 17,
     backgroundColor: colors.navy[800],
   },
-
   caseTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   reference: {
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.5,
     color: "#BBD0E8",
   },
-
   caseTitle: {
     marginTop: 10,
     marginBottom: 12,
@@ -1277,7 +1178,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     color: colors.textInverse,
   },
-
   currentStatus: {
     alignSelf: "flex-start",
     flexDirection: "row",
@@ -1287,7 +1187,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.12)",
   },
-
   statusDot: {
     width: 7,
     height: 7,
@@ -1295,38 +1194,31 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.teal[300],
   },
-
   currentStatusText: {
     fontSize: 10.5,
     fontWeight: "700",
     color: colors.textInverse,
   },
-
   priorityBadge: {
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 9,
     backgroundColor: colors.royal[50],
   },
-
   priorityHigh: {
     backgroundColor: colors.gold[50],
   },
-
   priorityUrgent: {
     backgroundColor: "#FFF0EF",
   },
-
   priorityText: {
     fontSize: 10,
     fontWeight: "700",
     color: colors.navy[700],
   },
-
   priorityUrgentText: {
     color: colors.error,
   },
-
   sectionTitle: {
     marginTop: 23,
     marginBottom: 9,
@@ -1334,7 +1226,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   sectionCard: {
     padding: 15,
     borderWidth: 1,
@@ -1342,19 +1233,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surface,
   },
-
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 15,
   },
-
   detailLabel: {
     flex: 1,
     fontSize: 11.5,
     color: colors.textSecondary,
   },
-
   detailValue: {
     flex: 1.4,
     textAlign: "right",
@@ -1362,19 +1250,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.navy[800],
   },
-
   divider: {
     height: 1,
     marginVertical: 12,
     backgroundColor: colors.border,
   },
-
   descriptionText: {
     fontSize: 12.5,
     lineHeight: 19,
     color: colors.navy[700],
   },
-
   evidenceButton: {
     minHeight: 82,
     flexDirection: "row",
@@ -1385,11 +1270,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.royal[50],
   },
-
   evidenceButtonPressed: {
     opacity: 0.82,
   },
-
   evidenceIconBox: {
     width: 44,
     height: 44,
@@ -1399,34 +1282,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.surface,
   },
-
   evidenceIcon: {
     fontSize: 19,
   },
-
   evidenceContent: {
     flex: 1,
   },
-
   evidenceButtonTitle: {
     fontSize: 13.5,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   evidenceButtonText: {
     marginTop: 3,
     fontSize: 11,
     lineHeight: 16,
     color: colors.textSecondary,
   },
-
   evidenceArrow: {
     marginLeft: 8,
     fontSize: 27,
     color: colors.royal[700],
   },
-
   requestHistoryCard: {
     marginBottom: 10,
     padding: 15,
@@ -1435,65 +1312,55 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surface,
   },
-
   requestHistoryHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
   },
-
   requestHistoryStatus: {
     fontSize: 9.5,
     fontWeight: "800",
     letterSpacing: 0.5,
     color: colors.warning,
   },
-
   requestHistoryResponded: {
     color: colors.success,
   },
-
   requestHistoryDate: {
     fontSize: 9.5,
     color: colors.textSoft,
   },
-
   requestHistoryTitle: {
     marginTop: 9,
     fontSize: 14,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   requestHistoryMessage: {
     marginTop: 5,
     fontSize: 11.5,
     lineHeight: 17,
     color: colors.textSecondary,
   },
-
   requestedItemsBox: {
     marginTop: 12,
     padding: 11,
     borderRadius: 10,
     backgroundColor: colors.navy[50],
   },
-
   requestedItemsLabel: {
     marginBottom: 6,
     fontSize: 10.5,
     fontWeight: "700",
     color: colors.navy[700],
   },
-
   requestedItemText: {
     marginTop: 3,
     fontSize: 10.5,
     lineHeight: 16,
     color: colors.textSecondary,
   },
-
   requestHistoryMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1501,12 +1368,10 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
   },
-
   requestHistoryMeta: {
     fontSize: 10,
     color: colors.textSoft,
   },
-
   reporterResponseBox: {
     marginTop: 13,
     padding: 12,
@@ -1515,45 +1380,38 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: colors.teal[50],
   },
-
   reporterResponseHeading: {
     fontSize: 12,
     fontWeight: "800",
     color: colors.teal[800],
   },
-
   reporterResponseDate: {
     marginTop: 2,
     marginBottom: 10,
     fontSize: 9.5,
     color: colors.textSoft,
   },
-
   reporterAnswerItem: {
     marginBottom: 11,
   },
-
   reporterAnswerQuestion: {
     fontSize: 10.5,
     fontWeight: "700",
     lineHeight: 15,
     color: colors.navy[700],
   },
-
   reporterResponseText: {
     marginTop: 3,
     fontSize: 11.5,
     lineHeight: 17,
     color: colors.navy[800],
   },
-
   additionalMessageBox: {
     marginTop: 4,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: colors.teal[100],
   },
-
   responseEvidenceButton: {
     minHeight: 38,
     marginTop: 12,
@@ -1562,38 +1420,32 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: colors.royal[700],
   },
-
   r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8: {
     fontSize: 10.5,
     fontWeight: "700",
     color: colors.textInverse,
   },
-
   awaitingResponseBox: {
     marginTop: 12,
     padding: 11,
     borderRadius: 10,
     backgroundColor: colors.gold[50],
   },
-
   awaitingResponseText: {
     fontSize: 10.5,
     lineHeight: 16,
     color: colors.textSecondary,
   },
-
   statusHelp: {
     fontSize: 11.5,
     color: colors.textSecondary,
   },
-
   statusOptions: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 7,
     marginTop: 12,
   },
-
   statusOption: {
     minHeight: 38,
     paddingHorizontal: 12,
@@ -1604,26 +1456,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.surface,
   },
-
   statusOptionActive: {
     borderColor: colors.royal[700],
     backgroundColor: colors.royal[700],
   },
-
   statusOptionText: {
     fontSize: 11,
     fontWeight: "600",
     color: colors.navy[700],
   },
-
   statusOptionTextActive: {
     color: colors.textInverse,
   },
-
   statusLoading: {
     marginTop: 12,
   },
-
   noteComposer: {
     padding: 15,
     borderWidth: 1,
@@ -1631,14 +1478,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surface,
   },
-
   noteLabel: {
     marginBottom: 8,
     fontSize: 12.5,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   noteInput: {
     minHeight: 120,
     padding: 12,
@@ -1650,19 +1495,16 @@ const styles = StyleSheet.create({
     color: colors.navy[800],
     backgroundColor: colors.background,
   },
-
   noteBottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 10,
   },
-
   characterCount: {
     fontSize: 10,
     color: colors.textSoft,
   },
-
   saveNoteButton: {
     minHeight: 40,
     minWidth: 105,
@@ -1672,17 +1514,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.royal[700],
   },
-
   saveNoteText: {
     fontSize: 11.5,
     fontWeight: "700",
     color: colors.textInverse,
   },
-
   disabledButton: {
     opacity: 0.55,
   },
-
   noteCard: {
     marginTop: 9,
     padding: 14,
@@ -1691,32 +1530,27 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: colors.surface,
   },
-
   noteHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 10,
   },
-
   noteOfficer: {
     fontSize: 10.5,
     fontWeight: "700",
     color: colors.royal[700],
   },
-
   noteDate: {
     fontSize: 9.5,
     color: colors.textSoft,
   },
-
   noteText: {
     marginTop: 8,
     fontSize: 12,
     lineHeight: 18,
     color: colors.navy[700],
   },
-
   emptyCard: {
     padding: 20,
     alignItems: "center",
@@ -1725,18 +1559,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surface,
   },
-
   emptyIcon: {
     fontSize: 24,
   },
-
   emptyTitle: {
     marginTop: 8,
     fontSize: 13,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   emptyText: {
     marginTop: 4,
     textAlign: "center",
@@ -1744,12 +1575,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: colors.textSecondary,
   },
-
   historyRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
-
   timelineDot: {
     width: 9,
     height: 9,
@@ -1758,59 +1587,29 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.royal[600],
   },
-
-  timelineEventDot: {
-    width: 9,
-    height: 9,
-    marginTop: 4,
-    marginRight: 10,
-    borderRadius: 5,
-    backgroundColor: colors.teal[600],
-  },
-
-  timelineEventType: {
-    marginBottom: 3,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-    color: colors.teal[700],
-  },
-
-  timelineEventDescription: {
-    marginTop: 3,
-    fontSize: 10.5,
-    lineHeight: 16,
-    color: colors.textSecondary,
-  },
-
   historyContent: {
     flex: 1,
   },
-
   historyTitle: {
     fontSize: 11.5,
     fontWeight: "600",
     color: colors.navy[800],
   },
-
   historyDate: {
     marginTop: 3,
     fontSize: 10,
     color: colors.textSoft,
   },
-
   historyDivider: {
     height: 1,
     marginVertical: 12,
     backgroundColor: colors.border,
   },
-
   emptyHistoryText: {
     textAlign: "center",
     fontSize: 11.5,
     color: colors.textSecondary,
   },
-
   securityNotice: {
     flexDirection: "row",
     marginTop: 20,
@@ -1820,46 +1619,38 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.teal[50],
   },
-
   securityIcon: {
     marginRight: 9,
   },
-
   securityContent: {
     flex: 1,
   },
-
   securityTitle: {
     fontSize: 12,
     fontWeight: "700",
     color: colors.teal[800],
   },
-
   securityText: {
     marginTop: 3,
     fontSize: 11,
     lineHeight: 16,
     color: colors.textSecondary,
   },
-
   errorContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 30,
   },
-
   errorIcon: {
     fontSize: 30,
   },
-
   errorTitle: {
     marginTop: 10,
     fontSize: 16,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   errorText: {
     marginTop: 6,
     textAlign: "center",
@@ -1867,7 +1658,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.textSecondary,
   },
-
   retryButton: {
     minHeight: 44,
     marginTop: 18,
@@ -1876,7 +1666,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.royal[700],
   },
-
   retryText: {
     fontSize: 12,
     fontWeight: "700",
