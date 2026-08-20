@@ -164,6 +164,78 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     },
     description: "Zero-byte corrupted image file upload.",
   },
+  {
+    id: "EVD-2026-9048",
+    caseId: "CASE-2026-0812",
+    reporterId: "REP-4402",
+    fileName: "file:///C:/Users/kavin/Documents/confidential_scan.png", // Exposed Local Server Path!
+    fileType: "image/png",
+    evidenceType: "image",
+    fileSizeBytes: 3100000,
+    uploadDate: "2026-08-20T20:00:00Z",
+    validationStatus: "pending",
+    localPathExposed: true,
+    storageBucket: "case-evidence",
+    storagePath: "file:///C:/Users/kavin/Documents/confidential_scan.png",
+    caseInfo: {
+      id: "CASE-2026-0812",
+      caseReference: "JN-2026-0812",
+      title: "Arbitrary Detention at Checkpoint #4",
+    },
+    reporterInfo: {
+      id: "REP-4402",
+      fullName: "Elena Rostova",
+    },
+    description: "Upload contained raw un-sanitized local device path.",
+  },
+  {
+    id: "EVD-2026-9049",
+    caseId: "CASE-2026-0835",
+    reporterId: "REP-6109",
+    fileName: "public_access_photo.jpg",
+    fileType: "image/jpeg",
+    evidenceType: "image",
+    fileSizeBytes: 2800000,
+    uploadDate: "2026-08-20T20:30:00Z",
+    validationStatus: "pending",
+    isPrivateBucket: false, // Public bucket exposure!
+    storageBucket: "public-web-assets",
+    storagePath: "public/unprotected_photo.jpg",
+    caseInfo: {
+      id: "CASE-2026-0835",
+      caseReference: "JN-2026-0835",
+      title: "Public Event Demonstration",
+    },
+    reporterInfo: {
+      id: "REP-6109",
+      fullName: "Jordan Lee",
+    },
+    description: "Evidence stored in an unencrypted public Web assets bucket.",
+  },
+  {
+    id: "EVD-2026-9050",
+    caseId: "CASE-2026-0840",
+    reporterId: "REP-7720",
+    fileName: "deleted_storage_object.pdf",
+    fileType: "application/pdf",
+    evidenceType: "document",
+    fileSizeBytes: 1200000,
+    uploadDate: "2026-08-20T21:00:00Z",
+    validationStatus: "pending",
+    fileExistsInStorage: false, // Missing file error!
+    storageBucket: "case-evidence",
+    storagePath: "CASE-2026-0840/EVD-2026-9050_deleted_storage_object.pdf",
+    caseInfo: {
+      id: "CASE-2026-0840",
+      caseReference: "JN-2026-0840",
+      title: "Missing Storage Asset Audit",
+    },
+    reporterInfo: {
+      id: "REP-7720",
+      fullName: "Samira Khan",
+    },
+    description: "Database reference exists but object missing from storage vault.",
+  },
 ];
 
 let inMemoryStore: EvidenceRecord[] = [...INITIAL_MOCK_EVIDENCE];

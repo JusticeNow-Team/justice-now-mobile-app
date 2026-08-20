@@ -19,6 +19,7 @@ import {
   CheckerFilterTab,
   CheckerSummaryStats,
   EvidenceRecord,
+  EvidenceValidationStatus,
 } from "../../checker/types";
 import { colors } from "../../theme";
 
@@ -71,10 +72,14 @@ export default function EvidenceCheckerDashboard() {
     let validatedCount = 0;
     let rejectedCount = 0;
     let invalidMetadataCount = 0;
+    let storageInsecureCount = 0;
 
     validatedRecords.forEach(({ record, validation }) => {
       if (!validation.isValid) {
         invalidMetadataCount++;
+      }
+      if (!validation.isStorageSecure) {
+        storageInsecureCount++;
       }
       if (record.validationStatus === "pending") {
         pendingCount++;
@@ -91,6 +96,7 @@ export default function EvidenceCheckerDashboard() {
       validatedCount,
       rejectedCount,
       invalidMetadataCount,
+      storageInsecureCount,
     };
   }, [validatedRecords, records]);
 
@@ -102,6 +108,7 @@ export default function EvidenceCheckerDashboard() {
       if (activeTab === "validated" && record.validationStatus !== "validated") return false;
       if (activeTab === "rejected" && record.validationStatus !== "rejected") return false;
       if (activeTab === "invalid_metadata" && validation.isValid) return false;
+      if (activeTab === "storage_insecure" && validation.isStorageSecure) return false;
 
       // Search filter
       if (!searchQuery.trim()) return true;
@@ -132,7 +139,7 @@ export default function EvidenceCheckerDashboard() {
             </View>
             <Text style={styles.headerTitle}>Evidence Metadata Audit</Text>
             <Text style={styles.headerSubtitle}>
-              Validate evidence completeness, case links & file integrity
+              Validate evidence completeness, case links & secure storage
             </Text>
           </View>
 
@@ -185,10 +192,10 @@ export default function EvidenceCheckerDashboard() {
         <View style={styles.statDivider} />
 
         <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: colors.error }]}>
-            {stats.invalidMetadataCount}
+          <Text style={[styles.statValue, { color: "#DC2626" }]}>
+            {stats.storageInsecureCount}
           </Text>
-          <Text style={styles.statLabel}>Invalid Meta (#7)</Text>
+          <Text style={styles.statLabel}>Storage Risk</Text>
         </View>
       </View>
 
@@ -210,9 +217,10 @@ export default function EvidenceCheckerDashboard() {
           onPress={() => setActiveTab("validated")}
         />
         <TabButton
-          label={`Rejected (${stats.rejectedCount})`}
-          active={activeTab === "rejected"}
-          onPress={() => setActiveTab("rejected")}
+          label={`Insecure (${stats.storageInsecureCount})`}
+          active={activeTab === "storage_insecure"}
+          onPress={() => setActiveTab("storage_insecure")}
+          isErrorTab
         />
         <TabButton
           label={`Errors (${stats.invalidMetadataCount})`}
