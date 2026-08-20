@@ -1,8 +1,13 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -138,20 +143,20 @@ export default function CaseDetailsScreen() {
           .from("cases")
           .select(
             `
-                id,
-                case_reference,
-                reporter_id,
-                title,
-                description,
-                category,
-                incident_date,
-                district,
-                status,
-                priority,
-                is_anonymous,
-                created_at,
-                updated_at
-              `,
+              id,
+              case_reference,
+              reporter_id,
+              title,
+              description,
+              category,
+              incident_date,
+              district,
+              status,
+              priority,
+              is_anonymous,
+              created_at,
+              updated_at
+            `,
           )
           .eq("id", caseId)
           .single();
@@ -167,12 +172,12 @@ export default function CaseDetailsScreen() {
           .from("investigation_notes")
           .select(
             `
-                id,
-                case_id,
-                officer_id,
-                note_text,
-                created_at
-              `,
+              id,
+              case_id,
+              officer_id,
+              note_text,
+              created_at
+            `,
           )
           .eq("case_id", caseId)
           .order("created_at", {
@@ -189,11 +194,11 @@ export default function CaseDetailsScreen() {
           .from("case_status_history")
           .select(
             `
-                id,
-                old_status,
-                new_status,
-                changed_at
-              `,
+              id,
+              old_status,
+              new_status,
+              changed_at
+            `,
           )
           .eq("case_id", caseId)
           .order("changed_at", {
@@ -221,9 +226,12 @@ export default function CaseDetailsScreen() {
     [caseId, verifySecureSession],
   );
 
-  useEffect(() => {
-    void loadWorkspace();
-  }, [loadWorkspace]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadWorkspace();
+      return undefined;
+    }, [loadWorkspace]),
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -288,6 +296,53 @@ export default function CaseDetailsScreen() {
     }
   };
 
+  const performStatusUpdate = async (nextStatus: CaseStatus) => {
+    if (!caseId) {
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+
+      const { error } = await supabase.rpc("update_officer_case_status", {
+        p_case_id: caseId,
+        p_status: nextStatus,
+      });
+
+      if (error) {
+        if (Platform.OS === "web") {
+          window.alert(`Unable to update status: ${error.message}`);
+        } else {
+          Alert.alert("Unable to update status", error.message);
+        }
+
+        return;
+      }
+
+      await loadWorkspace(false);
+
+      const message = `Case status changed to ${formatStatus(nextStatus)}.`;
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Status updated", message);
+      }
+    } catch (error) {
+      console.error("STATUS UPDATE ERROR:", error);
+
+      const message = "JusticeNow could not update the case status.";
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Update failed", message);
+      }
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const updateStatus = (nextStatus: CaseStatus) => {
     if (!caseId || !caseData || updatingStatus) {
       return;
@@ -297,54 +352,30 @@ export default function CaseDetailsScreen() {
       return;
     }
 
-    Alert.alert(
-      "Update case status",
-      `Change this case from "${formatStatus(
-        caseData.status,
-      )}" to "${formatStatus(nextStatus)}"?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Update",
-          onPress: async () => {
-            try {
-              setUpdatingStatus(true);
+    const message = `Change this case from "${formatStatus(
+      caseData.status,
+    )}" to "${formatStatus(nextStatus)}"?`;
 
-              const { error } = await supabase
-                .from("cases")
-                .update({
-                  status: nextStatus,
-                })
-                .eq("id", caseId);
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(message);
 
-              if (error) {
-                Alert.alert("Unable to update status", error.message);
-                return;
-              }
+      if (confirmed) {
+        void performStatusUpdate(nextStatus);
+      }
 
-              await loadWorkspace(false);
+      return;
+    }
 
-              Alert.alert(
-                "Status updated",
-                `Case status changed to ${formatStatus(nextStatus)}.`,
-              );
-            } catch (error) {
-              console.error("STATUS UPDATE ERROR:", error);
-
-              Alert.alert(
-                "Update failed",
-                "JusticeNow could not update the case status.",
-              );
-            } finally {
-              setUpdatingStatus(false);
-            }
-          },
-        },
-      ],
-    );
+    Alert.alert("Update case status", message, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Update",
+        onPress: () => void performStatusUpdate(nextStatus),
+      },
+    ]);
   };
 
   if (loading) {
