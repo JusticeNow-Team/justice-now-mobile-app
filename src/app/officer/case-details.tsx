@@ -1,9 +1,9 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,7 +12,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { supabase } from "../../lib/supabase";
@@ -23,6 +22,7 @@ type CaseStatus =
   | "under_review"
   | "assigned"
   | "investigating"
+  | "awaiting_information"
   | "awaiting_evidence"
   | "resolved"
   | "closed";
@@ -32,6 +32,7 @@ type CasePriority = "low" | "medium" | "high" | "urgent";
 type JusticeCase = {
   id: string;
   case_reference: string;
+  reporter_id: string | null;
   title: string;
   description: string | null;
   category: string;
@@ -59,6 +60,31 @@ type StatusHistory = {
   changed_at: string;
 };
 
+type InformationAnswer = {
+  question: string;
+  answer: string;
+};
+
+type InformationResponse = {
+  id: string;
+  answers: InformationAnswer[];
+  additional_message: string | null;
+  submitted_at: string;
+};
+
+type InformationRequestRecord = {
+  id: string;
+  title: string;
+  message: string;
+  requested_items: string[];
+  requires_evidence: boolean;
+  due_date: string | null;
+  status: "draft" | "sent" | "responded" | "cancelled";
+  sent_at: string | null;
+  responded_at: string | null;
+  response: InformationResponse | null;
+};
+
 const STATUS_OPTIONS: {
   value: CaseStatus;
   label: string;
@@ -77,6 +103,30 @@ const STATUS_OPTIONS: {
   },
 ];
 
+function parseInformationAnswers(value: unknown): InformationAnswer[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (
+        item,
+      ): item is {
+        question: string;
+        answer: string;
+      } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { question?: unknown }).question === "string" &&
+        typeof (item as { answer?: unknown }).answer === "string",
+    )
+    .map((item) => ({
+      question: item.question,
+      answer: item.answer,
+    }));
+}
+
 export default function CaseDetailsScreen() {
   const router = useRouter();
 
@@ -87,26 +137,17 @@ export default function CaseDetailsScreen() {
   const caseId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [caseData, setCaseData] = useState<JusticeCase | null>(null);
-
   const [notes, setNotes] = useState<InvestigationNote[]>([]);
-
   const [history, setHistory] = useState<StatusHistory[]>([]);
-
+  const [informationRequests, setInformationRequests] = useState<
+    InformationRequestRecord[]
+  >([]);
   const [newNote, setNewNote] = useState("");
-
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
-
   const [savingNote, setSavingNote] = useState(false);
-
   const [updatingStatus, setUpdatingStatus] = useState(false);
-
   const [errorMessage, setErrorMessage] = useState("");
-
-  // -------------------------------------------------------
-  // Verify MFA
-  // -------------------------------------------------------
 
   const verifySecureSession = useCallback(async () => {
     const { data, error } =
@@ -114,29 +155,22 @@ export default function CaseDetailsScreen() {
 
     if (error) {
       console.error("AAL ERROR:", error);
-
       return false;
     }
 
     if (data.currentLevel !== "aal2") {
       router.replace("/two-factor");
-
       return false;
     }
 
     return true;
   }, [router]);
 
-  // -------------------------------------------------------
-  // Load Case Workspace
-  // -------------------------------------------------------
-
   const loadWorkspace = useCallback(
     async (showLoader = true) => {
       if (!caseId) {
         setErrorMessage("Case ID is missing.");
         setLoading(false);
-
         return;
       }
 
@@ -153,16 +187,13 @@ export default function CaseDetailsScreen() {
           return;
         }
 
-        // -------------------------------------------------
-        // Load Case
-        // -------------------------------------------------
-
         const { data: loadedCase, error: caseError } = await supabase
           .from("cases")
           .select(
             `
               id,
               case_reference,
+              reporter_id,
               title,
               description,
               category,
@@ -178,21 +209,12 @@ export default function CaseDetailsScreen() {
           .eq("id", caseId)
           .single();
 
-        console.log("CASE DETAILS:", loadedCase);
-
-        console.log("CASE DETAILS ERROR:", caseError);
-
         if (caseError) {
           setErrorMessage(caseError.message);
-
           return;
         }
 
         setCaseData(loadedCase as JusticeCase);
-
-        // -------------------------------------------------
-        // Investigation Notes
-        // -------------------------------------------------
 
         const { data: noteData, error: notesError } = await supabase
           .from("investigation_notes")
@@ -216,10 +238,6 @@ export default function CaseDetailsScreen() {
           setNotes((noteData ?? []) as InvestigationNote[]);
         }
 
-        // -------------------------------------------------
-        // Status History
-        // -------------------------------------------------
-
         const { data: historyData, error: historyError } = await supabase
           .from("case_status_history")
           .select(
@@ -240,6 +258,74 @@ export default function CaseDetailsScreen() {
         } else {
           setHistory((historyData ?? []) as StatusHistory[]);
         }
+
+        const { data: requestData, error: requestError } = await supabase
+          .from("case_information_requests")
+          .select(
+            `
+              id,
+              title,
+              message,
+              requested_items,
+              requires_evidence,
+              due_date,
+              status,
+              sent_at,
+              responded_at,
+              case_information_responses (
+                id,
+                answers,
+                additional_message,
+                submitted_at
+              )
+            `,
+          )
+          .eq("case_id", caseId)
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (requestError) {
+          console.error("INFORMATION REQUEST HISTORY ERROR:", requestError);
+          setInformationRequests([]);
+        } else {
+          const records: InformationRequestRecord[] = (requestData ?? []).map(
+            (requestItem) => {
+              const nestedResponses = Array.isArray(
+                requestItem.case_information_responses,
+              )
+                ? requestItem.case_information_responses
+                : requestItem.case_information_responses
+                  ? [requestItem.case_information_responses]
+                  : [];
+
+              const responseItem = nestedResponses[0];
+
+              return {
+                id: requestItem.id,
+                title: requestItem.title,
+                message: requestItem.message,
+                requested_items: requestItem.requested_items ?? [],
+                requires_evidence: Boolean(requestItem.requires_evidence),
+                due_date: requestItem.due_date,
+                status:
+                  requestItem.status as InformationRequestRecord["status"],
+                sent_at: requestItem.sent_at,
+                responded_at: requestItem.responded_at,
+                response: responseItem
+                  ? {
+                      id: responseItem.id,
+                      answers: parseInformationAnswers(responseItem.answers),
+                      additional_message: responseItem.additional_message,
+                      submitted_at: responseItem.submitted_at,
+                    }
+                  : null,
+              };
+            },
+          );
+
+          setInformationRequests(records);
+        }
       } catch (error) {
         console.error("LOAD CASE WORKSPACE ERROR:", error);
 
@@ -256,27 +342,17 @@ export default function CaseDetailsScreen() {
     [caseId, verifySecureSession],
   );
 
-  // -------------------------------------------------------
-  // Initial Load
-  // -------------------------------------------------------
-
-  useEffect(() => {
-    loadWorkspace();
-  }, [loadWorkspace]);
-
-  // -------------------------------------------------------
-  // Pull to Refresh
-  // -------------------------------------------------------
+  useFocusEffect(
+    useCallback(() => {
+      void loadWorkspace();
+      return undefined;
+    }, [loadWorkspace]),
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
-
-    loadWorkspace(false);
+    void loadWorkspace(false);
   };
-
-  // -------------------------------------------------------
-  // Add Investigation Note
-  // -------------------------------------------------------
 
   const addNote = async () => {
     const cleanNote = newNote.trim();
@@ -286,7 +362,6 @@ export default function CaseDetailsScreen() {
         "Note required",
         "Enter an investigation note before saving.",
       );
-
       return;
     }
 
@@ -304,7 +379,6 @@ export default function CaseDetailsScreen() {
 
       if (userError || !user) {
         router.replace("/secure-role");
-
         return;
       }
 
@@ -314,16 +388,12 @@ export default function CaseDetailsScreen() {
         note_text: cleanNote,
       });
 
-      console.log("ADD NOTE ERROR:", error);
-
       if (error) {
         Alert.alert("Unable to save note", error.message);
-
         return;
       }
 
       setNewNote("");
-
       await loadWorkspace(false);
 
       Alert.alert(
@@ -342,9 +412,52 @@ export default function CaseDetailsScreen() {
     }
   };
 
-  // -------------------------------------------------------
-  // Update Status
-  // -------------------------------------------------------
+  const performStatusUpdate = async (nextStatus: CaseStatus) => {
+    if (!caseId) {
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+
+      const { error } = await supabase.rpc("update_officer_case_status", {
+        p_case_id: caseId,
+        p_status: nextStatus,
+      });
+
+      if (error) {
+        if (Platform.OS === "web") {
+          window.alert(`Unable to update status: ${error.message}`);
+        } else {
+          Alert.alert("Unable to update status", error.message);
+        }
+
+        return;
+      }
+
+      await loadWorkspace(false);
+
+      const message = `Case status changed to ${formatStatus(nextStatus)}.`;
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Status updated", message);
+      }
+    } catch (error) {
+      console.error("STATUS UPDATE ERROR:", error);
+
+      const message = "JusticeNow could not update the case status.";
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Update failed", message);
+      }
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   const updateStatus = (nextStatus: CaseStatus) => {
     if (!caseId || !caseData || updatingStatus) {
@@ -355,64 +468,31 @@ export default function CaseDetailsScreen() {
       return;
     }
 
-    Alert.alert(
-      "Update case status",
-      `Change this case from "${formatStatus(
-        caseData.status,
-      )}" to "${formatStatus(nextStatus)}"?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+    const message = `Change this case from "${formatStatus(
+      caseData.status,
+    )}" to "${formatStatus(nextStatus)}"?`;
 
-        {
-          text: "Update",
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(message);
 
-          onPress: async () => {
-            try {
-              setUpdatingStatus(true);
+      if (confirmed) {
+        void performStatusUpdate(nextStatus);
+      }
 
-              const { error } = await supabase
-                .from("cases")
-                .update({
-                  status: nextStatus,
-                })
-                .eq("id", caseId);
+      return;
+    }
 
-              console.log("STATUS UPDATE ERROR:", error);
-
-              if (error) {
-                Alert.alert("Unable to update status", error.message);
-
-                return;
-              }
-
-              await loadWorkspace(false);
-
-              Alert.alert(
-                "Status updated",
-                `Case status changed to ${formatStatus(nextStatus)}.`,
-              );
-            } catch (error) {
-              console.error("STATUS UPDATE ERROR:", error);
-
-              Alert.alert(
-                "Update failed",
-                "JusticeNow could not update the case status.",
-              );
-            } finally {
-              setUpdatingStatus(false);
-            }
-          },
-        },
-      ],
-    );
+    Alert.alert("Update case status", message, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Update",
+        onPress: () => void performStatusUpdate(nextStatus),
+      },
+    ]);
   };
-
-  // -------------------------------------------------------
-  // Loading
-  // -------------------------------------------------------
 
   if (loading) {
     return (
@@ -423,10 +503,6 @@ export default function CaseDetailsScreen() {
       </SafeAreaView>
     );
   }
-
-  // -------------------------------------------------------
-  // Error
-  // -------------------------------------------------------
 
   if (errorMessage !== "" || !caseData) {
     return (
@@ -454,7 +530,7 @@ export default function CaseDetailsScreen() {
           </Text>
 
           <Pressable
-            onPress={() => loadWorkspace()}
+            onPress={() => void loadWorkspace()}
             accessibilityRole="button"
             style={styles.retryButton}
           >
@@ -465,14 +541,8 @@ export default function CaseDetailsScreen() {
     );
   }
 
-  // -------------------------------------------------------
-  // UI
-  // -------------------------------------------------------
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
@@ -486,9 +556,7 @@ export default function CaseDetailsScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Case Details</Text>
 
-          <Text style={styles.headerSubtitle}>
-            {caseData.case_reference}
-          </Text>
+          <Text style={styles.headerSubtitle}>{caseData.case_reference}</Text>
         </View>
       </View>
 
@@ -504,8 +572,6 @@ export default function CaseDetailsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Case Header */}
-
         <View style={styles.caseHeaderCard}>
           <View style={styles.caseTopRow}>
             <Text style={styles.reference}>{caseData.case_reference}</Text>
@@ -517,8 +583,6 @@ export default function CaseDetailsScreen() {
 
           <StatusBadge status={caseData.status} />
         </View>
-
-        {/* Case Information */}
 
         <Text style={styles.sectionTitle}>Case information</Text>
 
@@ -558,8 +622,6 @@ export default function CaseDetailsScreen() {
           />
         </View>
 
-        {/* Description */}
-
         <Text style={styles.sectionTitle}>Report description</Text>
 
         <View style={styles.sectionCard}>
@@ -568,9 +630,196 @@ export default function CaseDetailsScreen() {
           </Text>
         </View>
 
-        {/* =================================================
-            CASE EVIDENCE
-        ================================================= */}
+        {caseData.reporter_id && !caseData.is_anonymous && (
+          <>
+            <Text style={styles.sectionTitle}>Reporter communication</Text>
+
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/officer/request-information",
+                  params: {
+                    caseId: caseData.id,
+                  },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Request additional information from reporter"
+              style={({ pressed }) => [
+                styles.evidenceButton,
+                pressed && styles.evidenceButtonPressed,
+              ]}
+            >
+              <View style={styles.evidenceIconBox}>
+                <Text style={styles.evidenceIcon}>✉️</Text>
+              </View>
+
+              <View style={styles.evidenceContent}>
+                <Text style={styles.evidenceButtonTitle}>
+                  Request Additional Information
+                </Text>
+
+                <Text style={styles.evidenceButtonText}>
+                  Send a secure, structured request to the registered Reporter
+                  assigned to this case.
+                </Text>
+              </View>
+
+              <Text style={styles.evidenceArrow}>›</Text>
+            </Pressable>
+          </>
+        )}
+
+        <Text style={styles.sectionTitle}>Information request history</Text>
+
+        {informationRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>✉️</Text>
+
+            <Text style={styles.emptyTitle}>No information requests</Text>
+
+            <Text style={styles.emptyText}>
+              Requests sent to the Reporter and their responses will appear
+              here.
+            </Text>
+          </View>
+        ) : (
+          informationRequests.map((requestItem) => (
+            <View key={requestItem.id} style={styles.requestHistoryCard}>
+              <View style={styles.requestHistoryHeader}>
+                <Text
+                  style={[
+                    styles.requestHistoryStatus,
+                    requestItem.status === "responded" &&
+                      styles.requestHistoryResponded,
+                  ]}
+                >
+                  {requestItem.status === "responded"
+                    ? "RESPONSE RECEIVED"
+                    : requestItem.status === "sent"
+                      ? "AWAITING RESPONSE"
+                      : requestItem.status.toUpperCase()}
+                </Text>
+
+                <Text style={styles.requestHistoryDate}>
+                  {requestItem.sent_at
+                    ? formatDateTime(requestItem.sent_at)
+                    : "Not sent"}
+                </Text>
+              </View>
+
+              <Text style={styles.requestHistoryTitle}>
+                {requestItem.title}
+              </Text>
+
+              <Text style={styles.requestHistoryMessage}>
+                {requestItem.message}
+              </Text>
+
+              {requestItem.requested_items.length > 0 && (
+                <View style={styles.requestedItemsBox}>
+                  <Text style={styles.requestedItemsLabel}>
+                    Information requested
+                  </Text>
+
+                  {requestItem.requested_items.map((item, index) => (
+                    <Text
+                      key={`${requestItem.id}-requested-${index}`}
+                      style={styles.requestedItemText}
+                    >
+                      {index + 1}. {item}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.requestHistoryMetaRow}>
+                <Text style={styles.requestHistoryMeta}>
+                  Due: {formatDate(requestItem.due_date)}
+                </Text>
+
+                <Text style={styles.requestHistoryMeta}>
+                  Evidence:{" "}
+                  {requestItem.requires_evidence
+                    ? "Requested"
+                    : "Not requested"}
+                </Text>
+              </View>
+
+              {requestItem.response ? (
+                <View style={styles.reporterResponseBox}>
+                  <Text style={styles.reporterResponseHeading}>
+                    Reporter response
+                  </Text>
+
+                  <Text style={styles.reporterResponseDate}>
+                    Submitted{" "}
+                    {formatDateTime(requestItem.response.submitted_at)}
+                  </Text>
+
+                  {requestItem.response.answers.length === 0 ? (
+                    <Text style={styles.reporterResponseText}>
+                      The Reporter submitted an additional message without
+                      individual answers.
+                    </Text>
+                  ) : (
+                    requestItem.response.answers.map((answer, index) => (
+                      <View
+                        key={`${requestItem.id}-answer-${index}`}
+                        style={styles.reporterAnswerItem}
+                      >
+                        <Text style={styles.reporterAnswerQuestion}>
+                          {answer.question}
+                        </Text>
+
+                        <Text style={styles.reporterResponseText}>
+                          {answer.answer}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+
+                  {requestItem.response.additional_message ? (
+                    <View style={styles.additionalMessageBox}>
+                      <Text style={styles.reporterAnswerQuestion}>
+                        Additional message
+                      </Text>
+
+                      <Text style={styles.reporterResponseText}>
+                        {requestItem.response.additional_message}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {requestItem.requires_evidence ? (
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: "/officer/evidence",
+                          params: {
+                            caseId: caseData.id,
+                          },
+                        })
+                      }
+                      accessibilityRole="button"
+                      style={styles.responseEvidenceButton}
+                    >
+                      <Text style={styles.r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8}>
+                        Review submitted evidence
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={styles.awaitingResponseBox}>
+                  <Text style={styles.awaitingResponseText}>
+                    The Reporter has not submitted a response yet.
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))
+        )}
 
         <Text style={styles.sectionTitle}>Case evidence</Text>
 
@@ -578,7 +827,6 @@ export default function CaseDetailsScreen() {
           onPress={() =>
             router.push({
               pathname: "/officer/evidence",
-
               params: {
                 caseId: caseData.id,
               },
@@ -588,7 +836,6 @@ export default function CaseDetailsScreen() {
           accessibilityLabel="Review case evidence"
           style={({ pressed }) => [
             styles.evidenceButton,
-
             pressed && styles.evidenceButtonPressed,
           ]}
         >
@@ -607,8 +854,6 @@ export default function CaseDetailsScreen() {
 
           <Text style={styles.evidenceArrow}>›</Text>
         </Pressable>
-
-        {/* Investigation Status */}
 
         <Text style={styles.sectionTitle}>Investigation status</Text>
 
@@ -633,14 +878,12 @@ export default function CaseDetailsScreen() {
                   }}
                   style={[
                     styles.statusOption,
-
                     active && styles.statusOptionActive,
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusOptionText,
-
                       active && styles.statusOptionTextActive,
                     ]}
                   >
@@ -658,8 +901,6 @@ export default function CaseDetailsScreen() {
             />
           )}
         </View>
-
-        {/* Investigation Notes */}
 
         <Text style={styles.sectionTitle}>Investigation notes</Text>
 
@@ -682,13 +923,12 @@ export default function CaseDetailsScreen() {
             <Text style={styles.characterCount}>{newNote.length}/5000</Text>
 
             <Pressable
-              onPress={addNote}
+              onPress={() => void addNote()}
               disabled={savingNote}
               accessibilityRole="button"
               accessibilityLabel="Save investigation note"
               style={[
                 styles.saveNoteButton,
-
                 savingNote && styles.disabledButton,
               ]}
             >
@@ -700,8 +940,6 @@ export default function CaseDetailsScreen() {
             </Pressable>
           </View>
         </View>
-
-        {/* Existing Notes */}
 
         {notes.length === 0 ? (
           <View style={styles.emptyCard}>
@@ -728,8 +966,6 @@ export default function CaseDetailsScreen() {
             </View>
           ))
         )}
-
-        {/* Status History */}
 
         <Text style={styles.sectionTitle}>Status history</Text>
 
@@ -764,8 +1000,6 @@ export default function CaseDetailsScreen() {
           )}
         </View>
 
-        {/* Security */}
-
         <View style={styles.securityNotice}>
           <Text style={styles.securityIcon}>🔒</Text>
 
@@ -785,21 +1019,10 @@ export default function CaseDetailsScreen() {
   );
 }
 
-// ---------------------------------------------------------
-// Components
-// ---------------------------------------------------------
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
-
       <Text style={styles.detailValue}>{value}</Text>
     </View>
   );
@@ -809,11 +1032,7 @@ function Divider() {
   return <View style={styles.divider} />;
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: CaseStatus;
-}) {
+function StatusBadge({ status }: { status: CaseStatus }) {
   return (
     <View style={styles.currentStatus}>
       <View style={styles.statusDot} />
@@ -823,25 +1042,18 @@ function StatusBadge({
   );
 }
 
-function PriorityBadge({
-  priority,
-}: {
-  priority: CasePriority;
-}) {
+function PriorityBadge({ priority }: { priority: CasePriority }) {
   return (
     <View
       style={[
         styles.priorityBadge,
-
         priority === "urgent" && styles.priorityUrgent,
-
         priority === "high" && styles.priorityHigh,
       ]}
     >
       <Text
         style={[
           styles.priorityText,
-
           priority === "urgent" && styles.priorityUrgentText,
         ]}
       >
@@ -851,10 +1063,6 @@ function PriorityBadge({
   );
 }
 
-// ---------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------
-
 function formatStatus(status: CaseStatus | null) {
   if (!status) {
     return "Unknown";
@@ -863,25 +1071,20 @@ function formatStatus(status: CaseStatus | null) {
   switch (status) {
     case "under_review":
       return "Under review";
-
     case "awaiting_evidence":
       return "Awaiting evidence";
-
+    case "awaiting_information":
+      return "Awaiting information";
     case "investigating":
       return "Investigating";
-
     case "submitted":
       return "Submitted";
-
     case "assigned":
       return "Assigned";
-
     case "resolved":
       return "Resolved";
-
     case "closed":
       return "Closed";
-
     default:
       return status;
   }
@@ -899,729 +1102,573 @@ function formatDateTime(date: string) {
   return new Date(date).toLocaleString();
 }
 
-// ---------------------------------------------------------
-// Styles
-// ---------------------------------------------------------
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-
     backgroundColor: colors.background,
   },
-
   loadingContainer: {
     flex: 1,
-
     alignItems: "center",
     justifyContent: "center",
-
     backgroundColor: colors.background,
   },
-
   loadingText: {
     marginTop: 12,
-
     fontSize: 13,
-
     color: colors.textSecondary,
   },
-
-  // -------------------------------------------------------
-  // Header
-  // -------------------------------------------------------
-
   header: {
     minHeight: 66,
-
     flexDirection: "row",
     alignItems: "center",
-
     paddingHorizontal: 14,
-
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-
     backgroundColor: colors.surface,
   },
-
   backButton: {
     width: 42,
     height: 42,
-
     alignItems: "center",
     justifyContent: "center",
   },
-
   backText: {
     fontSize: 32,
-
     color: colors.navy[700],
   },
-
   headerContent: {
     flex: 1,
   },
-
   headerTitle: {
     fontSize: 17,
-
     fontWeight: "700",
-
     color: colors.navy[800],
   },
-
   headerSubtitle: {
     marginTop: 2,
-
     fontSize: 11.5,
-
     color: colors.textSecondary,
   },
-
   scrollContent: {
     padding: 16,
-
     paddingBottom: 40,
   },
-
-  // -------------------------------------------------------
-  // Case Header
-  // -------------------------------------------------------
-
   caseHeaderCard: {
     padding: 18,
-
     borderRadius: 17,
-
     backgroundColor: colors.navy[800],
   },
-
   caseTopRow: {
     flexDirection: "row",
-
     justifyContent: "space-between",
-
     alignItems: "center",
   },
-
   reference: {
     fontSize: 11,
-
     fontWeight: "700",
-
     letterSpacing: 0.5,
-
     color: "#BBD0E8",
   },
-
   caseTitle: {
     marginTop: 10,
     marginBottom: 12,
-
     fontSize: 20,
-
     fontWeight: "800",
-
     lineHeight: 26,
-
     color: colors.textInverse,
   },
-
   currentStatus: {
     alignSelf: "flex-start",
-
     flexDirection: "row",
     alignItems: "center",
-
     paddingHorizontal: 10,
     paddingVertical: 6,
-
     borderRadius: 10,
-
     backgroundColor: "rgba(255,255,255,0.12)",
   },
-
   statusDot: {
     width: 7,
     height: 7,
-
     marginRight: 7,
-
     borderRadius: 4,
-
     backgroundColor: colors.teal[300],
   },
-
   currentStatusText: {
     fontSize: 10.5,
-
     fontWeight: "700",
-
     color: colors.textInverse,
   },
-
   priorityBadge: {
     paddingHorizontal: 9,
     paddingVertical: 5,
-
     borderRadius: 9,
-
     backgroundColor: colors.royal[50],
   },
-
   priorityHigh: {
     backgroundColor: colors.gold[50],
   },
-
   priorityUrgent: {
     backgroundColor: "#FFF0EF",
   },
-
   priorityText: {
     fontSize: 10,
-
     fontWeight: "700",
-
     color: colors.navy[700],
   },
-
   priorityUrgentText: {
     color: colors.error,
   },
-
-  // -------------------------------------------------------
-  // Sections
-  // -------------------------------------------------------
-
   sectionTitle: {
     marginTop: 23,
     marginBottom: 9,
-
     fontSize: 15,
-
     fontWeight: "700",
-
     color: colors.navy[800],
   },
-
   sectionCard: {
     padding: 15,
-
     borderWidth: 1,
     borderColor: colors.border,
-
     borderRadius: 14,
-
     backgroundColor: colors.surface,
   },
-
   detailRow: {
     flexDirection: "row",
-
     justifyContent: "space-between",
-
     gap: 15,
   },
-
   detailLabel: {
     flex: 1,
-
     fontSize: 11.5,
-
     color: colors.textSecondary,
   },
-
   detailValue: {
     flex: 1.4,
-
     textAlign: "right",
-
     fontSize: 11.5,
-
     fontWeight: "600",
-
     color: colors.navy[800],
   },
-
   divider: {
     height: 1,
-
     marginVertical: 12,
-
     backgroundColor: colors.border,
   },
-
   descriptionText: {
     fontSize: 12.5,
-
     lineHeight: 19,
-
     color: colors.navy[700],
   },
-
-  // -------------------------------------------------------
-  // Evidence
-  // -------------------------------------------------------
-
   evidenceButton: {
     minHeight: 82,
-
     flexDirection: "row",
     alignItems: "center",
-
     padding: 14,
-
     borderWidth: 1,
     borderColor: colors.royal[100],
-
     borderRadius: 14,
-
     backgroundColor: colors.royal[50],
   },
-
   evidenceButtonPressed: {
     opacity: 0.82,
   },
-
   evidenceIconBox: {
     width: 44,
     height: 44,
-
     marginRight: 12,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderRadius: 12,
-
     backgroundColor: colors.surface,
   },
-
   evidenceIcon: {
     fontSize: 19,
   },
-
   evidenceContent: {
     flex: 1,
   },
-
   evidenceButtonTitle: {
     fontSize: 13.5,
-
     fontWeight: "700",
-
     color: colors.navy[800],
   },
-
   evidenceButtonText: {
     marginTop: 3,
-
     fontSize: 11,
-
     lineHeight: 16,
-
     color: colors.textSecondary,
   },
-
   evidenceArrow: {
     marginLeft: 8,
-
     fontSize: 27,
-
     color: colors.royal[700],
   },
-
-  // -------------------------------------------------------
-  // Status
-  // -------------------------------------------------------
-
-  statusHelp: {
-    fontSize: 11.5,
-
-    color: colors.textSecondary,
-  },
-
-  statusOptions: {
-    flexDirection: "row",
-
-    flexWrap: "wrap",
-
-    gap: 7,
-
-    marginTop: 12,
-  },
-
-  statusOption: {
-    minHeight: 38,
-
-    paddingHorizontal: 12,
-
-    alignItems: "center",
-    justifyContent: "center",
-
+  requestHistoryCard: {
+    marginBottom: 10,
+    padding: 15,
     borderWidth: 1,
     borderColor: colors.border,
-
-    borderRadius: 10,
-
+    borderRadius: 14,
     backgroundColor: colors.surface,
   },
-
-  statusOptionActive: {
-    borderColor: colors.royal[700],
-
-    backgroundColor: colors.royal[700],
+  requestHistoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
-
-  statusOptionText: {
-    fontSize: 11,
-
-    fontWeight: "600",
-
+  requestHistoryStatus: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    color: colors.warning,
+  },
+  requestHistoryResponded: {
+    color: colors.success,
+  },
+  requestHistoryDate: {
+    fontSize: 9.5,
+    color: colors.textSoft,
+  },
+  requestHistoryTitle: {
+    marginTop: 9,
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  requestHistoryMessage: {
+    marginTop: 5,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.textSecondary,
+  },
+  requestedItemsBox: {
+    marginTop: 12,
+    padding: 11,
+    borderRadius: 10,
+    backgroundColor: colors.navy[50],
+  },
+  requestedItemsLabel: {
+    marginBottom: 6,
+    fontSize: 10.5,
+    fontWeight: "700",
     color: colors.navy[700],
   },
-
+  requestedItemText: {
+    marginTop: 3,
+    fontSize: 10.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  requestHistoryMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 10,
+  },
+  requestHistoryMeta: {
+    fontSize: 10,
+    color: colors.textSoft,
+  },
+  reporterResponseBox: {
+    marginTop: 13,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.teal[100],
+    borderRadius: 11,
+    backgroundColor: colors.teal[50],
+  },
+  reporterResponseHeading: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.teal[800],
+  },
+  reporterResponseDate: {
+    marginTop: 2,
+    marginBottom: 10,
+    fontSize: 9.5,
+    color: colors.textSoft,
+  },
+  reporterAnswerItem: {
+    marginBottom: 11,
+  },
+  reporterAnswerQuestion: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    lineHeight: 15,
+    color: colors.navy[700],
+  },
+  reporterResponseText: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.navy[800],
+  },
+  additionalMessageBox: {
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.teal[100],
+  },
+  responseEvidenceButton: {
+    minHeight: 38,
+    marginTop: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: colors.royal[700],
+  },
+  r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.textInverse,
+  },
+  awaitingResponseBox: {
+    marginTop: 12,
+    padding: 11,
+    borderRadius: 10,
+    backgroundColor: colors.gold[50],
+  },
+  awaitingResponseText: {
+    fontSize: 10.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  statusHelp: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+  },
+  statusOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 12,
+  },
+  statusOption: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  statusOptionActive: {
+    borderColor: colors.royal[700],
+    backgroundColor: colors.royal[700],
+  },
+  statusOptionText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.navy[700],
+  },
   statusOptionTextActive: {
     color: colors.textInverse,
   },
-
   statusLoading: {
     marginTop: 12,
   },
-
-  // -------------------------------------------------------
-  // Investigation Notes
-  // -------------------------------------------------------
-
   noteComposer: {
     padding: 15,
-
     borderWidth: 1,
     borderColor: colors.border,
-
     borderRadius: 14,
-
     backgroundColor: colors.surface,
   },
-
   noteLabel: {
     marginBottom: 8,
-
     fontSize: 12.5,
-
     fontWeight: "700",
-
     color: colors.navy[800],
   },
-
   noteInput: {
     minHeight: 120,
-
     padding: 12,
-
     borderWidth: 1,
     borderColor: colors.navy[200],
-
     borderRadius: 11,
-
     fontSize: 12.5,
-
     lineHeight: 18,
-
     color: colors.navy[800],
-
     backgroundColor: colors.background,
   },
-
   noteBottomRow: {
     flexDirection: "row",
-
     justifyContent: "space-between",
     alignItems: "center",
-
     marginTop: 10,
   },
-
   characterCount: {
     fontSize: 10,
-
     color: colors.textSoft,
   },
-
   saveNoteButton: {
     minHeight: 40,
-
     minWidth: 105,
-
     paddingHorizontal: 14,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderRadius: 10,
-
     backgroundColor: colors.royal[700],
   },
-
   saveNoteText: {
     fontSize: 11.5,
-
     fontWeight: "700",
-
     color: colors.textInverse,
   },
-
   disabledButton: {
     opacity: 0.55,
   },
-
   noteCard: {
     marginTop: 9,
-
     padding: 14,
-
     borderWidth: 1,
     borderColor: colors.border,
-
     borderRadius: 13,
-
     backgroundColor: colors.surface,
   },
-
   noteHeader: {
     flexDirection: "row",
-
     justifyContent: "space-between",
     alignItems: "center",
-
     gap: 10,
   },
-
   noteOfficer: {
     fontSize: 10.5,
-
     fontWeight: "700",
-
     color: colors.royal[700],
   },
-
   noteDate: {
     fontSize: 9.5,
-
     color: colors.textSoft,
   },
-
   noteText: {
     marginTop: 8,
-
     fontSize: 12,
-
     lineHeight: 18,
-
     color: colors.navy[700],
   },
-
   emptyCard: {
     padding: 20,
-
     alignItems: "center",
-
     borderWidth: 1,
     borderColor: colors.border,
-
     borderRadius: 14,
-
     backgroundColor: colors.surface,
   },
-
   emptyIcon: {
     fontSize: 24,
   },
-
   emptyTitle: {
     marginTop: 8,
-
     fontSize: 13,
-
     fontWeight: "700",
-
     color: colors.navy[800],
   },
-
   emptyText: {
     marginTop: 4,
-
     textAlign: "center",
-
     fontSize: 11,
-
     lineHeight: 16,
-
     color: colors.textSecondary,
   },
-
-  // -------------------------------------------------------
-  // Status History
-  // -------------------------------------------------------
-
   historyRow: {
     flexDirection: "row",
-
     alignItems: "flex-start",
   },
-
   timelineDot: {
     width: 9,
     height: 9,
-
     marginTop: 4,
     marginRight: 10,
-
     borderRadius: 5,
-
     backgroundColor: colors.royal[600],
   },
-
   historyContent: {
     flex: 1,
   },
-
   historyTitle: {
     fontSize: 11.5,
-
     fontWeight: "600",
-
     color: colors.navy[800],
   },
-
   historyDate: {
     marginTop: 3,
-
     fontSize: 10,
-
     color: colors.textSoft,
   },
-
   historyDivider: {
     height: 1,
-
     marginVertical: 12,
-
     backgroundColor: colors.border,
   },
-
   emptyHistoryText: {
     textAlign: "center",
-
     fontSize: 11.5,
-
     color: colors.textSecondary,
   },
-
-  // -------------------------------------------------------
-  // Security
-  // -------------------------------------------------------
-
   securityNotice: {
     flexDirection: "row",
-
     marginTop: 20,
-
     padding: 14,
-
     borderWidth: 1,
     borderColor: colors.teal[100],
-
     borderRadius: 14,
-
     backgroundColor: colors.teal[50],
   },
-
   securityIcon: {
     marginRight: 9,
   },
-
   securityContent: {
     flex: 1,
   },
-
   securityTitle: {
     fontSize: 12,
-
     fontWeight: "700",
-
     color: colors.teal[800],
   },
-
   securityText: {
     marginTop: 3,
-
     fontSize: 11,
-
     lineHeight: 16,
-
     color: colors.textSecondary,
   },
-
-  // -------------------------------------------------------
-  // Error
-  // -------------------------------------------------------
-
   errorContainer: {
     flex: 1,
-
     alignItems: "center",
     justifyContent: "center",
-
     padding: 30,
   },
-
   errorIcon: {
     fontSize: 30,
   },
-
   errorTitle: {
     marginTop: 10,
-
     fontSize: 16,
-
     fontWeight: "700",
-
     color: colors.navy[800],
   },
-
   errorText: {
     marginTop: 6,
-
     textAlign: "center",
-
     fontSize: 12,
-
     lineHeight: 18,
-
     color: colors.textSecondary,
   },
-
   retryButton: {
     minHeight: 44,
-
     marginTop: 18,
-
     paddingHorizontal: 20,
-
     justifyContent: "center",
-
     borderRadius: 10,
-
     backgroundColor: colors.royal[700],
   },
-
   retryText: {
     fontSize: 12,
-
     fontWeight: "700",
-
     color: colors.textInverse,
   },
 });

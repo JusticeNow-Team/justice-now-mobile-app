@@ -3,6 +3,7 @@ export type ReporterCaseStatus =
   | "under_review"
   | "assigned"
   | "investigating"
+  | "awaiting_information"
   | "awaiting_evidence"
   | "resolved"
   | "closed";
@@ -18,7 +19,11 @@ export interface ReporterCase {
   updatedAt: string;
 }
 
-export type CaseListTab = "all" | "active" | "waiting" | "resolved";
+export type CaseListTab =
+  | "all"
+  | "active"
+  | "waiting"
+  | "resolved";
 
 export const ACTIVE_STATUSES: ReporterCaseStatus[] = [
   "submitted",
@@ -27,18 +32,54 @@ export const ACTIVE_STATUSES: ReporterCaseStatus[] = [
   "investigating",
 ];
 
-export const WAITING_STATUSES: ReporterCaseStatus[] = ["awaiting_evidence"];
+export const WAITING_STATUSES: ReporterCaseStatus[] = [
+  "awaiting_information",
+  "awaiting_evidence",
+];
 
-export const RESOLVED_STATUSES: ReporterCaseStatus[] = ["resolved", "closed"];
+export const RESOLVED_STATUSES: ReporterCaseStatus[] = [
+  "resolved",
+  "closed",
+];
 
-export const STATUS_FILTERS: { value: "all" | ReporterCaseStatus; label: string }[] =
-  [
-    { value: "all", label: "Status: All" },
-    { value: "submitted", label: "Submitted" },
-    { value: "under_review", label: "Under review" },
-    { value: "assigned", label: "Assigned" },
-    { value: "investigating", label: "Investigating" },
-    { value: "awaiting_evidence", label: "Awaiting evidence" },
-    { value: "resolved", label: "Resolved" },
-    { value: "closed", label: "Closed" },
-  ];
+export const STATUS_FILTERS: {
+  value: "all" | ReporterCaseStatus;
+  label: string;
+}[] = [
+  {
+    value: "all",
+    label: "Status: All",
+  },
+  {
+    value: "submitted",
+    label: "Submitted",
+  },
+  {
+    value: "under_review",
+    label: "Under review",
+  },
+  {
+    value: "assigned",
+    label: "Assigned",
+  },
+  {
+    value: "investigating",
+    label: "Investigating",
+  },
+  {
+    value: "awaiting_information",
+    label: "Awaiting information",
+  },
+  {
+    value: "awaiting_evidence",
+    label: "Awaiting evidence",
+  },
+  {
+    value: "resolved",
+    label: "Resolved",
+  },
+  {
+    value: "closed",
+    label: "Closed",
+  },
+];
