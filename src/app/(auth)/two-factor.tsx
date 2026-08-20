@@ -252,16 +252,8 @@ export default function TwoFactorScreen() {
     // Other team modules are not connected yet
     // ---------------------------------------------------
 
-    await supabase.auth.signOut();
-
     if (profile.role === "evidence_validator") {
-      Alert.alert(
-        "Validator workspace",
-        "The Evidence Validator module is not connected in this branch yet.",
-      );
-
-      router.replace("/login");
-
+      router.replace("/checker");
       return;
     }
 

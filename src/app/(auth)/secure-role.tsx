@@ -39,13 +39,7 @@ export default function SecureRoleScreen() {
     }
 
     if (role === "evidence_validator") {
-      await supabase.auth.signOut();
-
-      Alert.alert(
-        "Validator workspace",
-        "The Evidence Validator module is not connected in this branch yet.",
-      );
-
+      router.replace("/checker");
       return;
     }
 
@@ -378,11 +372,17 @@ export default function SecureRoleScreen() {
 
             <View style={styles.divider} />
 
-            <RoleItem
-              icon="🔍"
-              title="Evidence Checker / Validator"
-              description="Reviews submitted evidence and records validation decisions."
-            />
+            <Pressable
+              onPress={() => router.push("/checker")}
+              accessibilityRole="button"
+              accessibilityLabel="Enter Evidence Checker Portal"
+            >
+              <RoleItem
+                icon="🔍"
+                title="Evidence Checker / Validator"
+                description="Reviews submitted evidence, validates metadata, and enforces acceptance criteria. (Tap to open workspace)"
+              />
+            </Pressable>
 
             <View style={styles.divider} />
 
