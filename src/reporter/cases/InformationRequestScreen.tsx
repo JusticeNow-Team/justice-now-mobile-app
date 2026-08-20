@@ -265,10 +265,15 @@ export default function InformationRequestScreen() {
     const cleanAdditionalMessage = additionalMessage.trim();
 
     if (preparedAnswers.length === 0 && cleanAdditionalMessage.length === 0) {
-      Alert.alert(
-        "Response required",
-        "Answer at least one question or add a message. Partial answers are accepted.",
-      );
+      const message =
+        "Answer at least one question or add a message. Partial answers are accepted.";
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Response required", message);
+      }
+
       return;
     }
 
@@ -300,25 +305,31 @@ export default function InformationRequestScreen() {
         throw error;
       }
 
-      Alert.alert(
-        "Response submitted",
-        "Your response was sent securely to the Case Officer.",
-        [
-          {
-            text: "Return to case",
-            onPress: () => router.back(),
-          },
-        ],
-      );
+      await loadRequest();
+
+      if (Platform.OS === "web") {
+        window.alert(
+          "Response submitted. Your response was sent securely to the Case Officer.",
+        );
+      } else {
+        Alert.alert(
+          "Response submitted",
+          "Your response was sent securely to the Case Officer.",
+        );
+      }
     } catch (error) {
       console.error("SUBMIT INFORMATION RESPONSE ERROR:", error);
 
-      Alert.alert(
-        "Unable to submit response",
+      const message =
         error instanceof Error
           ? error.message
-          : "JusticeNow could not submit your response.",
-      );
+          : "JusticeNow could not submit your response.";
+
+      if (Platform.OS === "web") {
+        window.alert(`Unable to submit response: ${message}`);
+      } else {
+        Alert.alert("Unable to submit response", message);
+      }
     } finally {
       setSubmitting(false);
     }
