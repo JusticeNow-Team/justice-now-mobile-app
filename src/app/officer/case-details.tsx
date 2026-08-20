@@ -1,8 +1,4 @@
-import {
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
-} from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -64,6 +60,31 @@ type StatusHistory = {
   changed_at: string;
 };
 
+type InformationAnswer = {
+  question: string;
+  answer: string;
+};
+
+type InformationResponse = {
+  id: string;
+  answers: InformationAnswer[];
+  additional_message: string | null;
+  submitted_at: string;
+};
+
+type InformationRequestRecord = {
+  id: string;
+  title: string;
+  message: string;
+  requested_items: string[];
+  requires_evidence: boolean;
+  due_date: string | null;
+  status: "draft" | "sent" | "responded" | "cancelled";
+  sent_at: string | null;
+  responded_at: string | null;
+  response: InformationResponse | null;
+};
+
 const STATUS_OPTIONS: {
   value: CaseStatus;
   label: string;
@@ -82,6 +103,30 @@ const STATUS_OPTIONS: {
   },
 ];
 
+function parseInformationAnswers(value: unknown): InformationAnswer[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (
+        item,
+      ): item is {
+        question: string;
+        answer: string;
+      } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { question?: unknown }).question === "string" &&
+        typeof (item as { answer?: unknown }).answer === "string",
+    )
+    .map((item) => ({
+      question: item.question,
+      answer: item.answer,
+    }));
+}
+
 export default function CaseDetailsScreen() {
   const router = useRouter();
 
@@ -94,6 +139,9 @@ export default function CaseDetailsScreen() {
   const [caseData, setCaseData] = useState<JusticeCase | null>(null);
   const [notes, setNotes] = useState<InvestigationNote[]>([]);
   const [history, setHistory] = useState<StatusHistory[]>([]);
+  const [informationRequests, setInformationRequests] = useState<
+    InformationRequestRecord[]
+  >([]);
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -209,6 +257,74 @@ export default function CaseDetailsScreen() {
           console.error("HISTORY ERROR:", historyError);
         } else {
           setHistory((historyData ?? []) as StatusHistory[]);
+        }
+
+        const { data: requestData, error: requestError } = await supabase
+          .from("case_information_requests")
+          .select(
+            `
+              id,
+              title,
+              message,
+              requested_items,
+              requires_evidence,
+              due_date,
+              status,
+              sent_at,
+              responded_at,
+              case_information_responses (
+                id,
+                answers,
+                additional_message,
+                submitted_at
+              )
+            `,
+          )
+          .eq("case_id", caseId)
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (requestError) {
+          console.error("INFORMATION REQUEST HISTORY ERROR:", requestError);
+          setInformationRequests([]);
+        } else {
+          const records: InformationRequestRecord[] = (requestData ?? []).map(
+            (requestItem) => {
+              const nestedResponses = Array.isArray(
+                requestItem.case_information_responses,
+              )
+                ? requestItem.case_information_responses
+                : requestItem.case_information_responses
+                  ? [requestItem.case_information_responses]
+                  : [];
+
+              const responseItem = nestedResponses[0];
+
+              return {
+                id: requestItem.id,
+                title: requestItem.title,
+                message: requestItem.message,
+                requested_items: requestItem.requested_items ?? [],
+                requires_evidence: Boolean(requestItem.requires_evidence),
+                due_date: requestItem.due_date,
+                status:
+                  requestItem.status as InformationRequestRecord["status"],
+                sent_at: requestItem.sent_at,
+                responded_at: requestItem.responded_at,
+                response: responseItem
+                  ? {
+                      id: responseItem.id,
+                      answers: parseInformationAnswers(responseItem.answers),
+                      additional_message: responseItem.additional_message,
+                      submitted_at: responseItem.submitted_at,
+                    }
+                  : null,
+              };
+            },
+          );
+
+          setInformationRequests(records);
         }
       } catch (error) {
         console.error("LOAD CASE WORKSPACE ERROR:", error);
@@ -552,6 +668,157 @@ export default function CaseDetailsScreen() {
               <Text style={styles.evidenceArrow}>›</Text>
             </Pressable>
           </>
+        )}
+
+        <Text style={styles.sectionTitle}>Information request history</Text>
+
+        {informationRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>✉️</Text>
+
+            <Text style={styles.emptyTitle}>No information requests</Text>
+
+            <Text style={styles.emptyText}>
+              Requests sent to the Reporter and their responses will appear
+              here.
+            </Text>
+          </View>
+        ) : (
+          informationRequests.map((requestItem) => (
+            <View key={requestItem.id} style={styles.requestHistoryCard}>
+              <View style={styles.requestHistoryHeader}>
+                <Text
+                  style={[
+                    styles.requestHistoryStatus,
+                    requestItem.status === "responded" &&
+                      styles.requestHistoryResponded,
+                  ]}
+                >
+                  {requestItem.status === "responded"
+                    ? "RESPONSE RECEIVED"
+                    : requestItem.status === "sent"
+                      ? "AWAITING RESPONSE"
+                      : requestItem.status.toUpperCase()}
+                </Text>
+
+                <Text style={styles.requestHistoryDate}>
+                  {requestItem.sent_at
+                    ? formatDateTime(requestItem.sent_at)
+                    : "Not sent"}
+                </Text>
+              </View>
+
+              <Text style={styles.requestHistoryTitle}>
+                {requestItem.title}
+              </Text>
+
+              <Text style={styles.requestHistoryMessage}>
+                {requestItem.message}
+              </Text>
+
+              {requestItem.requested_items.length > 0 && (
+                <View style={styles.requestedItemsBox}>
+                  <Text style={styles.requestedItemsLabel}>
+                    Information requested
+                  </Text>
+
+                  {requestItem.requested_items.map((item, index) => (
+                    <Text
+                      key={`${requestItem.id}-requested-${index}`}
+                      style={styles.requestedItemText}
+                    >
+                      {index + 1}. {item}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.requestHistoryMetaRow}>
+                <Text style={styles.requestHistoryMeta}>
+                  Due: {formatDate(requestItem.due_date)}
+                </Text>
+
+                <Text style={styles.requestHistoryMeta}>
+                  Evidence:{" "}
+                  {requestItem.requires_evidence
+                    ? "Requested"
+                    : "Not requested"}
+                </Text>
+              </View>
+
+              {requestItem.response ? (
+                <View style={styles.reporterResponseBox}>
+                  <Text style={styles.reporterResponseHeading}>
+                    Reporter response
+                  </Text>
+
+                  <Text style={styles.reporterResponseDate}>
+                    Submitted{" "}
+                    {formatDateTime(requestItem.response.submitted_at)}
+                  </Text>
+
+                  {requestItem.response.answers.length === 0 ? (
+                    <Text style={styles.reporterResponseText}>
+                      The Reporter submitted an additional message without
+                      individual answers.
+                    </Text>
+                  ) : (
+                    requestItem.response.answers.map((answer, index) => (
+                      <View
+                        key={`${requestItem.id}-answer-${index}`}
+                        style={styles.reporterAnswerItem}
+                      >
+                        <Text style={styles.reporterAnswerQuestion}>
+                          {answer.question}
+                        </Text>
+
+                        <Text style={styles.reporterResponseText}>
+                          {answer.answer}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+
+                  {requestItem.response.additional_message ? (
+                    <View style={styles.additionalMessageBox}>
+                      <Text style={styles.reporterAnswerQuestion}>
+                        Additional message
+                      </Text>
+
+                      <Text style={styles.reporterResponseText}>
+                        {requestItem.response.additional_message}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {requestItem.requires_evidence ? (
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: "/officer/evidence",
+                          params: {
+                            caseId: caseData.id,
+                          },
+                        })
+                      }
+                      accessibilityRole="button"
+                      style={styles.responseEvidenceButton}
+                    >
+                      <Text style={styles.r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8}>
+                        Review submitted evidence
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={styles.awaitingResponseBox}>
+                  <Text style={styles.awaitingResponseText}>
+                    The Reporter has not submitted a response yet.
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))
         )}
 
         <Text style={styles.sectionTitle}>Case evidence</Text>
@@ -1036,6 +1303,138 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 27,
     color: colors.royal[700],
+  },
+  requestHistoryCard: {
+    marginBottom: 10,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+  },
+  requestHistoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  requestHistoryStatus: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    color: colors.warning,
+  },
+  requestHistoryResponded: {
+    color: colors.success,
+  },
+  requestHistoryDate: {
+    fontSize: 9.5,
+    color: colors.textSoft,
+  },
+  requestHistoryTitle: {
+    marginTop: 9,
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  requestHistoryMessage: {
+    marginTop: 5,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.textSecondary,
+  },
+  requestedItemsBox: {
+    marginTop: 12,
+    padding: 11,
+    borderRadius: 10,
+    backgroundColor: colors.navy[50],
+  },
+  requestedItemsLabel: {
+    marginBottom: 6,
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.navy[700],
+  },
+  requestedItemText: {
+    marginTop: 3,
+    fontSize: 10.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  requestHistoryMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 10,
+  },
+  requestHistoryMeta: {
+    fontSize: 10,
+    color: colors.textSoft,
+  },
+  reporterResponseBox: {
+    marginTop: 13,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.teal[100],
+    borderRadius: 11,
+    backgroundColor: colors.teal[50],
+  },
+  reporterResponseHeading: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.teal[800],
+  },
+  reporterResponseDate: {
+    marginTop: 2,
+    marginBottom: 10,
+    fontSize: 9.5,
+    color: colors.textSoft,
+  },
+  reporterAnswerItem: {
+    marginBottom: 11,
+  },
+  reporterAnswerQuestion: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    lineHeight: 15,
+    color: colors.navy[700],
+  },
+  reporterResponseText: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.navy[800],
+  },
+  additionalMessageBox: {
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.teal[100],
+  },
+  responseEvidenceButton: {
+    minHeight: 38,
+    marginTop: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: colors.royal[700],
+  },
+  r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.textInverse,
+  },
+  awaitingResponseBox: {
+    marginTop: 12,
+    padding: 11,
+    borderRadius: 10,
+    backgroundColor: colors.gold[50],
+  },
+  awaitingResponseText: {
+    fontSize: 10.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
   statusHelp: {
     fontSize: 11.5,
