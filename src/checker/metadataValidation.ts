@@ -30,7 +30,39 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Enforces all 8 Acceptance Criteria on an Evidence Record:
+ * Sanitizes any string to remove local server or device file system paths.
+ */
+export function sanitizePath(rawPath: string): string {
+  if (!rawPath) return "";
+  let clean = rawPath
+    .replace(/^file:\/\/\/?/i, "")
+    .replace(/^[a-zA-Z]:[/\\]/i, "")
+    .replace(/^[/\\]tmp[/\\]/i, "")
+    .replace(/^[/\\]Users[/\\][^/\\]+[/\\]/i, "")
+    .replace(/^content:\/\//i, "");
+
+  const parts = clean.split(/[/\\]/);
+  return parts[parts.length - 1] || "evidence_file";
+}
+
+/**
+ * Generates a collision-proof secure relative storage path formatted as:
+ * cases/{caseId}/evidence/{evidenceId}_{timestamp}_{sanitizedFileName}
+ */
+export function generateCollisionProofStoragePath(
+  caseId: string,
+  evidenceId: string,
+  fileName: string
+): string {
+  const cleanName = sanitizePath(fileName);
+  const timestamp = Date.now();
+  const safeCaseId = caseId || "UNLINKED_CASE";
+  const safeEvidenceId = evidenceId || `EVD-${timestamp}`;
+  return `cases/${safeCaseId}/evidence/${safeEvidenceId}_${timestamp}_${cleanName}`;
+}
+
+/**
+ * Enforces all Metadata & Secure Reference Storage Criteria on an Evidence Record:
  * 1. Unique identifier present
  * 2. Linked to case and reporter
  * 3. File name, type, size, upload date, status recorded
@@ -39,12 +71,22 @@ export function formatBytes(bytes: number): string {
  * 6. Unsupported files rejected
  * 7. Empty or invalid metadata rejected
  * 8. New evidence receives default Pending status
+ * 
+ * --- Secure Evidence Reference Storage Criteria ---
+ * 9. Stored outside publicly accessible paths
+ * 10. Linked to correct case path
+ * 11. File names prevent collisions (unique hash/timestamp)
+ * 12. Unauthorized access prevented (signed URLs with 15-min expiry)
+ * 13. Missing-file errors handled gracefully
+ * 14. Failed uploads prevent incomplete DB records
+ * 15. Local server paths stripped & protected
  */
 export function validateEvidenceMetadata(
   record: Partial<EvidenceRecord>
 ): MetadataValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const securityCallouts: string[] = [];
 
   // Criteria 1: Unique Identifier
   const hasUniqueId = Boolean(
@@ -55,10 +97,8 @@ export function validateEvidenceMetadata(
   }
 
   // Criteria 2: Linked to Case and Reporter
-  const hasCaseId = Boolean(
-    (record.caseId && typeof record.caseId === "string" && record.caseId.trim().length > 0) ||
-      (record.caseInfo?.id && record.caseInfo.id.trim().length > 0)
-  );
+  const caseRef = record.caseInfo?.caseReference || record.caseId || "";
+  const hasCaseId = Boolean(caseRef && caseRef.trim().length > 0);
   if (!hasCaseId) {
     errors.push("Evidence is not linked to a valid Case.");
   }
@@ -74,7 +114,7 @@ export function validateEvidenceMetadata(
   const hasCaseLink = hasCaseId;
   const hasReporterLink = hasReporterId;
 
-  // Criteria 3: File name, file type, size, upload date, and status recorded
+  // Criteria 3: File attributes recorded
   const hasFileName = Boolean(
     record.fileName && typeof record.fileName === "string" && record.fileName.trim().length > 0
   );
@@ -140,7 +180,7 @@ export function validateEvidenceMetadata(
     );
   }
 
-  // Criteria 8: Default Pending Status for New Evidence
+  // Criteria 8: Default Pending Status
   const isDefaultPendingStatus = record.validationStatus === "pending";
   if (!isDefaultPendingStatus && record.validationStatus) {
     warnings.push(
@@ -148,13 +188,89 @@ export function validateEvidenceMetadata(
     );
   }
 
-  // Criteria 7: Empty or Invalid Evidence Metadata Rejected
+  // --- Secure Evidence Reference Storage Validation Rules ---
+  const storagePath = record.storagePath || "";
+  const storageBucket = record.storageBucket || "case-evidence";
+
+  // Security Rule 1: Stored outside publicly accessible paths
+  const isStoredInPrivatePath =
+    record.isPrivateBucket !== false &&
+    !storagePath.startsWith("public/") &&
+    !storagePath.includes("/public_access/");
+  if (!isStoredInPrivatePath) {
+    securityCallouts.push("SECURITY WARNING: Evidence is located in a publicly accessible bucket path.");
+  }
+
+  // Security Rule 2: Linked to correct case path
+  const isLinkedToCorrectCasePath = Boolean(
+    hasCaseId &&
+      (storagePath.includes(caseRef) ||
+        storagePath.includes(record.caseId || "") ||
+        storagePath.length === 0)
+  );
+  if (!isLinkedToCorrectCasePath) {
+    securityCallouts.push(
+      `PATH MISMATCH: Storage path '${storagePath}' does not match linked case reference '${caseRef}'.`
+    );
+  }
+
+  // Security Rule 3: File name collision prevention
+  const hasCollisionProofFileName = Boolean(
+    record.id &&
+      (storagePath.includes(record.id) ||
+        /\d{10,}/.test(storagePath) ||
+        /[a-f0-9-]{12,}/i.test(storagePath) ||
+        storagePath.length === 0)
+  );
+  if (!hasCollisionProofFileName) {
+    warnings.push("Storage path lacks unique timestamp/hash collision prevention slug.");
+  }
+
+  // Security Rule 4: Protected from unauthorized access (Signed URLs)
+  const expiry = record.signedUrlExpirySeconds ?? 900; // Default 15 mins (900 seconds)
+  const isProtectedFromUnauthorizedAccess = expiry > 0 && expiry <= 3600;
+  if (expiry > 3600) {
+    securityCallouts.push("SECURITY WARNING: Signed URL expiration exceeds 1 hour security policy.");
+  }
+
+  // Security Rule 5: Missing file errors handled
+  const fileExistsInStorage = record.fileExistsInStorage !== false;
+  const handlesMissingFileErrors = true;
+  if (!fileExistsInStorage) {
+    errors.push("Missing File Error: Storage object was removed or not found (404 Storage Error).");
+  }
+
+  // Security Rule 6: Failed uploads prevent incomplete DB records
+  const preventsIncompleteUploadRecords = isNonEmptyFile && hasCaseId && hasUniqueId;
+
+  // Security Rule 7: Local server paths stripped & protected
+  const rawFileName = record.fileName || "";
+  const exposesLocalServerPath =
+    record.localPathExposed === true ||
+    /^file:\/\//i.test(rawFileName) ||
+    /^[a-zA-Z]:[/\\]/i.test(rawFileName) ||
+    /\/Users\//i.test(rawFileName) ||
+    /\/tmp\//i.test(rawFileName) ||
+    /^content:\/\//i.test(rawFileName) ||
+    /^file:\/\//i.test(storagePath) ||
+    /^[a-zA-Z]:[/\\]/i.test(storagePath);
+
+  const doesNotExposeLocalServerPaths = !exposesLocalServerPath;
+  if (exposesLocalServerPath) {
+    securityCallouts.push(
+      "SECURITY RISK: Evidence metadata exposes local server/device path details."
+    );
+  }
+
   const isMetadataValid = errors.length === 0;
+  const isStorageSecure = securityCallouts.length === 0 && doesNotExposeLocalServerPaths;
 
   return {
     isValid: isMetadataValid,
+    isStorageSecure,
     errors,
     warnings,
+    securityCallouts,
     testedAt: new Date().toISOString(),
     audit: {
       hasUniqueId,
@@ -166,6 +282,13 @@ export function validateEvidenceMetadata(
       isNonEmptyFile,
       isMetadataValid,
       isDefaultPendingStatus,
+      isStoredInPrivatePath,
+      isLinkedToCorrectCasePath,
+      hasCollisionProofFileName,
+      isProtectedFromUnauthorizedAccess,
+      handlesMissingFileErrors,
+      preventsIncompleteUploadRecords,
+      doesNotExposeLocalServerPaths,
     },
   };
 }

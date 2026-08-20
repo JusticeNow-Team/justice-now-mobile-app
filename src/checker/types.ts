@@ -32,13 +32,18 @@ export interface EvidenceRecord {
   uploadDate: string; // ISO date string
   validationStatus: EvidenceValidationStatus;
   
+  // Storage & Security Metadata (Secure Evidence Storage Criteria)
+  storageBucket?: string;
+  storagePath?: string;
+  isPrivateBucket?: boolean;
+  signedUrlExpirySeconds?: number;
+  localPathExposed?: boolean;
+  fileExistsInStorage?: boolean;
+  
   // Linked metadata details
   caseInfo?: CaseLinkInfo;
   reporterInfo?: ReporterLinkInfo;
   
-  // Optional storage details
-  storageBucket?: string;
-  storagePath?: string;
   description?: string;
   rejectionReason?: string;
   checkerNotes?: string;
@@ -47,6 +52,7 @@ export interface EvidenceRecord {
 }
 
 export interface CriteriaAudit {
+  // Original 8 Criteria
   hasUniqueId: boolean;
   hasCaseLink: boolean;
   hasReporterLink: boolean;
@@ -56,12 +62,23 @@ export interface CriteriaAudit {
   isNonEmptyFile: boolean;
   isMetadataValid: boolean;
   isDefaultPendingStatus: boolean;
+
+  // New Secure Evidence Storage Criteria
+  isStoredInPrivatePath: boolean;
+  isLinkedToCorrectCasePath: boolean;
+  hasCollisionProofFileName: boolean;
+  isProtectedFromUnauthorizedAccess: boolean;
+  handlesMissingFileErrors: boolean;
+  preventsIncompleteUploadRecords: boolean;
+  doesNotExposeLocalServerPaths: boolean;
 }
 
 export interface MetadataValidationResult {
   isValid: boolean;
+  isStorageSecure: boolean;
   errors: string[];
   warnings: string[];
+  securityCallouts: string[];
   audit: CriteriaAudit;
   testedAt: string;
 }
@@ -71,7 +88,8 @@ export type CheckerFilterTab =
   | "pending"
   | "validated"
   | "rejected"
-  | "invalid_metadata";
+  | "invalid_metadata"
+  | "storage_insecure";
 
 export interface CheckerSummaryStats {
   totalCount: number;
@@ -79,4 +97,5 @@ export interface CheckerSummaryStats {
   validatedCount: number;
   rejectedCount: number;
   invalidMetadataCount: number;
+  storageInsecureCount: number;
 }
