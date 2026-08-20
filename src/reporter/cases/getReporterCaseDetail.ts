@@ -38,6 +38,30 @@ export interface ReporterStatusEvent {
   changedAt: string;
 }
 
+export interface ReporterInformationAnswer {
+  question: string;
+  answer: string;
+}
+
+export interface ReporterInformationResponse {
+  id: string;
+  answers: ReporterInformationAnswer[];
+  additionalMessage: string | null;
+  submittedAt: string;
+}
+
+export interface ReporterInformationRequest {
+  id: string;
+  title: string;
+  message: string;
+  requestedItems: string[];
+  requiresEvidence: boolean;
+  dueDate: string | null;
+  status: "sent" | "responded";
+  sentAt: string;
+  response: ReporterInformationResponse | null;
+}
+
 export type GetReporterCaseDetailResult =
   | {
       ok: true;
@@ -45,6 +69,7 @@ export type GetReporterCaseDetailResult =
       officer: ReporterOfficerPublic | null;
       evidence: ReporterEvidenceRecord[];
       history: ReporterStatusEvent[];
+      informationRequests: ReporterInformationRequest[];
     }
   | {
       ok: false;
@@ -72,8 +97,40 @@ export function formatEvidenceSize(bytes: number | null) {
   return formatBytes(bytes) ?? "Size unknown";
 }
 
+function asInformationAnswers(value: unknown): ReporterInformationAnswer[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (
+        item,
+      ): item is {
+        question: string;
+        answer: string;
+      } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (
+          item as {
+            question?: unknown;
+          }
+        ).question === "string" &&
+        typeof (
+          item as {
+            answer?: unknown;
+          }
+        ).answer === "string",
+    )
+    .map((item) => ({
+      question: item.question,
+      answer: item.answer,
+    }));
+}
+
 export async function getReporterCaseDetail(
-  caseId: string
+  caseId: string,
 ): Promise<GetReporterCaseDetailResult> {
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getUser();
@@ -118,7 +175,7 @@ export async function getReporterCaseDetail(
         is_anonymous,
         created_at,
         updated_at
-      `
+      `,
     )
     .eq("id", caseId)
     .eq("reporter_id", user.id)
@@ -181,26 +238,32 @@ export async function getReporterCaseDetail(
   const { data: evidenceRows } = await supabase
     .from("case_evidence")
     .select(
-      "id, title, file_name, evidence_type, file_size_bytes, validation_status, created_at"
+      "id, title, file_name, evidence_type, file_size_bytes, validation_status, created_at",
     )
     .eq("case_id", caseId)
-    .order("created_at", { ascending: false });
+    .order("created_at", {
+      ascending: false,
+    });
 
-  const evidence: ReporterEvidenceRecord[] = (evidenceRows ?? []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    fileName: row.file_name,
-    evidenceType: row.evidence_type,
-    fileSizeBytes: row.file_size_bytes,
-    validationStatus: row.validation_status,
-    createdAt: row.created_at,
-  }));
+  const evidence: ReporterEvidenceRecord[] = (evidenceRows ?? []).map(
+    (row) => ({
+      id: row.id,
+      title: row.title,
+      fileName: row.file_name,
+      evidenceType: row.evidence_type,
+      fileSizeBytes: row.file_size_bytes,
+      validationStatus: row.validation_status,
+      createdAt: row.created_at,
+    }),
+  );
 
   const { data: historyRows } = await supabase
     .from("case_status_history")
     .select("id, old_status, new_status, changed_at")
     .eq("case_id", caseId)
-    .order("changed_at", { ascending: true });
+    .order("changed_at", {
+      ascending: true,
+    });
 
   const history: ReporterStatusEvent[] = (historyRows ?? []).map((row) => ({
     id: row.id,
@@ -209,5 +272,76 @@ export async function getReporterCaseDetail(
     changedAt: row.changed_at,
   }));
 
-  return { ok: true, detail, officer, evidence, history };
+  const { data: requestRows, error: requestError } = await supabase
+    .from("case_information_requests")
+    .select(
+      `
+        id,
+        title,
+        message,
+        requested_items,
+        requires_evidence,
+        due_date,
+        status,
+        sent_at,
+        case_information_responses (
+          id,
+          answers,
+          additional_message,
+          submitted_at
+        )
+      `,
+    )
+    .eq("case_id", caseId)
+    .eq("reporter_id", user.id)
+    .in("status", ["sent", "responded"])
+    .order("created_at", {
+      ascending: false,
+    });
+
+  if (requestError) {
+    return {
+      ok: false,
+      reason: "generic",
+      message:
+        requestError.message ||
+        "JusticeNow could not load information requests for this case.",
+    };
+  }
+
+  const informationRequests: ReporterInformationRequest[] = (
+    requestRows ?? []
+  ).map((row) => {
+    const nested = row.case_information_responses;
+
+    const responseRow = Array.isArray(nested) ? nested[0] : nested;
+
+    return {
+      id: row.id,
+      title: row.title,
+      message: row.message,
+      requestedItems: row.requested_items ?? [],
+      requiresEvidence: Boolean(row.requires_evidence),
+      dueDate: row.due_date,
+      status: row.status === "responded" ? "responded" : "sent",
+      sentAt: row.sent_at,
+      response: responseRow
+        ? {
+            id: responseRow.id,
+            answers: asInformationAnswers(responseRow.answers),
+            additionalMessage: responseRow.additional_message,
+            submittedAt: responseRow.submitted_at,
+          }
+        : null,
+    };
+  });
+
+  return {
+    ok: true,
+    detail,
+    officer,
+    evidence,
+    history,
+    informationRequests,
+  };
 }

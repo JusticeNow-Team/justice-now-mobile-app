@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -76,16 +77,10 @@ const INITIAL_STATS: DashboardStats = {
 export default function OfficerDashboardScreen() {
   const router = useRouter();
 
-  const [officerName, setOfficerName] =
-    useState("Case Officer");
-  const [stats, setStats] =
-    useState<DashboardStats>(INITIAL_STATS);
-  const [recentUpdates, setRecentUpdates] = useState<
-    StatusHistoryItem[]
-  >([]);
-  const [caseMap, setCaseMap] = useState<
-    Record<string, DashboardCase>
-  >({});
+  const [officerName, setOfficerName] = useState("Case Officer");
+  const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
+  const [recentUpdates, setRecentUpdates] = useState<StatusHistoryItem[]>([]);
+  const [caseMap, setCaseMap] = useState<Record<string, DashboardCase>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -110,12 +105,11 @@ export default function OfficerDashboardScreen() {
           return;
         }
 
-        const { data: profile, error: profileError } =
-          await supabase
-            .from("profiles")
-            .select("full_name, role")
-            .eq("id", user.id)
-            .single();
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("full_name, role")
+          .eq("id", user.id)
+          .single();
 
         if (profileError || !profile) {
           await supabase.auth.signOut();
@@ -156,12 +150,11 @@ export default function OfficerDashboardScreen() {
           return;
         }
 
-        const { data: assignments, error: assignmentsError } =
-          await supabase
-            .from("case_assignments")
-            .select("case_id")
-            .eq("assigned_officer_id", user.id)
-            .eq("is_active", true);
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from("case_assignments")
+          .select("case_id")
+          .eq("assigned_officer_id", user.id)
+          .eq("is_active", true);
 
         if (assignmentsError) {
           setErrorMessage(assignmentsError.message);
@@ -170,9 +163,7 @@ export default function OfficerDashboardScreen() {
 
         const caseIds = [
           ...new Set(
-            (assignments ?? []).map(
-              (assignment) => assignment.case_id,
-            ),
+            (assignments ?? []).map((assignment) => assignment.case_id),
           ),
         ];
 
@@ -183,11 +174,10 @@ export default function OfficerDashboardScreen() {
           return;
         }
 
-        const { data: casesData, error: casesError } =
-          await supabase
-            .from("cases")
-            .select(
-              `
+        const { data: casesData, error: casesError } = await supabase
+          .from("cases")
+          .select(
+            `
                 id,
                 case_reference,
                 title,
@@ -195,16 +185,15 @@ export default function OfficerDashboardScreen() {
                 priority,
                 updated_at
               `,
-            )
-            .in("id", caseIds);
+          )
+          .in("id", caseIds);
 
         if (casesError) {
           setErrorMessage(casesError.message);
           return;
         }
 
-        const officerCases =
-          (casesData ?? []) as DashboardCase[];
+        const officerCases = (casesData ?? []) as DashboardCase[];
 
         const nextCaseMap: Record<string, DashboardCase> = {};
 
@@ -214,11 +203,10 @@ export default function OfficerDashboardScreen() {
 
         setCaseMap(nextCaseMap);
 
-        const { data: evidenceData, error: evidenceError } =
-          await supabase
-            .from("case_evidence")
-            .select(
-              `
+        const { data: evidenceData, error: evidenceError } = await supabase
+          .from("case_evidence")
+          .select(
+            `
                 id,
                 case_id,
                 officer_evidence_reviews (
@@ -226,18 +214,15 @@ export default function OfficerDashboardScreen() {
                   review_state
                 )
               `,
-            )
-            .in("case_id", caseIds);
+          )
+          .in("case_id", caseIds);
 
         if (evidenceError) {
-          console.error(
-            "DASHBOARD EVIDENCE ERROR:",
-            evidenceError,
-          );
+          console.error("DASHBOARD EVIDENCE ERROR:", evidenceError);
         }
 
-        const evidenceRecords =
-          (evidenceData ?? []) as unknown as EvidenceRecord[];
+        const evidenceRecords = (evidenceData ??
+          []) as unknown as EvidenceRecord[];
 
         const assignedCount = officerCases.length;
 
@@ -248,8 +233,7 @@ export default function OfficerDashboardScreen() {
         ).length;
 
         const awaitingEvidenceCount = officerCases.filter(
-          (caseItem) =>
-            caseItem.status === "awaiting_evidence",
+          (caseItem) => caseItem.status === "awaiting_evidence",
         ).length;
 
         const urgentCount = officerCases.filter(
@@ -262,12 +246,10 @@ export default function OfficerDashboardScreen() {
             evidenceItem.officer_evidence_reviews.length === 0,
         ).length;
 
-        const followUpCount = evidenceRecords.filter(
-          (evidenceItem) =>
-            evidenceItem.officer_evidence_reviews?.some(
-              (review) =>
-                review.review_state === "follow_up_required",
-            ),
+        const followUpCount = evidenceRecords.filter((evidenceItem) =>
+          evidenceItem.officer_evidence_reviews?.some(
+            (review) => review.review_state === "follow_up_required",
+          ),
         ).length;
 
         setStats({
@@ -279,34 +261,28 @@ export default function OfficerDashboardScreen() {
           followUps: followUpCount,
         });
 
-        const { data: historyData, error: historyError } =
-          await supabase
-            .from("case_status_history")
-            .select(
-              `
+        const { data: historyData, error: historyError } = await supabase
+          .from("case_status_history")
+          .select(
+            `
                 id,
                 case_id,
                 old_status,
                 new_status,
                 changed_at
               `,
-            )
-            .in("case_id", caseIds)
-            .order("changed_at", {
-              ascending: false,
-            })
-            .limit(5);
+          )
+          .in("case_id", caseIds)
+          .order("changed_at", {
+            ascending: false,
+          })
+          .limit(5);
 
         if (historyError) {
-          console.error(
-            "DASHBOARD HISTORY ERROR:",
-            historyError,
-          );
+          console.error("DASHBOARD HISTORY ERROR:", historyError);
           setRecentUpdates([]);
         } else {
-          setRecentUpdates(
-            (historyData ?? []) as StatusHistoryItem[],
-          );
+          setRecentUpdates((historyData ?? []) as StatusHistoryItem[]);
         }
       } catch (error) {
         console.error("LOAD OFFICER DASHBOARD ERROR:", error);
@@ -336,7 +312,35 @@ export default function OfficerDashboardScreen() {
     void loadDashboard(false);
   };
 
+  const completeSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      if (Platform.OS === "web") {
+        window.alert(`Unable to sign out: ${error.message}`);
+      } else {
+        Alert.alert("Unable to sign out", error.message);
+      }
+
+      return;
+    }
+
+    router.replace("/login");
+  };
+
   const signOut = () => {
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        "Do you want to sign out of the JusticeNow staff workspace?",
+      );
+
+      if (confirmed) {
+        void completeSignOut();
+      }
+
+      return;
+    }
+
     Alert.alert(
       "Sign out",
       "Do you want to sign out of the JusticeNow staff workspace?",
@@ -348,20 +352,7 @@ export default function OfficerDashboardScreen() {
         {
           text: "Sign out",
           style: "destructive",
-          onPress: async () => {
-            const { error } =
-              await supabase.auth.signOut();
-
-            if (error) {
-              Alert.alert(
-                "Unable to sign out",
-                error.message,
-              );
-              return;
-            }
-
-            router.replace("/login");
-          },
+          onPress: () => void completeSignOut(),
         },
       ],
     );
@@ -370,10 +361,7 @@ export default function OfficerDashboardScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color={colors.royal[700]}
-        />
+        <ActivityIndicator size="large" color={colors.royal[700]} />
 
         <Text style={styles.loadingText}>
           Loading Case Officer workspace...
@@ -388,9 +376,7 @@ export default function OfficerDashboardScreen() {
         <View>
           <Text style={styles.brandName}>JusticeNow</Text>
 
-          <Text style={styles.workspaceLabel}>
-            Case Officer Workspace
-          </Text>
+          <Text style={styles.workspaceLabel}>Case Officer Workspace</Text>
         </View>
 
         <Pressable
@@ -420,25 +406,19 @@ export default function OfficerDashboardScreen() {
         <View style={styles.welcomeCard}>
           <Text style={styles.welcomeLabel}>CASE OFFICER</Text>
 
-          <Text style={styles.welcomeTitle}>
-            Welcome, {officerName}
-          </Text>
+          <Text style={styles.welcomeTitle}>Welcome, {officerName}</Text>
 
           <Text style={styles.welcomeText}>
-            Review assigned cases, examine evidence and record
-            investigation progress securely.
+            Review assigned cases, examine evidence and record investigation
+            progress securely.
           </Text>
         </View>
 
         {errorMessage !== "" && (
           <View style={styles.errorCard}>
-            <Text style={styles.errorTitle}>
-              Dashboard update failed
-            </Text>
+            <Text style={styles.errorTitle}>Dashboard update failed</Text>
 
-            <Text style={styles.errorText}>
-              {errorMessage}
-            </Text>
+            <Text style={styles.errorText}>{errorMessage}</Text>
 
             <Pressable
               onPress={() => void loadDashboard()}
@@ -451,19 +431,14 @@ export default function OfficerDashboardScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>
-              Case overview
-            </Text>
+            <Text style={styles.sectionTitle}>Case overview</Text>
 
             <Text style={styles.sectionSubtitle}>
               Live data from your assigned investigations
             </Text>
           </View>
 
-          <Pressable
-            onPress={handleRefresh}
-            accessibilityRole="button"
-          >
+          <Pressable onPress={handleRefresh} accessibilityRole="button">
             <Text style={styles.refreshText}>Refresh</Text>
           </Pressable>
         </View>
@@ -512,9 +487,7 @@ export default function OfficerDashboardScreen() {
           />
         </View>
 
-        <Text style={styles.actionsSectionTitle}>
-          Quick actions
-        </Text>
+        <Text style={styles.actionsSectionTitle}>Quick actions</Text>
 
         <ActionCard
           icon="📁"
@@ -548,16 +521,12 @@ export default function OfficerDashboardScreen() {
           icon="🔔"
           title="Notifications"
           description="Review case assignments, evidence activity and officer alerts."
-          onPress={() =>
-            router.push("/officer/notifications")
-          }
+          onPress={() => router.push("/officer/notifications")}
         />
 
         <View style={styles.activityHeader}>
           <View>
-            <Text style={styles.sectionTitle}>
-              Recent case activity
-            </Text>
+            <Text style={styles.sectionTitle}>Recent case activity</Text>
 
             <Text style={styles.sectionSubtitle}>
               Latest status changes from assigned cases
@@ -569,13 +538,10 @@ export default function OfficerDashboardScreen() {
           <View style={styles.emptyActivity}>
             <Text style={styles.emptyActivityIcon}>🕘</Text>
 
-            <Text style={styles.emptyActivityTitle}>
-              No recent updates
-            </Text>
+            <Text style={styles.emptyActivityTitle}>No recent updates</Text>
 
             <Text style={styles.emptyActivityText}>
-              Status changes from your assigned cases will appear
-              here.
+              Status changes from your assigned cases will appear here.
             </Text>
           </View>
         ) : (
@@ -639,14 +605,11 @@ export default function OfficerDashboardScreen() {
           <Text style={styles.securityIcon}>🔒</Text>
 
           <View style={styles.securityContent}>
-            <Text style={styles.securityTitle}>
-              Protected staff workspace
-            </Text>
+            <Text style={styles.securityTitle}>Protected staff workspace</Text>
 
             <Text style={styles.securityText}>
-              JusticeNow restricts this workspace to your
-              authenticated Case Officer account and actively
-              assigned cases.
+              JusticeNow restricts this workspace to your authenticated Case
+              Officer account and actively assigned cases.
             </Text>
           </View>
         </View>
@@ -704,10 +667,7 @@ function ActionCard({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={title}
-      style={({ pressed }) => [
-        styles.actionCard,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
     >
       <View style={styles.actionIconBox}>
         <Text style={styles.actionIcon}>{icon}</Text>
@@ -719,16 +679,12 @@ function ActionCard({
 
           {badge !== undefined && badge > 0 && (
             <View style={styles.actionBadge}>
-              <Text style={styles.actionBadgeText}>
-                {badge}
-              </Text>
+              <Text style={styles.actionBadgeText}>{badge}</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.actionDescription}>
-          {description}
-        </Text>
+        <Text style={styles.actionDescription}>{description}</Text>
       </View>
 
       <Text style={styles.actionArrow}>›</Text>

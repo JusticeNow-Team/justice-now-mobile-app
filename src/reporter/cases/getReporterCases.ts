@@ -2,7 +2,10 @@ import { supabase } from "../../lib/supabase";
 import { ReporterCase, ReporterCaseStatus } from "./types";
 
 export type GetReporterCasesResult =
-  | { ok: true; cases: ReporterCase[] }
+  | {
+      ok: true;
+      cases: ReporterCase[];
+    }
   | {
       ok: false;
       reason: "unauthenticated" | "generic";
@@ -14,6 +17,7 @@ const STATUSES: ReporterCaseStatus[] = [
   "under_review",
   "assigned",
   "investigating",
+  "awaiting_information",
   "awaiting_evidence",
   "resolved",
   "closed",
@@ -58,10 +62,12 @@ export async function getReporterCases(): Promise<GetReporterCasesResult> {
   const { data, error } = await supabase
     .from("cases")
     .select(
-      "id, case_reference, title, category, incident_date, status, created_at, updated_at, reporter_id"
+      "id, case_reference, title, category, incident_date, status, created_at, updated_at, reporter_id",
     )
     .eq("reporter_id", user.id)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", {
+      ascending: false,
+    });
 
   if (error) {
     return {
@@ -84,5 +90,8 @@ export async function getReporterCases(): Promise<GetReporterCasesResult> {
       updatedAt: row.updated_at,
     }));
 
-  return { ok: true, cases };
+  return {
+    ok: true,
+    cases,
+  };
 }

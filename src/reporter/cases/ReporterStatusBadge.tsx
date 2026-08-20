@@ -5,9 +5,17 @@ import { ReporterCaseStatus } from "./types";
 
 const labels: Record<
   ReporterCaseStatus,
-  { label: string; color: string; background: string }
+  {
+    label: string;
+    color: string;
+    background: string;
+  }
 > = {
-  submitted: { label: "Submitted", color: colors.info, background: "#E8F1FB" },
+  submitted: {
+    label: "Submitted",
+    color: colors.info,
+    background: "#E8F1FB",
+  },
   under_review: {
     label: "Under review",
     color: colors.royal[600],
@@ -23,12 +31,21 @@ const labels: Record<
     color: colors.navy[700],
     background: colors.navy[50],
   },
+  awaiting_information: {
+    label: "Awaiting information",
+    color: colors.warning,
+    background: "#FBF7EC",
+  },
   awaiting_evidence: {
     label: "Awaiting evidence",
     color: colors.warning,
     background: "#FBF7EC",
   },
-  resolved: { label: "Resolved", color: colors.success, background: "#EAF8F2" },
+  resolved: {
+    label: "Resolved",
+    color: colors.success,
+    background: "#EAF8F2",
+  },
   closed: {
     label: "Closed",
     color: colors.textSecondary,
@@ -44,8 +61,24 @@ export default function ReporterStatusBadge({
   const config = labels[status];
 
   return (
-    <View style={[styles.badge, { backgroundColor: config.background }]}>
-      <Text style={[styles.text, { color: config.color }]}>{config.label}</Text>
+    <View
+      style={[
+        styles.badge,
+        {
+          backgroundColor: config.background,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.text,
+          {
+            color: config.color,
+          },
+        ]}
+      >
+        {config.label}
+      </Text>
     </View>
   );
 }
