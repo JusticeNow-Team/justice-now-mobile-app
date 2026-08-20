@@ -6,7 +6,6 @@ import {
   getStaffRoles,
   isValidRole,
   normalizeRole,
-  ROLE_CONFIGS,
   SYSTEM_ROLES,
 } from "../roles";
 

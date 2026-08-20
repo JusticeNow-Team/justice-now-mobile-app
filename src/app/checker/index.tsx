@@ -13,7 +13,7 @@ import { colors } from "../../theme";
 
 export default function EvidenceCheckerScreen() {
   const router = useRouter();
-  const { user, role, signOut, can } = useAuth();
+  const { user, role, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();

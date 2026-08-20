@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
     ActivityIndicator,
@@ -46,11 +46,7 @@ export default function TwoFactorScreen() {
   // Prepare MFA
   // -------------------------------------------------------
 
-  useEffect(() => {
-    prepareMfa();
-  }, []);
-
-  const prepareMfa = async () => {
+  const prepareMfa = useCallback(async () => {
     try {
       setMode("loading");
       setErrorMessage("");
@@ -146,7 +142,12 @@ export default function TwoFactorScreen() {
 
       setMode("verify");
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void prepareMfa();
+  }, [prepareMfa]);
 
   // -------------------------------------------------------
   // Update digit
