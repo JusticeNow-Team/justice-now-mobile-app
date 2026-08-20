@@ -2,12 +2,6 @@ import { supabase } from "../../lib/supabase";
 import { incidentCategories } from "./options";
 import { CaseDraft } from "./types";
 
-function generateCaseReference() {
-  const year = new Date().getFullYear();
-  const serial = `${Math.floor(10000 + Math.random() * 90000)}`;
-  return `JN-${year}-${serial}`;
-}
-
 function categoryLabels(ids: string[]) {
   return ids
     .map((id) => incidentCategories.find((item) => item.id === id)?.label ?? id)
@@ -40,7 +34,7 @@ function buildDescription(draft: CaseDraft) {
       draft.victimRelation === "self"
         ? "The affected person"
         : "For another person"
-    }`
+    }`,
   );
 
   if (draft.victimName.trim()) {
@@ -65,22 +59,26 @@ function buildDescription(draft: CaseDraft) {
 
   if (draft.witnesses.length > 0) {
     lines.push(`Witnesses: ${draft.witnesses.length}`);
+
     draft.witnesses.forEach((witness, index) => {
       lines.push(
         `Witness ${index + 1}: ${witness.name || "Name withheld"} · ${
           witness.seen || "No description"
-        }`
+        }`,
       );
     });
   }
 
   lines.push(
-    `Hide identity from selected parties: ${draft.hideIdentity ? "Yes" : "No"}`
+    `Hide identity from selected parties: ${draft.hideIdentity ? "Yes" : "No"}`,
   );
+
   lines.push(`Investigator may contact: ${draft.allowContact ? "Yes" : "No"}`);
+
   lines.push(
-    `Discreet notifications: ${draft.discreetNotifications ? "Yes" : "No"}`
+    `Discreet notifications: ${draft.discreetNotifications ? "Yes" : "No"}`,
   );
+
   lines.push(`Preferred contact: ${draft.contactMethod}`);
 
   return lines.join("\n");
@@ -93,10 +91,14 @@ export type SubmitCaseResult =
       caseReference: string;
       submittedAt: string;
     }
-  | { ok: false; reason: "unauthenticated" | "generic"; message: string };
+  | {
+      ok: false;
+      reason: "unauthenticated" | "generic";
+      message: string;
+    };
 
 export async function submitReporterCase(
-  draft: CaseDraft
+  draft: CaseDraft,
 ): Promise<SubmitCaseResult> {
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getUser();
@@ -121,54 +123,22 @@ export async function submitReporterCase(
     return {
       ok: false,
       reason: "unauthenticated",
-      message: "Only a signed-in reporter can submit a case.",
+      message: "Only a signed-in Reporter can submit a case.",
     };
   }
 
-  const payload = {
-    reporter_id: user.id,
-    case_reference: generateCaseReference(),
-    title: draft.title.trim(),
-    description: buildDescription(draft),
-    category: categoryLabels(draft.categories),
-    incident_date: draft.incidentDate.trim(),
-    district: draft.district,
-    status: "submitted",
-    priority: "medium",
-    is_anonymous: draft.reportingMode === "anonymous",
-  };
+  const { data, error } = await supabase.rpc("submit_reporter_case", {
+    p_title: draft.title.trim(),
+    p_description: buildDescription(draft),
+    p_category: categoryLabels(draft.categories),
+    p_incident_date: draft.incidentDate.trim(),
+    p_district: draft.district,
+    p_is_anonymous: draft.reportingMode === "anonymous",
+  });
 
-  let { data, error } = await supabase
-    .from("cases")
-    .insert(payload)
-    .select("id, case_reference, created_at")
-    .single();
+  const submittedCase = Array.isArray(data) ? data[0] : data;
 
-  if (error && /reporter_id/i.test(error.message)) {
-    const withoutReporter = { ...payload };
-    delete (withoutReporter as { reporter_id?: string }).reporter_id;
-    const retry = await supabase
-      .from("cases")
-      .insert(withoutReporter)
-      .select("id, case_reference, created_at")
-      .single();
-
-    data = retry.data;
-    error = retry.error;
-  }
-
-  if (error && /duplicate|unique/i.test(error.message)) {
-    const retry = await supabase
-      .from("cases")
-      .insert({ ...payload, case_reference: generateCaseReference() })
-      .select("id, case_reference, created_at")
-      .single();
-
-    data = retry.data;
-    error = retry.error;
-  }
-
-  if (error || !data) {
+  if (error || !submittedCase) {
     return {
       ok: false,
       reason: "generic",
@@ -180,8 +150,8 @@ export async function submitReporterCase(
 
   return {
     ok: true,
-    id: data.id,
-    caseReference: data.case_reference,
-    submittedAt: data.created_at,
+    id: submittedCase.id,
+    caseReference: submittedCase.case_reference,
+    submittedAt: submittedCase.created_at,
   };
 }
