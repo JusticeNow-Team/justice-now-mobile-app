@@ -238,43 +238,27 @@ export default function TwoFactorScreen() {
 
     console.log("MFA VERIFIED ROLE:", profile.role);
 
-    // ---------------------------------------------------
-    // Your Case Officer module
-    // ---------------------------------------------------
+    const normalized =
+      profile.role === "evidence_validator"
+        ? "evidence_checker"
+        : profile.role;
 
-    if (profile.role === "case_officer") {
+    if (normalized === "case_officer") {
       router.replace("/officer");
-
       return;
     }
 
-    // ---------------------------------------------------
-    // Other team modules are not connected yet
-    // ---------------------------------------------------
+    if (normalized === "evidence_checker") {
+      router.replace("/checker");
+      return;
+    }
+
+    if (normalized === "system_admin") {
+      router.replace("/admin");
+      return;
+    }
 
     await supabase.auth.signOut();
-
-    if (profile.role === "evidence_validator") {
-      Alert.alert(
-        "Validator workspace",
-        "The Evidence Validator module is not connected in this branch yet.",
-      );
-
-      router.replace("/login");
-
-      return;
-    }
-
-    if (profile.role === "system_admin") {
-      Alert.alert(
-        "Administrator workspace",
-        "The System Administrator module is not connected in this branch yet.",
-      );
-
-      router.replace("/login");
-
-      return;
-    }
 
     Alert.alert(
       "Access denied",

@@ -33,30 +33,21 @@ export default function SecureRoleScreen() {
   // -------------------------------------------------------
 
   const routeStaff = async (role: string) => {
-    if (role === "case_officer") {
+    const normalized =
+      role === "evidence_validator" ? "evidence_checker" : role;
+
+    if (normalized === "case_officer") {
       router.replace("/officer");
       return;
     }
 
-    if (role === "evidence_validator") {
-      await supabase.auth.signOut();
-
-      Alert.alert(
-        "Validator workspace",
-        "The Evidence Validator module is not connected in this branch yet.",
-      );
-
+    if (normalized === "evidence_checker") {
+      router.replace("/checker");
       return;
     }
 
-    if (role === "system_admin") {
-      await supabase.auth.signOut();
-
-      Alert.alert(
-        "Administrator workspace",
-        "The System Administrator module is not connected in this branch yet.",
-      );
-
+    if (normalized === "system_admin") {
+      router.replace("/admin");
       return;
     }
 
@@ -171,6 +162,7 @@ export default function SecureRoleScreen() {
 
       const allowedStaffRoles = [
         "case_officer",
+        "evidence_checker",
         "evidence_validator",
         "system_admin",
       ];
