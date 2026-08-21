@@ -1,12 +1,38 @@
-export type EvidenceValidationStatus =
+export type EvidenceStatus =
   | "pending"
+  | "under_review"
   | "validated"
+  | "info_requested"
   | "rejected"
-  | "info_requested";
+  | "archived";
+
+// Backwards compatibility alias
+export type EvidenceValidationStatus = EvidenceStatus;
 
 export type EvidenceCategory = "photo" | "video" | "audio" | "document";
 
 export type PreviewKind = "image" | "document" | "audio" | "video" | "unsupported";
+
+export interface StatusHistoryRecord {
+  id: string;
+  evidenceId: string;
+  fromStatus: EvidenceStatus;
+  toStatus: EvidenceStatus;
+  changedAt: string; // ISO timestamp
+  changedByRole: "checker" | "case_officer" | "system" | "reporter";
+  changedById?: string;
+  changedByName?: string;
+  notes?: string;
+  rejectionReason?: string;
+}
+
+export interface PublicStatusInfo {
+  publicLabel: string;
+  publicDescription: string;
+  badgeBg: string;
+  badgeFg: string;
+  actionRequiredForReporter: boolean;
+}
 
 export interface CaseLinkInfo {
   id: string;
@@ -74,6 +100,10 @@ export interface EvidenceRecord {
   validatedAt?: string;
   validatedBy?: string;
   controlledDownloadLogs?: ControlledDownloadLog[];
+
+  // JN-170 Track Evidence Status Additions
+  statusHistory?: StatusHistoryRecord[];
+  lastStatusChangedAt?: string;
 }
 
 export interface CriteriaAudit {
@@ -117,16 +147,20 @@ export interface MetadataValidationResult {
 export type CheckerFilterTab =
   | "all"
   | "pending"
+  | "under_review"
   | "validated"
   | "rejected"
+  | "archived"
   | "invalid_metadata"
   | "storage_insecure";
 
 export interface CheckerSummaryStats {
   totalCount: number;
   pendingCount: number;
+  underReviewCount: number;
   validatedCount: number;
   rejectedCount: number;
+  archivedCount: number;
   invalidMetadataCount: number;
   storageInsecureCount: number;
 }
