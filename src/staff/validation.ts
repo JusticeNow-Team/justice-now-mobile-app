@@ -1,8 +1,14 @@
+import { SystemRole } from "../auth/types";
 import { CreateStaffInput, StaffAccount, StaffValidationResult } from "./types";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const ALLOWED_STAFF_ROLES = ["case_officer", "evidence_checker", "system_admin"] as const;
+const ALLOWED_STAFF_ROLES: readonly SystemRole[] = [
+  "case_officer",
+  "evidence_checker",
+  "system_admin",
+  "reporter",
+];
 
 /**
  * Validates the input payload for creating or editing a staff account.

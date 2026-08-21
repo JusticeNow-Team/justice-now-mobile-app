@@ -436,11 +436,16 @@ export default function AdminStaffScreen() {
                   <View style={styles.divider} />
 
                   <View style={styles.staffCardFooter}>
-                    <View style={styles.roleChip}>
+                    <Pressable
+                      style={styles.roleChip}
+                      onPress={() => router.push("/admin/roles")}
+                      accessibilityRole="button"
+                      accessibilityLabel="Manage role in Roles & Permissions"
+                    >
                       <Text style={styles.roleChipText}>
-                        {getRoleLabel(staff.role)}
+                        {getRoleLabel(staff.role)} ✏️
                       </Text>
-                    </View>
+                    </Pressable>
 
                     <View style={styles.switchRow}>
                       <Text style={styles.switchLabel}>

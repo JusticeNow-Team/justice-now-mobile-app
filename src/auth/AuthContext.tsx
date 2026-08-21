@@ -167,6 +167,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateActiveUserRole = useCallback((newRole: SystemRole) => {
+    const normalized = normalizeRole(newRole) || "reporter";
+    setRole(normalized);
+    setUser((prev) => (prev ? { ...prev, role: normalized } : null));
+  }, []);
+
   const contextValue = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -179,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       refreshProfile,
       loginAsRole,
+      updateActiveUserRole,
     }),
     [
       user,
@@ -190,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       refreshProfile,
       loginAsRole,
+      updateActiveUserRole,
     ]
   );
 
