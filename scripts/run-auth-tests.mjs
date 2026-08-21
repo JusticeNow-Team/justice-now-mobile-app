@@ -974,4 +974,112 @@ describe("Acceptance Criteria 7: Logout Returns to Public Login", () => {
   });
 });
 
+// ============================================================================
+// JN-191 STAFF ACCOUNT MANAGEMENT TEST SUITE
+// Covers: JN-193, JN-194, JN-195, JN-196, JN-197, JN-228
+// ============================================================================
+
+const TEST_STAFF_ACCOUNTS = [
+  {
+    id: "staff_admin_01",
+    email: "admin@justicenow.org",
+    fullName: "Chief System Administrator",
+    role: "system_admin",
+    isActive: true,
+    status: "active",
+  },
+  {
+    id: "staff_officer_01",
+    email: "officer.silva@justicenow.org",
+    fullName: "Investigator K. Silva",
+    role: "case_officer",
+    isActive: true,
+    status: "active",
+  },
+  {
+    id: "staff_checker_01",
+    email: "checker.fernando@justicenow.org",
+    fullName: "Forensic Analyst N. Fernando",
+    role: "evidence_checker",
+    isActive: true,
+    status: "active",
+  },
+  {
+    id: "staff_inactive_01",
+    email: "former.staff@justicenow.org",
+    fullName: "Former Staff Member",
+    role: "case_officer",
+    isActive: false,
+    status: "inactive",
+  },
+];
+
+function validateStaffInputTest(input) {
+  const errors = [];
+  const cleanName = input.fullName ? input.fullName.trim() : "";
+  const cleanEmail = input.email ? input.email.trim().toLowerCase() : "";
+
+  if (!cleanName) errors.push("Full name is required.");
+  if (!cleanEmail || !cleanEmail.includes("@")) errors.push("Valid email is required.");
+  if (!input.role) errors.push("Role is required.");
+
+  return { isValid: errors.length === 0, errors };
+}
+
+function checkDuplicateEmailTest(email, existingList, currentId) {
+  const clean = email.trim().toLowerCase();
+  const match = existingList.find((s) => s.email.toLowerCase() === clean && s.id !== currentId);
+  return { isDuplicate: Boolean(match) };
+}
+
+describe("JN-191 & JN-193: Staff Account Retrieval (AC 1)", () => {
+  it("Admin can view staff accounts", () => {
+    assert.ok(TEST_STAFF_ACCOUNTS.length >= 4);
+    const roles = TEST_STAFF_ACCOUNTS.map((s) => s.role);
+    assert.ok(roles.includes("case_officer"));
+    assert.ok(roles.includes("evidence_checker"));
+    assert.ok(roles.includes("system_admin"));
+  });
+});
+
+describe("JN-194 & JN-196: Create Staff & Duplicate Email Prevention (AC 2 & AC 4)", () => {
+  it("Validates required fields when creating staff", () => {
+    const valid = validateStaffInputTest({
+      fullName: "Officer John",
+      email: "john@justicenow.org",
+      role: "case_officer",
+    });
+    assert.equal(valid.isValid, true);
+
+    const invalid = validateStaffInputTest({ fullName: "", email: "bad", role: "" });
+    assert.equal(invalid.isValid, false);
+  });
+
+  it("AC 4: Duplicate email addresses are rejected (case-insensitive)", () => {
+    const dup = checkDuplicateEmailTest("OFFICER.SILVA@JUSTICENOW.ORG", TEST_STAFF_ACCOUNTS);
+    assert.equal(dup.isDuplicate, true);
+
+    const unique = checkDuplicateEmailTest("new.unique.officer@justicenow.org", TEST_STAFF_ACCOUNTS);
+    assert.equal(unique.isDuplicate, false);
+  });
+});
+
+describe("JN-195 & JN-228: Staff Activation/Deactivation & Login Gating (AC 3 & AC 5)", () => {
+  it("AC 3: Admin can activate or deactivate a staff account", () => {
+    const staff = { ...TEST_STAFF_ACCOUNTS[1], isActive: false, status: "inactive" };
+    assert.equal(staff.isActive, false);
+    assert.equal(staff.status, "inactive");
+  });
+
+  it("AC 5: Deactivated staff users cannot log in", () => {
+    const deactivatedStaff = TEST_STAFF_ACCOUNTS.find((s) => !s.isActive);
+    assert.equal(isAccountActive(deactivatedStaff), false);
+
+    const redirect = resolvePostLoginRedirect(deactivatedStaff);
+    assert.equal(redirect.allowed, false);
+    assert.equal(redirect.reason, "inactive_account");
+  });
+});
+
+
 

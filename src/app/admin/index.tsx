@@ -62,6 +62,19 @@ export default function AdminDashboardScreen() {
           <View style={styles.actionGrid}>
             <Pressable
               style={styles.actionCard}
+              onPress={() => router.push("/admin/staff")}
+              accessibilityRole="button"
+              accessibilityLabel="Manage Staff Accounts"
+            >
+              <Text style={styles.actionIcon}>👥</Text>
+              <Text style={styles.actionTitle}>Staff Accounts</Text>
+              <Text style={styles.actionDesc}>
+                Manage, invite, activate, or deactivate Case Officers and Evidence Checkers with full audit logging.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionCard}
               onPress={() => router.push("/admin/categories")}
               accessibilityRole="button"
               accessibilityLabel="Manage Report Categories"
