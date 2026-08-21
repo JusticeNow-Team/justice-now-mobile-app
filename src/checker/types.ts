@@ -154,6 +154,27 @@ export type CheckerFilterTab =
   | "invalid_metadata"
   | "storage_insecure";
 
+export interface StorageAccessPolicy {
+  bucketName: string;
+  isPrivate: boolean;
+  allowedRoles: string[];
+  maxSignedUrlDurationSeconds: number;
+}
+
+export interface SignedUrlResponse {
+  success: boolean;
+  signedUrl?: string;
+  expiresAt?: string;
+  error?: string;
+}
+
+export interface UploadTransactionResult {
+  success: boolean;
+  record?: EvidenceRecord;
+  rolledBack?: boolean;
+  error?: string;
+}
+
 export interface CheckerSummaryStats {
   totalCount: number;
   pendingCount: number;

@@ -24,6 +24,7 @@ import {
   MAX_EVIDENCE_BYTES,
   validateEvidenceMetadata,
 } from "../../../checker/metadataValidation";
+import { generateSecureSignedUrl } from "../../../checker/evidenceStorageService";
 import {
   getPublicStatusForReporter,
   getCaseOfficerStatusView,
@@ -79,6 +80,8 @@ export default function EvidenceAuditDetailScreen() {
     return validateEvidenceMetadata(record);
   }, [record]);
 
+  const handleGenerateSignedAccessUrl = async () => {
+    if (!record) return;
   const handleGenerateSignedAccessUrl = () => {
     if (!isAuthorized) {
       Alert.alert(
@@ -89,16 +92,34 @@ export default function EvidenceAuditDetailScreen() {
     }
 
     setGeneratingSignedUrl(true);
-    setTimeout(() => {
-      const timestamp = Math.floor(Date.now() / 1000) + 900; // 15 mins expiry
-      const token = `https://justicenow-secure-vault.internal/signed-access/${record?.id || "EVD"}?exp=${timestamp}&sig=auth_verified_staff`;
-      setSignedUrlToken(token);
+
+    try {
+      const userRole = isAuthorized ? "evidence_checker" : "unauthorized_guest";
+      const path = record.storagePath || `cases/${record.caseId}/evidence/${record.id}_file`;
+
+      const res = await generateSecureSignedUrl({
+        evidenceId: record.id,
+        storagePath: path,
+        userRole,
+        expirySeconds: 900,
+      });
+
       setGeneratingSignedUrl(false);
-      Alert.alert(
-        "🔒 Secure Time-Limited Token Generated",
-        "Generated a 15-minute signed access token for authorized staff review. Access expires automatically after 900 seconds."
-      );
-    }, 600);
+
+      if (res.success && res.signedUrl) {
+        setSignedUrlToken(res.signedUrl);
+        Alert.alert(
+          "🔒 Secure Signed Token Generated",
+          `Access Granted for Role: ${userRole}\n\nSigned Token URL:\n${res.signedUrl}\n\nExpires At: ${res.expiresAt}`
+        );
+      } else {
+        setSignedUrlToken("");
+        Alert.alert("🔒 Access Denied", res.error || "Unauthorized request.");
+      }
+    } catch (err: any) {
+      setGeneratingSignedUrl(false);
+      Alert.alert("Error", err.message || "Failed to generate signed token.");
+    }
   };
 
   const handleMarkUnderReview = async () => {
