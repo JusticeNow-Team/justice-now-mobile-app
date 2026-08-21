@@ -218,14 +218,6 @@ export default function EvidenceAuditDetailScreen() {
 
   const { audit } = validation;
 
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/checker");
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -434,7 +426,7 @@ export default function EvidenceAuditDetailScreen() {
                     <View style={styles.officerRow}>
                       <Text style={styles.officerLabel}>Public Reporter Summary:</Text>
                       <Text style={styles.officerValue}>
-                        "{officerView.publicReporterSummary}"
+                        {`"${officerView.publicReporterSummary}"`}
                       </Text>
                     </View>
 
@@ -1446,7 +1438,7 @@ const styles = StyleSheet.create({
   roleTabRow: {
     flexDirection: "row",
     marginTop: 10,
-    backgroundColor: colors.navy[950] || "#0B132B",
+    backgroundColor: colors.navy[900] || "#0B132B",
     borderRadius: 8,
     padding: 3,
     gap: 4,

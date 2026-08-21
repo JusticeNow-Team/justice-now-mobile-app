@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme";
+import { isAccountActive } from "../navigation";
 import { SystemRole } from "../types";
 import { useAuth } from "../useAuth";
 
@@ -9,25 +10,60 @@ interface RoleGuardProps {
   children: React.ReactNode;
   allowedRoles: SystemRole[];
   fallback?: React.ReactNode;
+  redirectToUnauthorized?: boolean;
 }
 
 export function RoleGuard({
   children,
   allowedRoles,
   fallback,
+  redirectToUnauthorized = false,
 }: RoleGuardProps) {
   const router = useRouter();
-  const { role, isLoading, loginAsRole } = useAuth();
+  const { role, user, isLoading, loginAsRole, signOut } = useAuth();
 
   if (isLoading) {
     return null;
   }
 
+  // 1. Check account active status (JN-182)
+  if (user && !isAccountActive(user)) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.icon}>⚠️</Text>
+          <Text style={styles.title}>Account Inactive</Text>
+          <Text style={styles.message}>
+            Your account or assigned role is currently inactive. Please contact your system administrator at{" "}
+            <Text style={styles.bold}>admin@justicenow.org</Text>.
+          </Text>
+
+          <Pressable
+            style={styles.authButton}
+            onPress={async () => {
+              await signOut();
+              router.replace("/login");
+            }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.authButtonText}>Sign Out</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // 2. Check role authorization (JN-179)
   const isAllowed = role && allowedRoles.includes(role);
 
   if (!isAllowed) {
     if (fallback) {
       return <>{fallback}</>;
+    }
+
+    if (redirectToUnauthorized) {
+      router.replace("/unauthorized");
+      return null;
     }
 
     const targetRole = allowedRoles[0] || "system_admin";
@@ -67,6 +103,16 @@ export function RoleGuard({
           >
             <Text style={styles.loginLinkText}>
               Go to Staff & Admin Login
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.unauthorizedLink}
+            onPress={() => router.push("/unauthorized")}
+            accessibilityRole="button"
+          >
+            <Text style={styles.unauthorizedLinkText}>
+              View Security Notice Details
             </Text>
           </Pressable>
         </View>
@@ -132,11 +178,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   loginLink: {
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   loginLinkText: {
     color: colors.royal[700],
     fontSize: 12.5,
     fontWeight: "600",
+  },
+  unauthorizedLink: {
+    paddingVertical: 4,
+    marginTop: 2,
+  },
+  unauthorizedLinkText: {
+    color: colors.textSoft,
+    fontSize: 11.5,
   },
 });

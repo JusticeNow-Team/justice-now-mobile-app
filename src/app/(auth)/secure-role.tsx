@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../../auth";
+import { getDashboardRouteForRole, resolvePostLoginRedirect, useAuth } from "../../auth";
 import { SystemRole } from "../../auth/types";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
@@ -39,31 +39,19 @@ export default function SecureRoleScreen() {
   // Route verified staff by their database role
   // -------------------------------------------------------
 
-  const routeStaff = async (role: string) => {
-    const normalized =
-      role === "evidence_validator" ? "evidence_checker" : role;
+  const routeStaff = async (roleOrProfile: any) => {
+    const redirect = resolvePostLoginRedirect(roleOrProfile);
 
-    if (normalized === "case_officer") {
-      router.replace("/officer");
+    if (!redirect.allowed) {
+      await supabase.auth.signOut();
+      Alert.alert(
+        "Access denied",
+        redirect.error || "This account does not have an authorized JusticeNow staff role."
+      );
       return;
     }
 
-    if (normalized === "evidence_checker") {
-      router.replace("/checker");
-      return;
-    }
-
-    if (normalized === "system_admin") {
-      router.replace("/admin");
-      return;
-    }
-
-    await supabase.auth.signOut();
-
-    Alert.alert(
-      "Access denied",
-      "This account does not have an authorized JusticeNow staff role."
-    );
+    router.replace(redirect.targetRoute as any);
   };
 
   // -------------------------------------------------------
@@ -72,15 +60,8 @@ export default function SecureRoleScreen() {
 
   const handleQuickDemoLogin = (role: SystemRole) => {
     loginAsRole(role);
-    if (role === "system_admin") {
-      router.replace("/admin");
-    } else if (role === "case_officer") {
-      router.replace("/officer");
-    } else if (role === "evidence_checker") {
-      router.replace("/checker");
-    } else {
-      router.replace("/reporter");
-    }
+    const targetRoute = getDashboardRouteForRole(role) || "/reporter";
+    router.replace(targetRoute as any);
   };
 
   // -------------------------------------------------------
@@ -591,44 +572,6 @@ export default function SecureRoleScreen() {
               title="Evidence Checker / Validator"
               description="Reviews submitted evidence and records validation decisions."
             />
-
-
-            <Pressable
-              onPress={() => router.push("/checker")}
-              accessibilityRole="button"
-              accessibilityLabel="Enter Evidence Checker Portal"
-            >
-              <RoleItem
-                icon="🔍"
-                title="Evidence Checker / Validator"
-                description="Reviews submitted evidence, validates metadata, and enforces acceptance criteria. (Tap to open workspace)"
-              />
-            </Pressable>
-
-            <View style={styles.divider} />
-
-            <RoleItem
-              icon="⚙️"
-              title="System Administrator"
-              description="Manages accounts, permissions, security and system configuration."
-            />
-          </View>
-
-          {/* Role Info */}
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>
-                Roles are assigned by JusticeNow
-              </Text>
-
-              <Text style={styles.infoText}>
-                Staff cannot select or change their role during sign in.
-                JusticeNow loads the authorized role from the account profile.
-              </Text>
-            </View>
           </View>
 
           {/* Regular Login Link */}

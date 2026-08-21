@@ -769,3 +769,209 @@ describe("JN-139 & JN-141: Category Selection & Case Record Linking (Acceptance 
   });
 });
 
+// ============================================================================
+// JN-177 DASHBOARD ROUTING TEST SUITE
+// Covers: JN-178, JN-179, JN-180, JN-181, JN-182, JN-183
+// ============================================================================
+
+const ROLE_DASHBOARD_ROUTES = {
+  reporter: "/reporter",
+  case_officer: "/officer",
+  evidence_checker: "/checker",
+  system_admin: "/admin",
+};
+
+const PUBLIC_AUTH_ROUTES = [
+  "/",
+  "/login",
+  "/register",
+  "/secure-role",
+  "/two-factor",
+  "/forgot-password",
+  "/onboarding",
+  "/unauthorized",
+];
+
+function getDashboardRouteForRole(role) {
+  const normalized = normalizeRole(role);
+  if (!normalized) return null;
+  return ROLE_DASHBOARD_ROUTES[normalized] || null;
+}
+
+function getRoleForDashboardRoute(pathname) {
+  if (!pathname) return null;
+  const cleanPath = pathname.trim().toLowerCase();
+  if (cleanPath === "/reporter" || cleanPath.startsWith("/reporter/")) return "reporter";
+  if (cleanPath === "/officer" || cleanPath.startsWith("/officer/")) return "case_officer";
+  if (cleanPath === "/checker" || cleanPath.startsWith("/checker/")) return "evidence_checker";
+  if (cleanPath === "/admin" || cleanPath.startsWith("/admin/")) return "system_admin";
+  return null;
+}
+
+function isAccountActive(profile) {
+  if (!profile) return true;
+  if (profile.is_active === false) return false;
+  if (profile.status === "inactive" || profile.status === "suspended") return false;
+  return true;
+}
+
+function isRoleAuthorizedForPath(role, pathname) {
+  if (!pathname) return false;
+  const cleanPath = pathname.trim().toLowerCase();
+
+  for (const pub of PUBLIC_AUTH_ROUTES) {
+    if (cleanPath === pub || cleanPath.startsWith(`${pub}/`)) return true;
+  }
+
+  const normalized = normalizeRole(role);
+  if (!normalized) return false;
+
+  const requiredRole = getRoleForDashboardRoute(cleanPath);
+  if (!requiredRole) return true;
+
+  return normalized === requiredRole;
+}
+
+function resolvePostLoginRedirect(profileOrRole) {
+  if (!profileOrRole) {
+    return {
+      allowed: false,
+      targetRoute: "/login",
+      role: null,
+      error: "No role provided for user account.",
+      reason: "invalid_role",
+    };
+  }
+
+  let roleStr;
+  let active = true;
+
+  if (typeof profileOrRole === "string") {
+    roleStr = profileOrRole;
+  } else {
+    roleStr = profileOrRole.role;
+    active = isAccountActive(profileOrRole);
+  }
+
+  const normalized = normalizeRole(roleStr);
+
+  if (!normalized) {
+    return {
+      allowed: false,
+      targetRoute: "/login",
+      role: null,
+      error: "Unknown or invalid user role assigned to this account.",
+      reason: "invalid_role",
+    };
+  }
+
+  if (!active) {
+    return {
+      allowed: false,
+      targetRoute: "/unauthorized?reason=inactive",
+      role: normalized,
+      error: "Your account or assigned role is currently inactive. Please contact your system administrator.",
+      reason: "inactive_account",
+    };
+  }
+
+  return {
+    allowed: true,
+    targetRoute: ROLE_DASHBOARD_ROUTES[normalized],
+    role: normalized,
+  };
+}
+
+describe("JN-178 & JN-180: Role-Dashboard Route Definitions & Post-Login Redirection (AC 1-4)", () => {
+  it("AC 1: Reporter is routed to the Reporter dashboard (/reporter)", () => {
+    assert.equal(getDashboardRouteForRole("reporter"), "/reporter");
+    const res = resolvePostLoginRedirect("reporter");
+    assert.equal(res.allowed, true);
+    assert.equal(res.targetRoute, "/reporter");
+  });
+
+  it("AC 2: Case Officer is routed to the Case Officer dashboard (/officer)", () => {
+    assert.equal(getDashboardRouteForRole("case_officer"), "/officer");
+    const res = resolvePostLoginRedirect("case_officer");
+    assert.equal(res.allowed, true);
+    assert.equal(res.targetRoute, "/officer");
+  });
+
+  it("AC 3: Evidence Checker is routed to the Evidence Checker dashboard (/checker)", () => {
+    assert.equal(getDashboardRouteForRole("evidence_checker"), "/checker");
+    assert.equal(getDashboardRouteForRole("evidence_validator"), "/checker");
+    const res = resolvePostLoginRedirect("evidence_checker");
+    assert.equal(res.allowed, true);
+    assert.equal(res.targetRoute, "/checker");
+  });
+
+  it("AC 4: System Admin is routed to the Admin dashboard (/admin)", () => {
+    assert.equal(getDashboardRouteForRole("system_admin"), "/admin");
+    const res = resolvePostLoginRedirect("system_admin");
+    assert.equal(res.allowed, true);
+    assert.equal(res.targetRoute, "/admin");
+  });
+});
+
+describe("JN-179 & AC 5: Manual Cross-Role Dashboard Access Prevention", () => {
+  it("A user cannot manually open another role's dashboard", () => {
+    // Reporter
+    assert.equal(isRoleAuthorizedForPath("reporter", "/reporter"), true);
+    assert.equal(isRoleAuthorizedForPath("reporter", "/officer"), false);
+    assert.equal(isRoleAuthorizedForPath("reporter", "/checker"), false);
+    assert.equal(isRoleAuthorizedForPath("reporter", "/admin"), false);
+
+    // Case Officer
+    assert.equal(isRoleAuthorizedForPath("case_officer", "/officer"), true);
+    assert.equal(isRoleAuthorizedForPath("case_officer", "/reporter"), false);
+    assert.equal(isRoleAuthorizedForPath("case_officer", "/checker"), false);
+    assert.equal(isRoleAuthorizedForPath("case_officer", "/admin"), false);
+
+    // Evidence Checker
+    assert.equal(isRoleAuthorizedForPath("evidence_checker", "/checker"), true);
+    assert.equal(isRoleAuthorizedForPath("evidence_checker", "/reporter"), false);
+    assert.equal(isRoleAuthorizedForPath("evidence_checker", "/officer"), false);
+    assert.equal(isRoleAuthorizedForPath("evidence_checker", "/admin"), false);
+
+    // System Admin
+    assert.equal(isRoleAuthorizedForPath("system_admin", "/admin"), true);
+    assert.equal(isRoleAuthorizedForPath("system_admin", "/reporter"), false);
+  });
+});
+
+describe("JN-181 & JN-182: Inactive & Unknown Role Handling (AC 6)", () => {
+  it("Unknown roles are rejected with appropriate error", () => {
+    const res = resolvePostLoginRedirect("unknown_role_abc");
+    assert.equal(res.allowed, false);
+    assert.equal(res.reason, "invalid_role");
+    assert.ok(res.error?.includes("Unknown or invalid user role"));
+  });
+
+  it("Inactive accounts are rejected with error and directed to unauthorized notice", () => {
+    const inactiveUser = {
+      id: "usr_inactive",
+      role: "reporter",
+      is_active: false,
+    };
+    const res = resolvePostLoginRedirect(inactiveUser);
+    assert.equal(res.allowed, false);
+    assert.equal(res.reason, "inactive_account");
+    assert.ok(res.error?.includes("inactive"));
+    assert.ok(res.targetRoute.includes("/unauthorized"));
+  });
+});
+
+describe("Acceptance Criteria 7: Logout Returns to Public Login", () => {
+  it("Unauthenticated session resolves to /login", () => {
+    const res = resolvePostLoginRedirect(null);
+    assert.equal(res.allowed, false);
+    assert.equal(res.targetRoute, "/login");
+  });
+
+  it("Public routes are accessible to all users", () => {
+    assert.equal(isRoleAuthorizedForPath(null, "/login"), true);
+    assert.equal(isRoleAuthorizedForPath(null, "/unauthorized"), true);
+  });
+});
+
+
