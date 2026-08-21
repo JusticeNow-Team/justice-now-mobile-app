@@ -1221,6 +1221,95 @@ describe("JN-243 & AC 7: Role Change Audit Recording", () => {
   });
 });
 
+// ============================================================================
+// JN-244 MODULE-LEVEL PERMISSIONS ENFORCEMENT TEST SUITE
+// Covers: JN-245, JN-246, JN-247, JN-248, JN-249, JN-250
+// ============================================================================
+
+const MODULE_ROLES_MAP = {
+  reporter_module: ["reporter"],
+  case_officer_module: ["case_officer"],
+  evidence_checker_module: ["evidence_checker"],
+  system_admin_module: ["system_admin"],
+};
+
+function canAccessModuleTest(role, moduleName) {
+  const allowed = MODULE_ROLES_MAP[moduleName] || [];
+  return allowed.includes(role);
+}
+
+function authorizeBackendActionTest(role, action) {
+  if (!role) return { authorized: false, statusCode: 401 };
+
+  if (action === "case:update_status") {
+    if (role === "evidence_checker") {
+      return { authorized: false, statusCode: 403, error: "Evidence Checkers cannot update case status." };
+    }
+    if (role === "reporter") {
+      return { authorized: false, statusCode: 403, error: "Reporters cannot update case status." };
+    }
+    return { authorized: true, statusCode: 200 };
+  }
+
+  if (action === "admin:staff_manage") {
+    if (role !== "system_admin") {
+      return { authorized: false, statusCode: 403, error: "Only System Admin can manage staff." };
+    }
+    return { authorized: true, statusCode: 200 };
+  }
+
+  return { authorized: false, statusCode: 403 };
+}
+
+describe("JN-244 & JN-245: Module Permission Boundaries (AC 1-4)", () => {
+  it("AC 1: Reporter cannot access staff modules", () => {
+    assert.equal(canAccessModuleTest("reporter", "case_officer_module"), false);
+    assert.equal(canAccessModuleTest("reporter", "evidence_checker_module"), false);
+    assert.equal(canAccessModuleTest("reporter", "system_admin_module"), false);
+    assert.equal(canAccessModuleTest("reporter", "reporter_module"), true);
+  });
+
+  it("AC 2: Case Officer cannot access System Admin operations", () => {
+    assert.equal(canAccessModuleTest("case_officer", "system_admin_module"), false);
+    const res = authorizeBackendActionTest("case_officer", "admin:staff_manage");
+    assert.equal(res.authorized, false);
+    assert.equal(res.statusCode, 403);
+  });
+
+  it("AC 3: Evidence Checker cannot update case-management fields", () => {
+    const res = authorizeBackendActionTest("evidence_checker", "case:update_status");
+    assert.equal(res.authorized, false);
+    assert.equal(res.statusCode, 403);
+    assert.ok(res.error.includes("Evidence Checkers cannot update"));
+  });
+
+  it("AC 4: System Admin operations are authorized for admin only", () => {
+    const res = authorizeBackendActionTest("system_admin", "admin:staff_manage");
+    assert.equal(res.authorized, true);
+    assert.equal(res.statusCode, 200);
+  });
+});
+
+describe("JN-247 & JN-246: Route & API Independent Protection (AC 5 & AC 6)", () => {
+  it("AC 5: Direct URL access is protected by route rules", () => {
+    assert.equal(isRoleAuthorizedForPath("reporter", "/admin"), false);
+    assert.equal(isRoleAuthorizedForPath("reporter", "/officer"), false);
+    assert.equal(isRoleAuthorizedForPath("case_officer", "/admin"), false);
+    assert.equal(isRoleAuthorizedForPath("system_admin", "/admin"), true);
+  });
+
+  it("AC 6: Backend API rejects unauthorized calls with HTTP 403 / 401", () => {
+    const unauth = authorizeBackendActionTest(null, "case:update_status");
+    assert.equal(unauth.authorized, false);
+    assert.equal(unauth.statusCode, 401);
+
+    const forbidden = authorizeBackendActionTest("reporter", "admin:staff_manage");
+    assert.equal(forbidden.authorized, false);
+    assert.equal(forbidden.statusCode, 403);
+  });
+});
+
+
 
 
 

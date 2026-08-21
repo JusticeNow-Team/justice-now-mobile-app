@@ -10,3 +10,6 @@ export * from "./seeds/rolesSeed";
 export * from "./navigation";
 export * from "./roleValidation";
 export * from "./roleAssignmentService";
+export * from "./permissionMatrix";
+export * from "./backendAuthorization";
+export * from "./unauthorizedHandler";

@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getDashboardRouteForRole, getRoleConfig, useAuth } from "../auth";
+import { formatUnauthorizedReason, getDashboardRouteForRole, getRoleConfig, useAuth } from "../auth";
 import { colors } from "../theme";
 
 export default function UnauthorizedAccessScreen() {
@@ -20,6 +20,7 @@ export default function UnauthorizedAccessScreen() {
   const isInactive = params.reason === "inactive";
   const targetRoute = role ? getDashboardRouteForRole(role) : null;
   const currentRoleConfig = role ? getRoleConfig(role) : null;
+  const reasonDetails = formatUnauthorizedReason(params.reason);
 
   const handleGoToMyDashboard = () => {
     if (targetRoute) {
@@ -66,15 +67,9 @@ export default function UnauthorizedAccessScreen() {
             <Text style={styles.icon}>{isInactive ? "⚠️" : "🔒"}</Text>
           </View>
 
-          <Text style={styles.title}>
-            {isInactive ? "Account Inactive" : "Access Restricted"}
-          </Text>
+          <Text style={styles.title}>{reasonDetails.title}</Text>
 
-          <Text style={styles.message}>
-            {isInactive
-              ? "Your account or assigned role is currently inactive or suspended. Please contact your system administrator to reactivate your credentials."
-              : "You do not have authorization to view this section. JusticeNow enforces strict role-based access control to protect human-rights data and chain of custody."}
-          </Text>
+          <Text style={styles.message}>{reasonDetails.message}</Text>
 
           {/* User Session Info */}
           {role && (
