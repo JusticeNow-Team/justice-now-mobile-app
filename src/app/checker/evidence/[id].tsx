@@ -82,7 +82,6 @@ export default function EvidenceAuditDetailScreen() {
 
   const handleGenerateSignedAccessUrl = async () => {
     if (!record) return;
-  const handleGenerateSignedAccessUrl = () => {
     if (!isAuthorized) {
       Alert.alert(
         "🔒 Access Denied",
