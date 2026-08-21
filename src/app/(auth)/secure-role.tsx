@@ -47,6 +47,7 @@ export default function SecureRoleScreen() {
       router.replace("/officer");
       return;
     }
+
     if (normalized === "evidence_checker") {
       router.replace("/checker");
       return;
@@ -113,7 +114,6 @@ export default function SecureRoleScreen() {
     try {
       setLoading(true);
 
-      // Sign up in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
@@ -132,7 +132,6 @@ export default function SecureRoleScreen() {
       }
 
       if (data.user) {
-        // Upsert profile in database
         await supabase.from("profiles").upsert({
           id: data.user.id,
           full_name: cleanName,
@@ -206,7 +205,6 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      // Load role from profiles
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role, full_name")
@@ -248,7 +246,6 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      // Check MFA
       const { data: aal, error: aalError } =
         await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 

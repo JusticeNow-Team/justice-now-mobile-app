@@ -62,6 +62,19 @@ export default function AdminDashboardScreen() {
           <View style={styles.actionGrid}>
             <Pressable
               style={styles.actionCard}
+              onPress={() => router.push("/admin/categories")}
+              accessibilityRole="button"
+              accessibilityLabel="Manage Report Categories"
+            >
+              <Text style={styles.actionIcon}>📂</Text>
+              <Text style={styles.actionTitle}>Report Categories</Text>
+              <Text style={styles.actionDesc}>
+                Manage human-rights report categories, toggle active status, and configure case classifications.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionCard}
               onPress={() => router.push("/admin/roles")}
               accessibilityRole="button"
               accessibilityLabel="Manage Roles & Permissions"

@@ -1,10 +1,20 @@
+import { getCachedAllCategories } from "../../categories";
 import { supabase } from "../../lib/supabase";
 import { incidentCategories } from "./options";
 import { CaseDraft } from "./types";
 
 function categoryLabels(ids: string[]) {
+  const allCategories = getCachedAllCategories();
   return ids
-    .map((id) => incidentCategories.find((item) => item.id === id)?.label ?? id)
+    .map((id) => {
+      const match = allCategories.find(
+        (item) => item.code === id || item.id === id
+      );
+      if (match) return match.name;
+      return (
+        incidentCategories.find((item) => item.id === id)?.label ?? id
+      );
+    })
     .join("; ");
 }
 

@@ -1,8 +1,9 @@
+import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme";
-import { useAuth } from "../useAuth";
 import { SystemRole } from "../types";
+import { useAuth } from "../useAuth";
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -15,7 +16,8 @@ export function RoleGuard({
   allowedRoles,
   fallback,
 }: RoleGuardProps) {
-  const { role, isLoading } = useAuth();
+  const router = useRouter();
+  const { role, isLoading, loginAsRole } = useAuth();
 
   if (isLoading) {
     return null;
@@ -28,14 +30,45 @@ export function RoleGuard({
       return <>{fallback}</>;
     }
 
+    const targetRole = allowedRoles[0] || "system_admin";
+    const targetLabel =
+      targetRole === "system_admin"
+        ? "System Admin"
+        : targetRole === "case_officer"
+        ? "Case Officer"
+        : targetRole === "evidence_checker"
+        ? "Evidence Checker"
+        : "Reporter";
+
     return (
       <View style={styles.container}>
         <View style={styles.card}>
           <Text style={styles.icon}>🔒</Text>
           <Text style={styles.title}>Access Restricted</Text>
           <Text style={styles.message}>
-            You do not have the required permissions to view this section.
+            You must be authenticated as a{" "}
+            <Text style={styles.bold}>{targetLabel}</Text> to view this section.
           </Text>
+
+          <Pressable
+            style={styles.authButton}
+            onPress={() => loginAsRole(targetRole)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.authButtonText}>
+              ⚙️ Authenticate as {targetLabel}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.loginLink}
+            onPress={() => router.push("/secure-role")}
+            accessibilityRole="button"
+          >
+            <Text style={styles.loginLinkText}>
+              Go to Staff & Admin Login
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -54,7 +87,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
     backgroundColor: colors.surface,
     padding: 24,
     borderRadius: 16,
@@ -63,7 +96,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   icon: {
-    fontSize: 40,
+    fontSize: 44,
     marginBottom: 12,
   },
   title: {
@@ -74,9 +107,36 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   message: {
-    fontSize: 14,
+    fontSize: 13.5,
     lineHeight: 20,
     color: colors.textSecondary,
     textAlign: "center",
+    marginBottom: 16,
+  },
+  bold: {
+    fontWeight: "700",
+    color: colors.navy[900],
+  },
+  authButton: {
+    width: "100%",
+    minHeight: 46,
+    backgroundColor: colors.royal[700],
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  authButtonText: {
+    color: colors.textInverse,
+    fontSize: 13.5,
+    fontWeight: "700",
+  },
+  loginLink: {
+    paddingVertical: 8,
+  },
+  loginLinkText: {
+    color: colors.royal[700],
+    fontSize: 12.5,
+    fontWeight: "600",
   },
 });

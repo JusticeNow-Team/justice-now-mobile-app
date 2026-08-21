@@ -244,6 +244,12 @@ export default function TwoFactorScreen() {
         ? "evidence_checker"
         : profile.role;
 
+    if (normalized === "case_officer") {
+      router.replace("/officer");
+      return;
+    }
+
+    if (normalized === "evidence_checker" || profile.role === "evidence_validator") {
     if (normalized === "evidence_checker") {
       router.replace("/checker");
       return;

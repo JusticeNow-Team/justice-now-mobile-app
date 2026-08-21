@@ -5,6 +5,9 @@ export default function CheckerLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
+        contentStyle: {
+          backgroundColor: "#F1F5FA",
+        },
           backgroundColor: "#F8FAFC",
       }}
     />
