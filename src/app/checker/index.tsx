@@ -212,8 +212,10 @@ export default function EvidenceCheckerDashboard() {
   // Compute summary stats
   const stats: CheckerSummaryStats = useMemo(() => {
     let pendingCount = 0;
+    let underReviewCount = 0;
     let validatedCount = 0;
     let rejectedCount = 0;
+    let archivedCount = 0;
     let invalidMetadataCount = 0;
     let storageInsecureCount = 0;
 
@@ -226,18 +228,24 @@ export default function EvidenceCheckerDashboard() {
       }
       if (record.validationStatus === "pending") {
         pendingCount++;
+      } else if (record.validationStatus === "under_review") {
+        underReviewCount++;
       } else if (record.validationStatus === "validated") {
         validatedCount++;
       } else if (record.validationStatus === "rejected") {
         rejectedCount++;
+      } else if (record.validationStatus === "archived") {
+        archivedCount++;
       }
     });
 
     return {
       totalCount: records.length,
       pendingCount,
+      underReviewCount,
       validatedCount,
       rejectedCount,
+      archivedCount,
       invalidMetadataCount,
       storageInsecureCount,
     };
@@ -248,8 +256,10 @@ export default function EvidenceCheckerDashboard() {
     const list = validatedRecords.filter(({ record, validation }) => {
       // Tab filter
       if (activeTab === "pending" && record.validationStatus !== "pending") return false;
+      if (activeTab === "under_review" && record.validationStatus !== "under_review") return false;
       if (activeTab === "validated" && record.validationStatus !== "validated") return false;
       if (activeTab === "rejected" && record.validationStatus !== "rejected") return false;
+      if (activeTab === "archived" && record.validationStatus !== "archived") return false;
       if (activeTab === "invalid_metadata" && validation.isValid) return false;
       if (activeTab === "storage_insecure" && validation.isStorageSecure) return false;
 
@@ -581,7 +591,11 @@ function StatusBadge({ status }: { status: EvidenceValidationStatus }) {
   let fg = "#92400E";
   let label = "Pending (#8)";
 
-  if (status === "validated") {
+  if (status === "under_review") {
+    bg = "#E0F2FE";
+    fg = "#0369A1";
+    label = "Under Review";
+  } else if (status === "validated") {
     bg = "#D1FAE5";
     fg = "#065F46";
     label = "Validated";
@@ -593,6 +607,10 @@ function StatusBadge({ status }: { status: EvidenceValidationStatus }) {
     bg = "#E0E7FF";
     fg = "#3730A3";
     label = "Info Requested";
+  } else if (status === "archived") {
+    bg = "#F1F5F9";
+    fg = "#475569";
+    label = "Archived";
   }
 
   return (
