@@ -98,6 +98,19 @@ export default function AdminDashboardScreen() {
                 Configure the 4 system roles and security capabilities.
               </Text>
             </Pressable>
+
+            <Pressable
+              style={styles.actionCard}
+              onPress={() => router.push("/admin/audit")}
+              accessibilityRole="button"
+              accessibilityLabel="View Audit Logs"
+            >
+              <Text style={styles.actionIcon}>📜</Text>
+              <Text style={styles.actionTitle}>Audit Log Trail</Text>
+              <Text style={styles.actionDesc}>
+                Inspect immutable account and role change event logs, tamper-proof history, and security traces.
+              </Text>
+            </Pressable>
           </View>
 
           {/* Configured Roles Overview */}
