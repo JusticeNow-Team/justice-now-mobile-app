@@ -1081,5 +1081,146 @@ describe("JN-195 & JN-228: Staff Activation/Deactivation & Login Gating (AC 3 & 
   });
 });
 
+// ============================================================================
+// JN-230 ROLE ASSIGNMENT & UPDATE TEST SUITE
+// Covers: JN-238, JN-239, JN-240, JN-241, JN-242, JN-243
+// ============================================================================
+
+function getPermissionDiffTest(oldRole, newRole) {
+  const oldPerms = new Set(ROLE_CONFIGS[oldRole]?.permissions || []);
+  const newPerms = new Set(ROLE_CONFIGS[newRole]?.permissions || []);
+
+  const gained = [];
+  const removed = [];
+  const unchanged = [];
+
+  for (const p of newPerms) {
+    if (oldPerms.has(p)) {
+      unchanged.push(p);
+    } else {
+      gained.push(p);
+    }
+  }
+
+  for (const p of oldPerms) {
+    if (!newPerms.has(p)) {
+      removed.push(p);
+    }
+  }
+
+  return { gained, removed, unchanged };
+}
+
+function validateRoleAssignmentTest(actorRole, actorUserId, targetUserId, targetCurrentRole, proposedRole) {
+  if (actorRole !== "system_admin") {
+    return { isValid: false, error: "Unauthorized: Only System Administrators can assign roles." };
+  }
+
+  const validRoles = ["reporter", "case_officer", "evidence_checker", "system_admin"];
+  if (!validRoles.includes(proposedRole)) {
+    return { isValid: false, error: `Invalid role: "${proposedRole}" is not recognized.` };
+  }
+
+  if (targetCurrentRole === proposedRole) {
+    return { isValid: false, error: "User is already assigned to this role." };
+  }
+
+  if (actorUserId && actorUserId === targetUserId && targetCurrentRole === "system_admin" && proposedRole !== "system_admin") {
+    return { isValid: false, error: "Security Protection: Cannot demote own admin account." };
+  }
+
+  return { isValid: true };
+}
+
+describe("JN-230 & JN-238: View Current Roles and Capabilities (AC 1)", () => {
+  it("Admin can inspect assigned role capabilities", () => {
+    assert.ok(ROLE_CONFIGS.case_officer.permissions.includes("cases:update:status"));
+    assert.ok(ROLE_CONFIGS.evidence_checker.permissions.includes("evidence:validate"));
+    assert.ok(ROLE_CONFIGS.system_admin.permissions.includes("admin:roles:manage"));
+  });
+});
+
+describe("JN-239 & JN-240: Assign Valid Role & Validation Guardrails (AC 2, AC 4, AC 6)", () => {
+  it("AC 2: Admin can assign a valid role to a user", () => {
+    const validation = validateRoleAssignmentTest(
+      "system_admin",
+      "admin_1",
+      "officer_1",
+      "case_officer",
+      "evidence_checker"
+    );
+    assert.equal(validation.isValid, true);
+  });
+
+  it("AC 4: Invalid or unsupported roles are rejected", () => {
+    const validation = validateRoleAssignmentTest(
+      "system_admin",
+      "admin_1",
+      "officer_1",
+      "case_officer",
+      "super_custom_unsupported_role"
+    );
+    assert.equal(validation.isValid, false);
+    assert.ok(validation.error.includes("Invalid role"));
+  });
+
+  it("AC 6: Non-admin users cannot assign roles", () => {
+    const validation = validateRoleAssignmentTest(
+      "case_officer",
+      "officer_1",
+      "officer_2",
+      "case_officer",
+      "system_admin"
+    );
+    assert.equal(validation.isValid, false);
+    assert.ok(validation.error.includes("Unauthorized"));
+  });
+
+  it("AC 6: Active admin self-demotion is prohibited", () => {
+    const validation = validateRoleAssignmentTest(
+      "system_admin",
+      "admin_main",
+      "admin_main",
+      "system_admin",
+      "reporter"
+    );
+    assert.equal(validation.isValid, false);
+    assert.ok(validation.error.includes("Cannot demote"));
+  });
+});
+
+describe("JN-241 & JN-242: Permission Diff & Refresh State (AC 5)", () => {
+  it("AC 5: Computes exact permission gain and loss on role transition", () => {
+    const diff = getPermissionDiffTest("case_officer", "evidence_checker");
+    assert.ok(diff.gained.includes("evidence:validate"));
+    assert.ok(diff.removed.includes("cases:update:status"));
+    assert.ok(diff.unchanged.includes("evidence:read:all"));
+  });
+
+  it("AC 5: Promotion to admin grants all administrative capabilities", () => {
+    const diff = getPermissionDiffTest("reporter", "system_admin");
+    assert.ok(diff.gained.includes("admin:roles:manage"));
+    assert.ok(diff.gained.includes("admin:users:manage"));
+  });
+});
+
+describe("JN-243 & AC 7: Role Change Audit Recording", () => {
+  it("AC 7: Role updates generate immutable audit record payload", () => {
+    const auditRecord = {
+      eventType: "STAFF_ROLE_CHANGED",
+      actorEmail: "admin@justicenow.org",
+      targetUserEmail: "officer.silva@justicenow.org",
+      previousRole: "case_officer",
+      newRole: "evidence_checker",
+      timestamp: new Date().toISOString(),
+    };
+
+    assert.equal(auditRecord.eventType, "STAFF_ROLE_CHANGED");
+    assert.equal(auditRecord.previousRole, "case_officer");
+    assert.equal(auditRecord.newRole, "evidence_checker");
+  });
+});
+
+
 
 

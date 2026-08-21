@@ -8,4 +8,5 @@ export * from "./guards/RoleGuard";
 export * from "./guards/PermissionGuard";
 export * from "./seeds/rolesSeed";
 export * from "./navigation";
-
+export * from "./roleValidation";
+export * from "./roleAssignmentService";

@@ -1,6 +1,6 @@
 import { SystemRole } from "../auth/types";
 
-export type StaffRole = "case_officer" | "evidence_checker" | "system_admin";
+export type StaffRole = SystemRole;
 
 export type StaffStatus = "active" | "inactive" | "suspended";
 
