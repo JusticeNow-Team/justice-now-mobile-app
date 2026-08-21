@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
     ActivityIndicator,
@@ -31,11 +31,7 @@ export default function ReporterDashboard() {
   // Load User
   // -------------------------------------------------------
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
 
@@ -74,7 +70,12 @@ export default function ReporterDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadUser();
+  }, [loadUser]);
 
   // -------------------------------------------------------
   // Logout

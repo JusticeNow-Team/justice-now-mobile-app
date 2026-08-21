@@ -200,6 +200,40 @@ const PRESET_SCENARIOS: { name: string; icon: string; payload: Partial<EvidenceR
       reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
     },
   },
+  {
+    name: "9. Transition: Pending ➔ Under Review",
+    icon: "🔎",
+    payload: {
+      id: "EVD-2026-9909",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "examination_in_progress.jpg",
+      fileType: "image/jpeg",
+      evidenceType: "image",
+      fileSizeBytes: 2100000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "under_review",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "10. Invalid Direct Transition (Pending ➔ Archived)",
+    icon: "🚫",
+    payload: {
+      id: "EVD-2026-9910",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "direct_archived_attempt.pdf",
+      fileType: "application/pdf",
+      evidenceType: "document",
+      fileSizeBytes: 1200000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "archived",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
 ];
 
 export default function EvidenceMetadataSimulatorScreen() {
@@ -215,6 +249,8 @@ export default function EvidenceMetadataSimulatorScreen() {
     uploadDate: new Date().toISOString(),
     validationStatus: "pending",
   });
+
+  const validation = useMemo(() => validateEvidenceMetadata(form), [form]);
 
   const loadPreset = (payload: Partial<EvidenceRecord>) => {
     setForm({ ...payload });
@@ -234,16 +270,18 @@ export default function EvidenceMetadataSimulatorScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={handleBack}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
-        </Pressable>
+        <View style={styles.headerInner}>
+          <Pressable style={styles.backBtn} onPress={handleBack}>
+            <Text style={styles.backBtnText}>‹ Back</Text>
+          </Pressable>
 
-        <View style={styles.headerTitleBox}>
-          <Text style={styles.headerTitle}>Metadata Rules Simulator</Text>
-          <Text style={styles.headerSub}>Test Acceptance Criteria Compliance</Text>
+          <View style={styles.headerTitleBox}>
+            <Text style={styles.headerTitle}>Metadata Rules Simulator</Text>
+            <Text style={styles.headerSub}>Test Acceptance Criteria Compliance</Text>
+          </View>
+
+          <View style={{ width: 40 }} />
         </View>
-
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -333,7 +371,14 @@ export default function EvidenceMetadataSimulatorScreen() {
             <AuditItem label="SEC-5. Missing File Errors Handled" ok={validation.audit.handlesMissingFileErrors} />
             <AuditItem label="SEC-6. Transactional Upload Integrity" ok={validation.audit.preventsIncompleteUploadRecords} />
             <AuditItem label="SEC-7. Local Server Paths Protected" ok={validation.audit.doesNotExposeLocalServerPaths} />
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6 }} />
+
+            <AuditItem label="PRV-1. Safe Preview Supported for Images/Docs" ok={validation.audit.isSupportedPreview} />
+            <AuditItem label="PRV-2. Controlled Download Workflow for Unsupported Files" ok={validation.audit.offersControlledDownloadForUnsupported || validation.audit.isSupportedPreview} />
+            <AuditItem label="PRV-3. Public URLs Do Not Expose Evidence" ok={validation.audit.preventsPublicUrlExposure} />
           </View>
+
         </View>
 
         {/* Payload Form Editor */}
@@ -478,6 +523,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navy[900],
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+
+  headerInner: {
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -512,6 +563,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 14,
     paddingBottom: 40,
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
   },
 
   // Presets

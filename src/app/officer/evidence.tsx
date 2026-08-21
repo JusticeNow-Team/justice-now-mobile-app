@@ -209,7 +209,8 @@ export default function EvidenceReviewScreen() {
   );
 
   useEffect(() => {
-    loadEvidence();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadEvidence();
   }, [loadEvidence]);
 
   // -------------------------------------------------------

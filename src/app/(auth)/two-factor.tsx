@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
     ActivityIndicator,
@@ -46,11 +46,7 @@ export default function TwoFactorScreen() {
   // Prepare MFA
   // -------------------------------------------------------
 
-  useEffect(() => {
-    prepareMfa();
-  }, []);
-
-  const prepareMfa = async () => {
+  const prepareMfa = useCallback(async () => {
     try {
       setMode("loading");
       setErrorMessage("");
@@ -146,7 +142,12 @@ export default function TwoFactorScreen() {
 
       setMode("verify");
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void prepareMfa();
+  }, [prepareMfa]);
 
   // -------------------------------------------------------
   // Update digit
@@ -238,35 +239,28 @@ export default function TwoFactorScreen() {
 
     console.log("MFA VERIFIED ROLE:", profile.role);
 
-    // ---------------------------------------------------
-    // Your Case Officer module
-    // ---------------------------------------------------
+    const normalized =
+      profile.role === "evidence_validator"
+        ? "evidence_checker"
+        : profile.role;
 
-    if (profile.role === "case_officer") {
+    if (normalized === "case_officer") {
       router.replace("/officer");
-
       return;
     }
 
-    // ---------------------------------------------------
-    // Other team modules are not connected yet
-    // ---------------------------------------------------
-
-    if (profile.role === "evidence_validator") {
+    if (normalized === "evidence_checker" || profile.role === "evidence_validator") {
+    if (normalized === "evidence_checker") {
       router.replace("/checker");
       return;
     }
 
-    if (profile.role === "system_admin") {
-      Alert.alert(
-        "Administrator workspace",
-        "The System Administrator module is not connected in this branch yet.",
-      );
-
-      router.replace("/login");
-
+    if (normalized === "system_admin") {
+      router.replace("/admin");
       return;
     }
+
+    await supabase.auth.signOut();
 
     Alert.alert(
       "Access denied",

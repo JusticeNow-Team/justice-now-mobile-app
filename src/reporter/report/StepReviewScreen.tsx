@@ -210,7 +210,7 @@ export default function StepReviewScreen() {
             <View key={section.title} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>{section.title}</Text>
-                <Pressable onPress={() => router.push(section.path)}>
+                <Pressable onPress={() => router.push(section.path as any)}>
                   <Text style={styles.edit}>Edit</Text>
                 </Pressable>
               </View>

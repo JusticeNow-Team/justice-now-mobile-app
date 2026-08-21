@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-export default function CheckerLayout() {
+export default function AdminLayout() {
   return (
     <Stack
       screenOptions={{
@@ -8,7 +8,6 @@ export default function CheckerLayout() {
         contentStyle: {
           backgroundColor: "#F1F5FA",
         },
-          backgroundColor: "#F8FAFC",
       }}
     />
   );

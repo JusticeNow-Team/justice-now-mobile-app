@@ -81,8 +81,8 @@ export async function updateReporterProfile(
     data: {
       full_name: updates.full_name,
       phone: updates.phone,
-      preferred_language: updates.preferredLanguage,
-      allow_case_contact: updates.allowCaseContact,
+      preferred_language: updates.preferred_language,
+      allow_case_contact: updates.allow_case_contact,
     },
   });
 
