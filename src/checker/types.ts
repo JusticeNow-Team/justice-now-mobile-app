@@ -31,7 +31,7 @@ export interface EvidenceRecord {
   fileSizeBytes: number;
   uploadDate: string; // ISO date string
   validationStatus: EvidenceValidationStatus;
-  
+
   // Storage & Security Metadata (Secure Evidence Storage Criteria)
   storageBucket?: string;
   storagePath?: string;
@@ -39,11 +39,11 @@ export interface EvidenceRecord {
   signedUrlExpirySeconds?: number;
   localPathExposed?: boolean;
   fileExistsInStorage?: boolean;
-  
+
   // Linked metadata details
   caseInfo?: CaseLinkInfo;
   reporterInfo?: ReporterLinkInfo;
-  
+
   description?: string;
   rejectionReason?: string;
   checkerNotes?: string;

@@ -1,5 +1,4 @@
 import { supabase } from "../lib/supabase";
-import { validateEvidenceMetadata } from "./metadataValidation";
 import { EvidenceRecord, EvidenceValidationStatus } from "./types";
 
 // Seed mock records for offline/demo testing of all 8 acceptance criteria
@@ -304,10 +303,17 @@ export async function fetchEvidenceCheckerQueue(): Promise<EvidenceRecord[]> {
     // Combine with local mock test cases for full validation testing
     const dbIds = new Set(mapped.map((m) => m.id));
     const extraMocks = inMemoryStore.filter((mock) => !dbIds.has(mock.id));
-    return [...mapped, ...extraMocks];
+    const combined = [...mapped, ...extraMocks];
+
+    // Sort strictly by submission date descending (newest submission first)
+    return combined.sort(
+      (a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
+    );
   } catch (err) {
     console.warn("Using in-memory evidence store:", err);
-    return [...inMemoryStore];
+    return [...inMemoryStore].sort(
+      (a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
+    );
   }
 }
 
