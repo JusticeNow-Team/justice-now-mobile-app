@@ -70,6 +70,7 @@ export interface AuthContextValue {
   hasRole: (role: SystemRole | SystemRole[]) => boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  loginAsRole: (role: SystemRole, name?: string) => void;
 }
 
 export interface RouteAuthorizationRule {

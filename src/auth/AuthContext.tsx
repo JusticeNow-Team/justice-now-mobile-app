@@ -144,6 +144,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginAsRole = useCallback(
+    (targetRole: SystemRole, customName?: string) => {
+      const normalized = normalizeRole(targetRole) || "system_admin";
+      const defaultNames: Record<SystemRole, string> = {
+        system_admin: "System Administrator",
+        case_officer: "Case Officer (Investigator)",
+        evidence_checker: "Evidence Validator",
+        reporter: "Registered Reporter",
+      };
+
+      setUser({
+        id: `mock-${normalized}-${Date.now()}`,
+        email: `${normalized}@justicenow.org`,
+        full_name: customName || defaultNames[normalized],
+        role: normalized,
+        created_at: new Date().toISOString(),
+      });
+      setRole(normalized);
+      setIsLoading(false);
+    },
+    []
+  );
+
   const contextValue = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -155,8 +178,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasRole,
       signOut,
       refreshProfile,
+      loginAsRole,
     }),
-    [user, role, permissions, isLoading, can, hasRole, signOut, refreshProfile]
+    [
+      user,
+      role,
+      permissions,
+      isLoading,
+      can,
+      hasRole,
+      signOut,
+      refreshProfile,
+      loginAsRole,
+    ]
   );
 
   return (
