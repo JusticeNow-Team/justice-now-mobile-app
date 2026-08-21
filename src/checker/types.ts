@@ -6,11 +6,17 @@ export type EvidenceValidationStatus =
 
 export type EvidenceCategory = "photo" | "video" | "audio" | "document";
 
+export type PreviewKind = "image" | "document" | "audio" | "video" | "unsupported";
+
 export interface CaseLinkInfo {
   id: string;
   caseReference: string;
   title: string;
   category?: string;
+  incidentDate?: string;
+  incidentLocation?: string;
+  status?: string;
+  urgencyLevel?: "Low" | "Medium" | "High" | "Critical";
 }
 
 export interface ReporterLinkInfo {
@@ -18,7 +24,19 @@ export interface ReporterLinkInfo {
   fullName: string;
   email?: string;
   phone?: string;
+  role?: string;
+  organization?: string;
   isAnonymous?: boolean;
+}
+
+export interface ControlledDownloadLog {
+  downloadId: string;
+  evidenceId: string;
+  checkerId: string;
+  timestamp: string;
+  reason: string;
+  oneTimeToken: string;
+  tokenExpirySeconds: number;
 }
 
 export interface EvidenceRecord {
@@ -40,6 +58,12 @@ export interface EvidenceRecord {
   localPathExposed?: boolean;
   fileExistsInStorage?: boolean;
 
+  // Safe Preview Data
+  previewUrl?: string; // Safe mock image/document URI
+  documentPageCount?: number;
+  documentSnippet?: string;
+  mediaDurationSeconds?: number;
+
   // Linked metadata details
   caseInfo?: CaseLinkInfo;
   reporterInfo?: ReporterLinkInfo;
@@ -49,6 +73,7 @@ export interface EvidenceRecord {
   checkerNotes?: string;
   validatedAt?: string;
   validatedBy?: string;
+  controlledDownloadLogs?: ControlledDownloadLog[];
 }
 
 export interface CriteriaAudit {
@@ -71,11 +96,17 @@ export interface CriteriaAudit {
   handlesMissingFileErrors: boolean;
   preventsIncompleteUploadRecords: boolean;
   doesNotExposeLocalServerPaths: boolean;
+
+  // Safe Preview & Controlled Access Criteria
+  isSupportedPreview: boolean;
+  offersControlledDownloadForUnsupported: boolean;
+  preventsPublicUrlExposure: boolean;
 }
 
 export interface MetadataValidationResult {
   isValid: boolean;
   isStorageSecure: boolean;
+  previewKind: PreviewKind;
   errors: string[];
   warnings: string[];
   securityCallouts: string[];
@@ -99,3 +130,4 @@ export interface CheckerSummaryStats {
   invalidMetadataCount: number;
   storageInsecureCount: number;
 }
+

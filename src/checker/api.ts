@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabase";
-import { EvidenceRecord, EvidenceValidationStatus } from "./types";
+import { ControlledDownloadLog, EvidenceRecord, EvidenceValidationStatus } from "./types";
 
-// Seed mock records for offline/demo testing of all 8 acceptance criteria
+// Seed mock records for offline/demo testing of all acceptance criteria
 export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
   {
     id: "EVD-2026-9041",
@@ -13,16 +13,24 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 4280000, // 4.2 MB
     uploadDate: "2026-08-20T14:30:00Z",
     validationStatus: "pending",
+    previewUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80",
     caseInfo: {
       id: "CASE-2026-0812",
       caseReference: "JN-2026-0812",
       title: "Arbitrary Detention at Checkpoint #4",
-      category: "Civil Rights",
+      category: "Civil Rights & Physical Integrity",
+      incidentDate: "2026-08-19 18:45 UTC",
+      incidentLocation: "Northern Border Checkpoint #4, Sector B",
+      status: "Under Active Investigation",
+      urgencyLevel: "High",
     },
     reporterInfo: {
       id: "REP-4402",
       fullName: "Elena Rostova",
       email: "elena.r@humanrights-monitor.org",
+      phone: "+1 (555) 019-2834",
+      role: "Certified Human Rights Monitor",
+      organization: "Global Rights Watch",
     },
     description: "High-resolution photo showing physical evidence at checkpoint.",
     storageBucket: "case-evidence",
@@ -38,16 +46,23 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 18500000, // 18.5 MB
     uploadDate: "2026-08-20T15:05:12Z",
     validationStatus: "pending",
+    mediaDurationSeconds: 342, // 5 min 42 sec
     caseInfo: {
       id: "CASE-2026-0812",
       caseReference: "JN-2026-0812",
       title: "Arbitrary Detention at Checkpoint #4",
-      category: "Civil Rights",
+      category: "Civil Rights & Physical Integrity",
+      incidentDate: "2026-08-19 18:45 UTC",
+      incidentLocation: "Northern Border Checkpoint #4, Sector B",
+      status: "Under Active Investigation",
+      urgencyLevel: "High",
     },
     reporterInfo: {
       id: "REP-4402",
       fullName: "Elena Rostova",
       email: "elena.r@humanrights-monitor.org",
+      role: "Certified Human Rights Monitor",
+      organization: "Global Rights Watch",
     },
     description: "Audio recording of key eyewitness testimony.",
     storageBucket: "case-evidence",
@@ -63,20 +78,40 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 2450000, // 2.45 MB
     uploadDate: "2026-08-19T09:12:44Z",
     validationStatus: "validated",
+    documentPageCount: 8,
+    documentSnippet: `FORENSIC MEDICAL EXAMINATION REPORT
+Patient ID: AN-90218 | Date of Exam: August 18, 2026
+Attending Examiner: Dr. Marcus Vance, M.D.
+
+EXAMINATION FINDINGS:
+1. Physical trauma consistent with blunt force impacts observed on upper left extremity.
+2. Contusions measured at 4.5cm x 3.2cm. No fracture detected on radiological scan.
+3. Patient vitals stabilized at 120/80 mmHg.
+
+VERIFICATION STAMP:
+Official Forensic Clinic Signature Verified - Legal Compliance Passed.`,
     caseInfo: {
       id: "CASE-2026-0798",
       caseReference: "JN-2026-0798",
       title: "Excessive Force Incident in District 2",
       category: "Physical Integrity",
+      incidentDate: "2026-08-18 14:10 UTC",
+      incidentLocation: "District 2 General Hospital Ward",
+      status: "Verified For Court Filing",
+      urgencyLevel: "Critical",
     },
     reporterInfo: {
       id: "REP-1092",
       fullName: "Dr. Marcus Vance",
       email: "m.vance@clinic-legal.org",
+      role: "Forensic Medical Specialist",
+      organization: "Medico-Legal Defense Clinic",
     },
     description: "Official hospital forensic examination report.",
     validatedAt: "2026-08-19T11:00:00Z",
     validatedBy: "Evidence Checker Squad #1",
+    storageBucket: "case-evidence",
+    storagePath: "CASE-2026-0798/EVD-2026-9043_medical_report_signed.pdf",
   },
   {
     id: "EVD-2026-9044",
@@ -88,19 +123,27 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 15400000, // 15.4 MB
     uploadDate: "2026-08-20T16:00:00Z",
     validationStatus: "rejected",
-    rejectionReason: "Unsupported file type '.exe'. Allowed types: JPG, PNG, MP4, M4A, PDF.",
+    rejectionReason: "Unsupported file type '.exe'. Allowed formats: JPG, PNG, MP4, M4A, PDF.",
     caseInfo: {
       id: "CASE-2026-0820",
       caseReference: "JN-2026-0820",
       title: "Unlawful Digital Surveillance",
-      category: "Digital Rights",
+      category: "Digital Rights & Privacy",
+      incidentDate: "2026-08-20 10:00 UTC",
+      incidentLocation: "Digital Device Cyber Incident",
+      status: "Flagged - Malware Inspection",
+      urgencyLevel: "Medium",
     },
     reporterInfo: {
       id: "REP-3301",
       fullName: "Alex Chen",
       email: "alex.c@privacy-defender.net",
+      role: "Cybersecurity Analyst",
+      organization: "Digital Defense Network",
     },
-    description: "Submitted binary executable file.",
+    description: "Submitted binary executable file. Inline preview disabled for security.",
+    storageBucket: "case-evidence",
+    storagePath: "CASE-2026-0820/EVD-2026-9044_suspicious_payload_installer.exe",
   },
   {
     id: "EVD-2026-9045",
@@ -112,18 +155,27 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 145000000, // 145 MB (exceeds 100 MB max size!)
     uploadDate: "2026-08-20T18:22:10Z",
     validationStatus: "pending",
+    mediaDurationSeconds: 1240, // 20 mins 40 sec
     caseInfo: {
       id: "CASE-2026-0825",
       caseReference: "JN-2026-0825",
       title: "Protest Dispersion Video Documentation",
       category: "Freedom of Assembly",
+      incidentDate: "2026-08-20 16:30 UTC",
+      incidentLocation: "Central City Square",
+      status: "Pending Size Limit Review",
+      urgencyLevel: "Medium",
     },
     reporterInfo: {
       id: "REP-5590",
       fullName: "Sarah Jenkins",
       email: "s.jenkins@press-rights.org",
+      role: "Press Journalist",
+      organization: "Independent Press Guild",
     },
     description: "4K continuous raw footage of protest dispersion.",
+    storageBucket: "case-evidence",
+    storagePath: "CASE-2026-0825/EVD-2026-9045_gigabyte_raw_video_feed.mp4",
   },
   {
     id: "EVD-2026-9046",
@@ -135,11 +187,16 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 512000, // 512 KB
     uploadDate: "2026-08-20T19:00:00Z",
     validationStatus: "pending",
+    documentPageCount: 3,
+    documentSnippet: "Unlinked submission draft document without assigned case ID.",
     reporterInfo: {
       id: "REP-8812",
       fullName: "Anonymous Monitor",
+      isAnonymous: true,
     },
     description: "Document missing case association metadata.",
+    storageBucket: "case-evidence",
+    storagePath: "unlinked/EVD-2026-9046_unlinked_document.pdf",
   },
   {
     id: "EVD-2026-9047",
@@ -162,6 +219,8 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
       fullName: "Tariq Mansoor",
     },
     description: "Zero-byte corrupted image file upload.",
+    storageBucket: "case-evidence",
+    storagePath: "CASE-2026-0830/EVD-2026-9047_empty_log_file.jpg",
   },
   {
     id: "EVD-2026-9048",
@@ -173,6 +232,7 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 3100000,
     uploadDate: "2026-08-20T20:00:00Z",
     validationStatus: "pending",
+    previewUrl: "https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80",
     localPathExposed: true,
     storageBucket: "case-evidence",
     storagePath: "file:///C:/Users/kavin/Documents/confidential_scan.png",
@@ -197,6 +257,7 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 2800000,
     uploadDate: "2026-08-20T20:30:00Z",
     validationStatus: "pending",
+    previewUrl: "https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?auto=format&fit=crop&w=800&q=80",
     isPrivateBucket: false, // Public bucket exposure!
     storageBucket: "public-web-assets",
     storagePath: "public/unprotected_photo.jpg",
@@ -362,6 +423,60 @@ export async function updateEvidenceValidationDecision(params: {
   }
 }
 
+/**
+ * Handles controlled download requests for unsupported or high-risk evidence files.
+ * Enforces authorization checks, single-use signed tokens, and logs the download event.
+ */
+export async function requestControlledDownload(params: {
+  evidenceId: string;
+  checkerId: string;
+  reason: string;
+}): Promise<{
+  ok: boolean;
+  message: string;
+  log?: ControlledDownloadLog;
+}> {
+  const idx = inMemoryStore.findIndex((e) => e.id === params.evidenceId);
+  if (idx === -1) {
+    return { ok: false, message: "Evidence record not found." };
+  }
+
+  const record = inMemoryStore[idx];
+  if (!params.reason.trim()) {
+    return { ok: false, message: "A valid audit reason is required for controlled download." };
+  }
+
+  const downloadId = `DL-${Date.now()}`;
+  const timestamp = new Date().toISOString();
+  const tokenExpiry = 300; // 5 minutes single-use token TTL
+  const token = `https://justicenow-secure-vault.internal/controlled-download/${record.id}?token=${downloadId}_sig_${Math.floor(
+    Date.now() / 1000
+  )}&exp=${Math.floor(Date.now() / 1000) + tokenExpiry}`;
+
+  const log: ControlledDownloadLog = {
+    downloadId,
+    evidenceId: record.id,
+    checkerId: params.checkerId || "Evidence Checker Squad #1",
+    timestamp,
+    reason: params.reason,
+    oneTimeToken: token,
+    tokenExpirySeconds: tokenExpiry,
+  };
+
+  const updatedLogs = record.controlledDownloadLogs || [];
+  inMemoryStore[idx] = {
+    ...record,
+    controlledDownloadLogs: [log, ...updatedLogs],
+  };
+
+  return {
+    ok: true,
+    message: "Controlled download token generated & audit logged successfully.",
+    log,
+  };
+}
+
 export function resetInMemoryEvidenceStore() {
   inMemoryStore = [...INITIAL_MOCK_EVIDENCE];
 }
+

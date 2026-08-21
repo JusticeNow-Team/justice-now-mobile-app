@@ -162,107 +162,112 @@ export default function EvidenceCheckerDashboard() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
 
-      {/* Header */}
+      {/* Top Header Bar */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <View style={styles.badgeRow}>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleBadgeText}>Role: Evidence Checker</Text>
+        <View style={styles.headerInner}>
+          <View style={styles.headerTop}>
+            <View>
+              <View style={styles.badgeRow}>
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleBadgeText}>Role: Evidence Checker</Text>
+                </View>
+                <Text style={styles.sdgTag}>SDG 16 · Peace & Justice</Text>
               </View>
-              <Text style={styles.sdgTag}>SDG 16 · Peace & Justice</Text>
+
+              <Text style={styles.headerTitle}>Evidence Metadata Audit</Text>
+              <Text style={styles.headerSubtitle}>
+                Verification & safe evidence preview before legal case submission
+              </Text>
             </View>
-            <Text style={styles.headerTitle}>Evidence Metadata Audit</Text>
-            <Text style={styles.headerSubtitle}>
-              Validate evidence completeness, case links & secure storage
-            </Text>
+
+            <Pressable
+              style={styles.simulatorButton}
+              onPress={() => router.push("/checker/simulator")}
+            >
+              <Text style={styles.simulatorButtonText}>🧪 Test Criteria</Text>
+            </Pressable>
           </View>
 
-          <Pressable
-            style={styles.simulatorButton}
-            onPress={() => router.push("/checker/simulator")}
-            accessibilityRole="button"
-            accessibilityLabel="Open Metadata Simulator"
-          >
-            <Text style={styles.simulatorButtonText}>🧪 Test Criteria</Text>
-          </Pressable>
-        </View>
-
-        {/* Search bar */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search by ID, Case Ref, Reporter or File..."
-            placeholderTextColor={colors.navy[300]}
-            clearButtonMode="while-editing"
-          />
+          {/* Search Box */}
+          <View style={styles.searchContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search evidence ID, file name, or case reference..."
+              placeholderTextColor={colors.navy[300]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              clearButtonMode="while-editing"
+            />
+          </View>
         </View>
       </View>
 
       {/* Summary Stats Bar */}
       <View style={styles.statsBar}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.totalCount}</Text>
-          <Text style={styles.statLabel}>Total Evidence</Text>
-        </View>
-        <View style={styles.statDivider} />
+        <View style={styles.statsBarInner}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.totalCount}</Text>
+            <Text style={styles.statLabel}>Total Evidence</Text>
+          </View>
+          <View style={styles.statDivider} />
 
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: colors.royal[700] }]}>
-            {stats.pendingCount}
-          </Text>
-          <Text style={styles.statLabel}>Pending Queue</Text>
-        </View>
-        <View style={styles.statDivider} />
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: colors.royal[700] }]}>
+              {stats.pendingCount}
+            </Text>
+            <Text style={styles.statLabel}>Pending Queue</Text>
+          </View>
+          <View style={styles.statDivider} />
 
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: colors.teal[700] }]}>
-            {stats.validatedCount}
-          </Text>
-          <Text style={styles.statLabel}>Validated</Text>
-        </View>
-        <View style={styles.statDivider} />
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: colors.teal[700] }]}>
+              {stats.validatedCount}
+            </Text>
+            <Text style={styles.statLabel}>Validated</Text>
+          </View>
+          <View style={styles.statDivider} />
 
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: "#DC2626" }]}>
-            {stats.storageInsecureCount}
-          </Text>
-          <Text style={styles.statLabel}>Storage Risk</Text>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: "#DC2626" }]}>
+              {stats.storageInsecureCount}
+            </Text>
+            <Text style={styles.statLabel}>Storage Risk</Text>
+          </View>
         </View>
       </View>
 
       {/* Filter Tabs */}
       <View style={styles.tabsRow}>
-        <TabButton
-          label={`Pending Queue (${stats.pendingCount})`}
-          active={activeTab === "pending"}
-          onPress={() => setActiveTab("pending")}
-        />
-        <TabButton
-          label={`All (${stats.totalCount})`}
-          active={activeTab === "all"}
-          onPress={() => setActiveTab("all")}
-        />
-        <TabButton
-          label={`Validated (${stats.validatedCount})`}
-          active={activeTab === "validated"}
-          onPress={() => setActiveTab("validated")}
-        />
-        <TabButton
-          label={`Insecure (${stats.storageInsecureCount})`}
-          active={activeTab === "storage_insecure"}
-          onPress={() => setActiveTab("storage_insecure")}
-          isErrorTab
-        />
-        <TabButton
-          label={`Errors (${stats.invalidMetadataCount})`}
-          active={activeTab === "invalid_metadata"}
-          onPress={() => setActiveTab("invalid_metadata")}
-          isErrorTab
-        />
+        <View style={styles.tabsRowInner}>
+          <TabButton
+            label={`Pending Queue (${stats.pendingCount})`}
+            active={activeTab === "pending"}
+            onPress={() => setActiveTab("pending")}
+          />
+          <TabButton
+            label={`All (${stats.totalCount})`}
+            active={activeTab === "all"}
+            onPress={() => setActiveTab("all")}
+          />
+          <TabButton
+            label={`Validated (${stats.validatedCount})`}
+            active={activeTab === "validated"}
+            onPress={() => setActiveTab("validated")}
+          />
+          <TabButton
+            label={`Insecure (${stats.storageInsecureCount})`}
+            active={activeTab === "storage_insecure"}
+            onPress={() => setActiveTab("storage_insecure")}
+            isErrorTab
+          />
+          <TabButton
+            label={`Errors (${stats.invalidMetadataCount})`}
+            active={activeTab === "invalid_metadata"}
+            onPress={() => setActiveTab("invalid_metadata")}
+            isErrorTab
+          />
+        </View>
       </View>
 
       {/* Main Evidence Queue List */}
@@ -296,6 +301,7 @@ export default function EvidenceCheckerDashboard() {
               timeStyle: "short",
             });
             const isMissingFile = record.fileExistsInStorage === false;
+            const previewKind = validation.previewKind;
 
             return (
               <Pressable
@@ -329,9 +335,23 @@ export default function EvidenceCheckerDashboard() {
                     <Text style={styles.fileNameText} numberOfLines={1}>
                       {record.fileName}
                     </Text>
-                    <Text style={styles.fileMetaText}>
-                      {record.fileType} · {formatBytes(record.fileSizeBytes)}
-                    </Text>
+
+                    <View style={styles.previewTagRow}>
+                      <Text style={styles.fileMetaText}>
+                        {record.fileType} · {formatBytes(record.fileSizeBytes)}
+                      </Text>
+
+                      {/* Safe Preview Capability Badge */}
+                      <View style={styles.previewBadge}>
+                        <Text style={styles.previewBadgeText}>
+                          {previewKind === "image" && "🖼️ Image Preview"}
+                          {previewKind === "document" && "📄 Doc Reader"}
+                          {previewKind === "audio" && "🎵 Audio Player"}
+                          {previewKind === "video" && "🎥 Video Player"}
+                          {previewKind === "unsupported" && "⚠️ Controlled DL"}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
@@ -342,6 +362,7 @@ export default function EvidenceCheckerDashboard() {
                     <Text style={styles.linkLabel}>Case Link:</Text>
                     <Text style={styles.linkValue} numberOfLines={1}>
                       {record.caseInfo?.caseReference || record.caseId || "❌ UNLINKED"}
+                      {record.caseInfo?.title ? ` - ${record.caseInfo.title}` : ""}
                     </Text>
                   </View>
 
@@ -367,7 +388,7 @@ export default function EvidenceCheckerDashboard() {
                   <View style={styles.missingFileWarning}>
                     <Text style={styles.missingFileIcon}>⚠️</Text>
                     <Text style={styles.missingFileText}>
-                      Storage Object Missing / Deleted (404 Storage Error Handled)
+                      Storage Object Missing / Deleted (HTTP 404 Error Handled)
                     </Text>
                   </View>
                 )}
@@ -394,8 +415,8 @@ export default function EvidenceCheckerDashboard() {
                     ]}
                   >
                     {validation.isValid
-                      ? "All 8 Metadata Criteria Satisfied"
-                      : `${validation.errors.length} Criteria Validation Issue(s) Detected`}
+                      ? "All Metadata Criteria Satisfied"
+                      : `${validation.errors.length} Criteria Issue(s) Detected`}
                   </Text>
 
                   <Text style={styles.chevron}>›</Text>
@@ -403,6 +424,7 @@ export default function EvidenceCheckerDashboard() {
               </Pressable>
             );
           }}
+
         />
       )}
     </SafeAreaView>
@@ -479,6 +501,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 16,
+  },
+
+  headerInner: {
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
   },
 
   headerTop: {
@@ -568,6 +596,13 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
 
+  statsBarInner: {
+    flexDirection: "row",
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
+  },
+
   statCard: {
     flex: 1,
     alignItems: "center",
@@ -594,12 +629,18 @@ const styles = StyleSheet.create({
 
   // Filter tabs
   tabsRow: {
-    flexDirection: "row",
     backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+
+  tabsRowInner: {
+    flexDirection: "row",
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
   },
 
   tabButton: {
@@ -636,6 +677,9 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 14,
     paddingBottom: 32,
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
   },
 
   centerContainer: {
@@ -767,6 +811,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+
+  previewTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+
+  previewBadge: {
+    backgroundColor: colors.royal[50],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.royal[100],
+  },
+
+  previewBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.royal[700],
+  },
+
 
   linkContainer: {
     backgroundColor: "#F1F5F9",
