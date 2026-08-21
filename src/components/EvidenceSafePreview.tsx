@@ -113,7 +113,7 @@ export function EvidenceSafePreview({
           setDownloading(false);
           Alert.alert(
             "🔒 Controlled Download Authorized",
-            `Single-use download token generated & audit logged.\n\nDownload ID: ${res.log.downloadId}\nToken expires in 5 minutes.`
+            `Single-use download token generated & audit logged.\n\nDownload ID: ${res.log?.downloadId || "N/A"}\nToken expires in 5 minutes.`
           );
         }, 700);
       } else {
@@ -350,7 +350,7 @@ Digital Seal Verified by Authorized System Squad.`}
       {previewKind === "unsupported" && (
         <View style={styles.unsupportedCard}>
           <Text style={styles.unsupportedTitle}>
-            🚫 Live Inline Preview Disabled for '{record.fileName.split(".").pop()}' Format
+            {`🚫 Live Inline Preview Disabled for '${record.fileName.split(".").pop()}' Format`}
           </Text>
           <Text style={styles.unsupportedSub}>
             Executable binary files (`.exe`, `.dll`, `.zip`) cannot be rendered inline in order to protect client devices from executing unauthorized code.

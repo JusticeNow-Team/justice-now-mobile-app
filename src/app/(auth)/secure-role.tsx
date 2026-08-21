@@ -48,11 +48,7 @@ export default function SecureRoleScreen() {
       return;
     }
 
- JN-128-Configure-system-roles-and-permissions
     if (normalized === "evidence_checker") {
-
-    if (role === "evidence_validator") {
- main
       router.replace("/checker");
       return;
     }
@@ -118,7 +114,6 @@ export default function SecureRoleScreen() {
     try {
       setLoading(true);
 
-      // Sign up in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
@@ -137,7 +132,6 @@ export default function SecureRoleScreen() {
       }
 
       if (data.user) {
-        // Upsert profile in database
         await supabase.from("profiles").upsert({
           id: data.user.id,
           full_name: cleanName,
@@ -211,7 +205,6 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      // Load role from profiles
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role, full_name")
@@ -253,7 +246,6 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      // Check MFA
       const { data: aal, error: aalError } =
         await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
@@ -594,51 +586,11 @@ export default function SecureRoleScreen() {
               description="Reviews and investigates assigned human-rights cases."
             />
             <View style={styles.divider} />
-    JN-128-Configure-system-roles-and-permissions
             <RoleItem
               icon="🔍"
               title="Evidence Checker / Validator"
               description="Reviews submitted evidence and records validation decisions."
             />
-
-
-            <Pressable
-              onPress={() => router.push("/checker")}
-              accessibilityRole="button"
-              accessibilityLabel="Enter Evidence Checker Portal"
-            >
-              <RoleItem
-                icon="🔍"
-                title="Evidence Checker / Validator"
-                description="Reviews submitted evidence, validates metadata, and enforces acceptance criteria. (Tap to open workspace)"
-              />
-            </Pressable>
-
-            <View style={styles.divider} />
-
-            <RoleItem
-              icon="⚙️"
-              title="System Administrator"
-              description="Manages accounts, permissions, security and system configuration."
-            />
-          </View>
-
-          {/* Role Info */}
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>
-                Roles are assigned by JusticeNow
-              </Text>
-
-              <Text style={styles.infoText}>
-                Staff cannot select or change their role during sign in.
-                JusticeNow loads the authorized role from the account profile.
-              </Text>
-            </View>
- main
           </View>
 
           {/* Regular Login Link */}

@@ -578,3 +578,194 @@ describe("JN-133: Role-Based Navigation Support (Acceptance Criteria 7 & 8)", ()
     assert.equal(canAccessRoute(null, "/two-factor"), true);
   });
 });
+
+// ============================================================================
+// JN-135 REPORT CATEGORIES TEST SUITE
+// Covers: JN-136, JN-137, JN-138, JN-139, JN-140, JN-141
+// ============================================================================
+
+const INITIAL_REPORT_CATEGORIES = [
+  {
+    id: "cat_unlawful_detention",
+    code: "unlawful_detention",
+    name: "Unlawful Detention",
+    description: "Being held in custody without lawful authority.",
+    hint: "Being held without lawful reason or process",
+    icon: "⛓️",
+    isActive: true,
+    displayOrder: 1,
+  },
+  {
+    id: "cat_discrimination",
+    code: "discrimination",
+    name: "Discrimination",
+    description: "Unfair treatment based on identity or characteristics.",
+    hint: "Unfair treatment based on who you are",
+    icon: "⚖️",
+    isActive: true,
+    displayOrder: 2,
+  },
+  {
+    id: "cat_violence_abuse",
+    code: "violence_or_abuse",
+    name: "Violence or Abuse",
+    description: "Physical harm or ill-treatment.",
+    hint: "Physical harm, threats or ill-treatment",
+    icon: "🛡️",
+    isActive: true,
+    displayOrder: 3,
+  },
+  {
+    id: "cat_harassment",
+    code: "harassment",
+    name: "Harassment & Intimidation",
+    description: "Repeated stalking or intimidation.",
+    hint: "Repeated unwanted behaviour",
+    icon: "⚠️",
+    isActive: true,
+    displayOrder: 4,
+  },
+  {
+    id: "cat_freedom_expression",
+    code: "freedom_of_expression",
+    name: "Freedom of Expression Violation",
+    description: "Suppression of speech or assembly.",
+    hint: "Being stopped from speaking",
+    icon: "📢",
+    isActive: true,
+    displayOrder: 5,
+  },
+  {
+    id: "cat_workplace_rights",
+    code: "workplace_rights",
+    name: "Workplace Rights Violation",
+    description: "Unsafe or unpaid work conditions.",
+    hint: "Unsafe or unpaid conditions",
+    icon: "🏭",
+    isActive: true,
+    displayOrder: 6,
+  },
+  {
+    id: "cat_child_rights",
+    code: "child_rights",
+    name: "Child Rights Violation",
+    description: "Harm or denial of child rights.",
+    hint: "Harm affecting a child",
+    icon: "🧸",
+    isActive: true,
+    displayOrder: 7,
+  },
+  {
+    id: "cat_other",
+    code: "other",
+    name: "Other Human Rights Violation",
+    description: "Other human rights violations not listed.",
+    hint: "Something not listed here",
+    icon: "📋",
+    isActive: true,
+    displayOrder: 8,
+  },
+];
+
+let testCategories = INITIAL_REPORT_CATEGORIES.map((c) => ({ ...c }));
+
+function validateCategoryInput(input, existing = testCategories) {
+  const errors = [];
+  const name = (input.name || "").trim();
+  const code = (input.code || "").trim();
+
+  if (!name) errors.push("Category name is required.");
+  if (!code) errors.push("Category code is required.");
+
+  if (existing.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+    errors.push(`A category with the name "${name}" already exists.`);
+  }
+  if (existing.some((c) => c.code.toLowerCase() === code.toLowerCase())) {
+    errors.push(`A category with the code "${code}" already exists.`);
+  }
+
+  return { isValid: errors.length === 0, errors };
+}
+
+function validateSelectedCategories(selected, available = testCategories) {
+  if (!selected || selected.length === 0) {
+    return { isValid: false, invalidSelections: [], error: "Select at least one incident category." };
+  }
+  const activeCodes = new Set(available.filter((c) => c.isActive).map((c) => c.code));
+  const invalid = selected.filter((s) => !activeCodes.has(s));
+  if (invalid.length > 0) {
+    return { isValid: false, invalidSelections: invalid, error: `Invalid category: ${invalid.join(", ")}` };
+  }
+  return { isValid: true, invalidSelections: [] };
+}
+
+describe("JN-136: Report-Category Model & Migration (Acceptance Criteria 1)", () => {
+  it("Validates report-category data structure format", () => {
+    const cat = INITIAL_REPORT_CATEGORIES[0];
+    assert.ok(cat.id);
+    assert.ok(cat.code);
+    assert.ok(cat.name);
+    assert.ok(cat.description);
+    assert.equal(typeof cat.isActive, "boolean");
+    assert.equal(typeof cat.displayOrder, "number");
+  });
+});
+
+describe("JN-137: Initial Category Seed Data (Acceptance Criteria 2)", () => {
+  it("Initial human-rights categories are available and seeded", () => {
+    assert.ok(testCategories.length >= 8);
+    const codes = testCategories.map((c) => c.code);
+    assert.ok(codes.includes("unlawful_detention"));
+    assert.ok(codes.includes("discrimination"));
+    assert.ok(codes.includes("violence_or_abuse"));
+    assert.ok(codes.includes("harassment"));
+  });
+});
+
+describe("JN-138 & JN-140: Active Category Filtering (Acceptance Criteria 3 & 6)", () => {
+  it("Filters active categories only for the reporter form", () => {
+    const list = testCategories.map((c) => (c.code === "other" ? { ...c, isActive: false } : c));
+    const active = list.filter((c) => c.isActive);
+    assert.equal(active.some((c) => c.code === "other"), false);
+  });
+});
+
+describe("JN-136 & Acceptance Criteria 4: Duplicate Category Prevention", () => {
+  it("Prevents duplicate category names (case-insensitive)", () => {
+    const result = validateCategoryInput({ name: "Unlawful Detention", code: "new_code" });
+    assert.equal(result.isValid, false);
+    assert.ok(result.errors[0].includes("already exists"));
+  });
+
+  it("Prevents duplicate category codes", () => {
+    const result = validateCategoryInput({ name: "Brand New Category", code: "unlawful_detention" });
+    assert.equal(result.isValid, false);
+    assert.ok(result.errors[0].includes("already exists"));
+  });
+});
+
+describe("JN-139 & JN-141: Category Selection & Case Record Linking (Acceptance Criteria 5 & 7)", () => {
+  it("Accepts valid active category selection", () => {
+    const result = validateSelectedCategories(["unlawful_detention", "discrimination"]);
+    assert.equal(result.isValid, true);
+  });
+
+  it("Rejects empty category selection", () => {
+    const result = validateSelectedCategories([]);
+    assert.equal(result.isValid, false);
+  });
+
+  it("Rejects invalid/unknown category selection", () => {
+    const result = validateSelectedCategories(["fake_unknown_category"]);
+    assert.equal(result.isValid, false);
+  });
+
+  it("Rejects deactivated category selection", () => {
+    const listWithInactive = testCategories.map((c) =>
+      c.code === "discrimination" ? { ...c, isActive: false } : c
+    );
+    const result = validateSelectedCategories(["discrimination"], listWithInactive);
+    assert.equal(result.isValid, false);
+  });
+});
+

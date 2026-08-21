@@ -62,7 +62,8 @@ export default function EvidenceAuditDetailScreen() {
   };
 
   useEffect(() => {
-    loadRecord();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadRecord();
   }, [id]);
 
   const validation: MetadataValidationResult | null = useMemo(() => {
