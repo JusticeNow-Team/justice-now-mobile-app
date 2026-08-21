@@ -217,12 +217,28 @@ export default function EvidenceAuditDetailScreen() {
 
   const { audit } = validation;
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/checker");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Top Header Bar (Magic Patterns Style) */}
       <View style={styles.header}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={handleBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back to queue"
+        >
+          <Text style={styles.backBtnText}>‹ Back</Text>
+        </Pressable>
         <View style={styles.headerInner}>
           <Pressable
             style={styles.backBtn}
