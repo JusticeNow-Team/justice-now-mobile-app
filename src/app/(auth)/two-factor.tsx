@@ -14,6 +14,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { resolvePostLoginRedirect } from "../../auth";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
@@ -237,37 +238,19 @@ export default function TwoFactorScreen() {
       return;
     }
 
-    console.log("MFA VERIFIED ROLE:", profile.role);
+    const redirect = resolvePostLoginRedirect(profile);
 
-    const normalized =
-      profile.role === "evidence_validator"
-        ? "evidence_checker"
-        : profile.role;
-
-    if (normalized === "case_officer") {
-      router.replace("/officer");
+    if (!redirect.allowed) {
+      await supabase.auth.signOut();
+      Alert.alert(
+        "Access denied",
+        redirect.error || "This account does not have an authorized JusticeNow staff role."
+      );
+      router.replace("/login");
       return;
     }
 
-    if (normalized === "evidence_checker" || profile.role === "evidence_validator") {
-    if (normalized === "evidence_checker") {
-      router.replace("/checker");
-      return;
-    }
-
-    if (normalized === "system_admin") {
-      router.replace("/admin");
-      return;
-    }
-
-    await supabase.auth.signOut();
-
-    Alert.alert(
-      "Access denied",
-      "This account does not have an authorized JusticeNow staff role.",
-    );
-
-    router.replace("/login");
+    router.replace(redirect.targetRoute as any);
   };
 
   // -------------------------------------------------------
