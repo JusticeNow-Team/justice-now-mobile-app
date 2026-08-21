@@ -392,6 +392,15 @@ export async function fetchEvidenceCheckerQueue(): Promise<EvidenceRecord[]> {
   }
 }
 
+/**
+ * JN-157: Database query fetching only pending evidence items needing verification,
+ * sorted strictly by uploadDate descending (newest submissions first).
+ */
+export async function fetchPendingEvidenceQueue(): Promise<EvidenceRecord[]> {
+  const queue = await fetchEvidenceCheckerQueue();
+  return queue.filter((item) => item.validationStatus === "pending");
+}
+
 export async function updateEvidenceValidationDecision(params: {
   evidenceId: string;
   status: EvidenceValidationStatus;

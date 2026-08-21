@@ -143,7 +143,7 @@ const PRESET_SCENARIOS: { name: string; icon: string; payload: Partial<EvidenceR
     },
   },
   {
-    name: "8. Missing File in Storage Vault (404)",
+    name: "8. Missing File in Storage Vault (404 Handled)",
     icon: "❓",
     payload: {
       id: "EVD-2026-9908",
@@ -230,6 +230,23 @@ const PRESET_SCENARIOS: { name: string; icon: string; payload: Partial<EvidenceR
       fileSizeBytes: 1200000,
       uploadDate: new Date().toISOString(),
       validationStatus: "archived",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "9. Queue Submission Date Descending Order Test",
+    icon: "📅",
+    payload: {
+      id: "EVD-2026-9909",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "newest_submitted_photo.jpg",
+      fileType: "image/jpeg",
+      evidenceType: "image",
+      fileSizeBytes: 3100000,
+      uploadDate: new Date(Date.now() + 60000).toISOString(), // Future timestamp (Top of Queue!)
+      validationStatus: "pending",
       caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
       reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
     },
