@@ -1,21 +1,22 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getOfficerEvidenceAssignments } from "../../evidence-assignment/api";
-import { EvidenceAssignmentSummary } from "../../evidence-assignment/types";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
@@ -40,28 +41,35 @@ type OfficerReview = {
 
 type EvidenceItem = {
   id: string;
+
   case_id: string;
+
   evidence_type: EvidenceType;
+
   title: string;
+
   description: string | null;
+
   file_name: string | null;
+
   storage_bucket: string | null;
+
   storage_path: string | null;
+
   mime_type: string | null;
+
   file_size_bytes: number | null;
+
   validation_status: ValidationStatus;
+
   created_at: string;
+
   cases: CaseBrief | null;
+
   officer_evidence_reviews: OfficerReview[];
 };
 
-type ReviewFilter =
-  | "all"
-  | "unassigned"
-  | "assigned"
-  | "unreviewed"
-  | "reviewed"
-  | "follow_up";
+type ReviewFilter = "all" | "unreviewed" | "reviewed" | "follow_up";
 
 export default function EvidenceReviewScreen() {
   const router = useRouter();
@@ -76,21 +84,23 @@ export default function EvidenceReviewScreen() {
 
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
 
-  const [assignmentMap, setAssignmentMap] = useState<
-    Record<string, EvidenceAssignmentSummary>
-  >({});
-
   const [loading, setLoading] = useState(true);
+
   const [refreshing, setRefreshing] = useState(false);
+
   const [search, setSearch] = useState("");
+
   const [filter, setFilter] = useState<ReviewFilter>("all");
+
   const [selected, setSelected] = useState<EvidenceItem | null>(null);
 
   const [reviewState, setReviewState] =
     useState<OfficerReviewState>("reviewed");
 
   const [finding, setFinding] = useState("");
+
   const [saving, setSaving] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState("");
 
   // -------------------------------------------------------
@@ -106,49 +116,59 @@ export default function EvidenceReviewScreen() {
 
         setErrorMessage("");
 
+        // -----------------------------------------------
+        // Require staff MFA
+        // -----------------------------------------------
+
         const { data: aal, error: aalError } =
           await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
         if (aalError) {
           setErrorMessage(aalError.message);
+
           return;
         }
 
         if (aal.currentLevel !== "aal2") {
           router.replace("/two-factor");
+
           return;
         }
+
+        // -----------------------------------------------
+        // Evidence query
+        // -----------------------------------------------
 
         let query = supabase
           .from("case_evidence")
           .select(
             `
-              id,
-              case_id,
-              evidence_type,
-              title,
-              description,
-              file_name,
-              storage_bucket,
-              storage_path,
-              mime_type,
-              file_size_bytes,
-              validation_status,
-              created_at,
-
-              cases (
                 id,
-                case_reference,
-                title
-              ),
+                case_id,
+                evidence_type,
+                title,
+                description,
+                file_name,
+                storage_bucket,
+                storage_path,
+                mime_type,
+                file_size_bytes,
+                validation_status,
+                created_at,
 
-              officer_evidence_reviews (
-                id,
-                review_state,
-                finding_text,
-                reviewed_at
-              )
-            `,
+                cases (
+                  id,
+                  case_reference,
+                  title
+                ),
+
+                officer_evidence_reviews (
+                  id,
+                  review_state,
+                  finding_text,
+                  reviewed_at
+                )
+              `,
           )
           .order("created_at", {
             ascending: false,
@@ -161,29 +181,16 @@ export default function EvidenceReviewScreen() {
         const { data, error } = await query;
 
         console.log("EVIDENCE DATA:", data);
+
         console.log("EVIDENCE ERROR:", error);
 
         if (error) {
           setErrorMessage(error.message);
+
           return;
         }
 
         setEvidence((data ?? []) as unknown as EvidenceItem[]);
-
-        const assignmentRows = await getOfficerEvidenceAssignments(caseId);
-
-        const nextAssignmentMap: Record<string, EvidenceAssignmentSummary> = {};
-
-        assignmentRows.forEach((assignment) => {
-          if (
-            assignment.status === "assigned" ||
-            assignment.status === "under_review"
-          ) {
-            nextAssignmentMap[assignment.evidenceId] = assignment;
-          }
-        });
-
-        setAssignmentMap(nextAssignmentMap);
       } catch (error) {
         console.error("Load evidence error:", error);
 
@@ -194,18 +201,16 @@ export default function EvidenceReviewScreen() {
         );
       } finally {
         setLoading(false);
+
         setRefreshing(false);
       }
     },
     [caseId, router],
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadEvidence();
-      return undefined;
-    }, [loadEvidence]),
-  );
+  useEffect(() => {
+    loadEvidence();
+  }, [loadEvidence]);
 
   // -------------------------------------------------------
   // Refresh
@@ -213,7 +218,8 @@ export default function EvidenceReviewScreen() {
 
   const refresh = () => {
     setRefreshing(true);
-    void loadEvidence(false);
+
+    loadEvidence(false);
   };
 
   // -------------------------------------------------------
@@ -225,7 +231,6 @@ export default function EvidenceReviewScreen() {
 
     return evidence.filter((item) => {
       const review = item.officer_evidence_reviews?.[0];
-      const assignment = assignmentMap[item.id];
 
       const matchesSearch =
         query === "" ||
@@ -238,12 +243,6 @@ export default function EvidenceReviewScreen() {
       }
 
       switch (filter) {
-        case "unassigned":
-          return item.validation_status === "pending" && !assignment;
-
-        case "assigned":
-          return Boolean(assignment);
-
         case "unreviewed":
           return !review;
 
@@ -258,7 +257,7 @@ export default function EvidenceReviewScreen() {
           return true;
       }
     });
-  }, [assignmentMap, evidence, search, filter]);
+  }, [evidence, search, filter]);
 
   // -------------------------------------------------------
   // Start Review
@@ -271,9 +270,11 @@ export default function EvidenceReviewScreen() {
 
     if (existing) {
       setReviewState(existing.review_state);
+
       setFinding(existing.finding_text);
     } else {
       setReviewState("reviewed");
+
       setFinding("");
     }
   };
@@ -303,7 +304,9 @@ export default function EvidenceReviewScreen() {
 
       const { error } = await supabase.rpc("save_officer_evidence_review", {
         p_evidence_id: selected.id,
+
         p_review_state: reviewState,
+
         p_finding_text: cleanFinding,
       });
 
@@ -311,10 +314,12 @@ export default function EvidenceReviewScreen() {
 
       if (error) {
         Alert.alert("Unable to save review", error.message);
+
         return;
       }
 
       setSelected(null);
+
       setFinding("");
 
       await loadEvidence(false);
@@ -356,6 +361,7 @@ export default function EvidenceReviewScreen() {
 
       if (error) {
         Alert.alert("Unable to open file", error.message);
+
         return;
       }
 
@@ -379,6 +385,10 @@ export default function EvidenceReviewScreen() {
     }
   };
 
+  // -------------------------------------------------------
+  // Loading
+  // -------------------------------------------------------
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -391,6 +401,8 @@ export default function EvidenceReviewScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>‹</Text>
@@ -411,6 +423,8 @@ export default function EvidenceReviewScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Overview */}
+
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>INVESTIGATION EVIDENCE</Text>
 
@@ -422,14 +436,18 @@ export default function EvidenceReviewScreen() {
           </Text>
         </View>
 
+        {/* Important Boundary */}
+
         <View style={styles.infoBox}>
           <Text style={styles.infoIcon}>ℹ️</Text>
 
           <Text style={styles.infoText}>
             Case Officers record investigation findings. Evidence verification
-            decisions are handled separately by authorized Evidence Checkers.
+            decisions are handled separately by authorized Evidence Validators.
           </Text>
         </View>
+
+        {/* Search */}
 
         <View style={styles.searchBox}>
           <Text>🔎</Text>
@@ -449,6 +467,8 @@ export default function EvidenceReviewScreen() {
           )}
         </View>
 
+        {/* Filters */}
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -458,18 +478,6 @@ export default function EvidenceReviewScreen() {
             title="All"
             active={filter === "all"}
             onPress={() => setFilter("all")}
-          />
-
-          <FilterChip
-            title="Ready to assign"
-            active={filter === "unassigned"}
-            onPress={() => setFilter("unassigned")}
-          />
-
-          <FilterChip
-            title="Assigned"
-            active={filter === "assigned"}
-            onPress={() => setFilter("assigned")}
           />
 
           <FilterChip
@@ -491,6 +499,8 @@ export default function EvidenceReviewScreen() {
           />
         </ScrollView>
 
+        {/* Error */}
+
         {errorMessage !== "" && (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>Unable to load evidence</Text>
@@ -498,6 +508,8 @@ export default function EvidenceReviewScreen() {
             <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         )}
+
+        {/* Results */}
 
         {errorMessage === "" && (
           <View style={styles.resultsHeader}>
@@ -512,10 +524,11 @@ export default function EvidenceReviewScreen() {
 
         {filteredEvidence.map((item) => {
           const review = item.officer_evidence_reviews?.[0];
-          const assignment = assignmentMap[item.id];
 
           return (
             <View key={item.id} style={styles.evidenceCard}>
+              {/* Top */}
+
               <View style={styles.evidenceTop}>
                 <View style={styles.typeIcon}>
                   <Text style={styles.typeIconText}>
@@ -523,7 +536,11 @@ export default function EvidenceReviewScreen() {
                   </Text>
                 </View>
 
-                <View style={styles.evidenceHeading}>
+                <View
+                  style={{
+                    flex: 1,
+                  }}
+                >
                   <Text style={styles.caseReference}>
                     {item.cases?.case_reference ?? "Case"}
                   </Text>
@@ -534,9 +551,13 @@ export default function EvidenceReviewScreen() {
                 <ValidationBadge status={item.validation_status} />
               </View>
 
+              {/* Description */}
+
               <Text style={styles.evidenceDescription}>
                 {item.description ?? "No description provided."}
               </Text>
+
+              {/* Metadata */}
 
               <View style={styles.metadataRow}>
                 <View style={styles.metadataItem}>
@@ -555,6 +576,8 @@ export default function EvidenceReviewScreen() {
                   </Text>
                 </View>
               </View>
+
+              {/* Existing Review */}
 
               {review && (
                 <View
@@ -576,40 +599,7 @@ export default function EvidenceReviewScreen() {
                 </View>
               )}
 
-              {assignment ? (
-                <View style={styles.assignmentBox}>
-                  <Text style={styles.assignmentLabel}>
-                    ASSIGNED FOR VERIFICATION
-                  </Text>
-
-                  <Text style={styles.assignmentName}>
-                    {assignment.checkerName}
-                  </Text>
-
-                  <Text style={styles.assignmentMeta}>
-                    {formatValidationStatus(item.validation_status)} · Assigned{" "}
-                    {formatDate(assignment.assignedAt)}
-                  </Text>
-                </View>
-              ) : item.validation_status === "pending" ? (
-                <Pressable
-                  onPress={() =>
-                    router.push({
-                      pathname: "/officer/assign-evidence",
-                      params: {
-                        evidenceId: item.id,
-                        caseId: item.case_id,
-                      },
-                    })
-                  }
-                  accessibilityRole="button"
-                  style={styles.assignEvidenceButton}
-                >
-                  <Text style={styles.assignEvidenceButtonText}>
-                    Assign to Evidence Checker
-                  </Text>
-                </Pressable>
-              ) : null}
+              {/* Actions */}
 
               <View style={styles.actions}>
                 <Pressable
@@ -632,6 +622,8 @@ export default function EvidenceReviewScreen() {
           );
         })}
 
+        {/* Empty */}
+
         {errorMessage === "" && filteredEvidence.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>🔎</Text>
@@ -644,6 +636,8 @@ export default function EvidenceReviewScreen() {
           </View>
         )}
 
+        {/* Review Composer */}
+
         {selected && (
           <View style={styles.reviewComposer}>
             <Text style={styles.composerLabel}>CASE OFFICER FINDING</Text>
@@ -655,17 +649,21 @@ export default function EvidenceReviewScreen() {
               an evidence validation decision here.
             </Text>
 
+            {/* Review State */}
+
             <View style={styles.stateRow}>
               <Pressable
                 onPress={() => setReviewState("reviewed")}
                 style={[
                   styles.stateButton,
+
                   reviewState === "reviewed" && styles.stateButtonActive,
                 ]}
               >
                 <Text
                   style={[
                     styles.stateButtonText,
+
                     reviewState === "reviewed" && styles.stateButtonTextActive,
                   ]}
                 >
@@ -677,6 +675,7 @@ export default function EvidenceReviewScreen() {
                 onPress={() => setReviewState("follow_up_required")}
                 style={[
                   styles.stateButton,
+
                   reviewState === "follow_up_required" &&
                     styles.stateButtonWarning,
                 ]}
@@ -684,6 +683,7 @@ export default function EvidenceReviewScreen() {
                 <Text
                   style={[
                     styles.stateButtonText,
+
                     reviewState === "follow_up_required" &&
                       styles.stateButtonTextActive,
                   ]}
@@ -730,6 +730,8 @@ export default function EvidenceReviewScreen() {
           </View>
         )}
 
+        {/* Security */}
+
         <View style={styles.securityBox}>
           <Text>🔒</Text>
 
@@ -742,6 +744,10 @@ export default function EvidenceReviewScreen() {
     </SafeAreaView>
   );
 }
+
+// ---------------------------------------------------------
+// Filter Chip
+// ---------------------------------------------------------
 
 function FilterChip({
   title,
@@ -766,13 +772,20 @@ function FilterChip({
   );
 }
 
+// ---------------------------------------------------------
+// Validation Badge
+// ---------------------------------------------------------
+
 function ValidationBadge({ status }: { status: ValidationStatus }) {
   return (
     <View
       style={[
         styles.validationBadge,
+
         status === "verified" && styles.validationVerified,
+
         status === "rejected" && styles.validationRejected,
+
         status === "under_review" && styles.validationReview,
       ]}
     >
@@ -782,6 +795,10 @@ function ValidationBadge({ status }: { status: ValidationStatus }) {
     </View>
   );
 }
+
+// ---------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------
 
 function getEvidenceIcon(type: EvidenceType) {
   switch (type) {
@@ -828,6 +845,10 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString();
 }
 
+// ---------------------------------------------------------
+// Styles
+// ---------------------------------------------------------
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -838,34 +859,44 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+
     backgroundColor: colors.background,
   },
 
   loadingText: {
     marginTop: 12,
+
     fontSize: 13,
+
     color: colors.textSecondary,
   },
 
   header: {
     minHeight: 66,
+
     flexDirection: "row",
     alignItems: "center",
+
     paddingHorizontal: 14,
+
     borderBottomWidth: 1,
+
     borderBottomColor: colors.border,
+
     backgroundColor: colors.surface,
   },
 
   backButton: {
     width: 42,
     height: 42,
+
     alignItems: "center",
     justifyContent: "center",
   },
 
   backText: {
     fontSize: 32,
+
     color: colors.navy[700],
   },
 
@@ -876,12 +907,15 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
+
     color: colors.navy[800],
   },
 
   headerSubtitle: {
     marginTop: 2,
+
     fontSize: 11.5,
+
     color: colors.textSecondary,
   },
 
@@ -892,38 +926,55 @@ const styles = StyleSheet.create({
 
   hero: {
     padding: 18,
+
     borderRadius: 16,
+
     backgroundColor: colors.navy[800],
   },
 
   heroLabel: {
     fontSize: 10,
+
     fontWeight: "700",
+
     letterSpacing: 0.7,
+
     color: "#AEC3DC",
   },
 
   heroTitle: {
     marginTop: 5,
+
     fontSize: 19,
+
     fontWeight: "800",
+
     color: colors.textInverse,
   },
 
   heroText: {
     marginTop: 6,
+
     fontSize: 12,
+
     lineHeight: 18,
+
     color: "#DCE5EF",
   },
 
   infoBox: {
     flexDirection: "row",
+
     marginTop: 12,
+
     padding: 13,
+
     borderWidth: 1,
+
     borderColor: colors.royal[100],
+
     borderRadius: 12,
+
     backgroundColor: colors.royal[50],
   },
 
@@ -933,59 +984,82 @@ const styles = StyleSheet.create({
 
   infoText: {
     flex: 1,
+
     fontSize: 11,
+
     lineHeight: 16,
+
     color: colors.textSecondary,
   },
 
   searchBox: {
     minHeight: 48,
+
     marginTop: 15,
+
     flexDirection: "row",
     alignItems: "center",
+
     gap: 8,
+
     paddingHorizontal: 13,
+
     borderWidth: 1,
     borderColor: colors.border,
+
     borderRadius: 12,
+
     backgroundColor: colors.surface,
   },
 
   searchInput: {
     flex: 1,
+
     fontSize: 13,
+
     color: colors.navy[800],
   },
 
   clearText: {
     fontSize: 22,
+
     color: colors.textSoft,
   },
 
   filters: {
     gap: 7,
+
     paddingVertical: 13,
   },
 
   filterChip: {
     minHeight: 34,
+
     paddingHorizontal: 13,
+
     alignItems: "center",
     justifyContent: "center",
+
     borderWidth: 1,
+
     borderColor: colors.border,
+
     borderRadius: 18,
+
     backgroundColor: colors.surface,
   },
 
   filterChipActive: {
     borderColor: colors.royal[700],
+
     backgroundColor: colors.royal[700],
   },
 
   filterChipText: {
     fontSize: 11,
+
     fontWeight: "600",
+
     color: colors.navy[700],
   },
 
@@ -995,42 +1069,57 @@ const styles = StyleSheet.create({
 
   resultsHeader: {
     flexDirection: "row",
+
     justifyContent: "space-between",
+
     marginBottom: 9,
   },
 
   resultsTitle: {
     fontSize: 15,
+
     fontWeight: "700",
+
     color: colors.navy[800],
   },
 
   resultsCount: {
     fontSize: 11,
+
     color: colors.textSecondary,
   },
 
   evidenceCard: {
     marginBottom: 11,
+
     padding: 15,
+
     borderWidth: 1,
+
     borderColor: colors.border,
+
     borderRadius: 15,
+
     backgroundColor: colors.surface,
   },
 
   evidenceTop: {
     flexDirection: "row",
+
     alignItems: "center",
+
     gap: 10,
   },
 
   typeIcon: {
     width: 43,
     height: 43,
+
     alignItems: "center",
     justifyContent: "center",
+
     borderRadius: 12,
+
     backgroundColor: colors.royal[50],
   },
 
@@ -1038,33 +1127,39 @@ const styles = StyleSheet.create({
     fontSize: 19,
   },
 
-  evidenceHeading: {
-    flex: 1,
-  },
-
   caseReference: {
     fontSize: 9.5,
+
     fontWeight: "700",
+
     color: colors.royal[700],
   },
 
   evidenceTitle: {
     marginTop: 2,
+
     fontSize: 13.5,
+
     fontWeight: "700",
+
     color: colors.navy[800],
   },
 
   evidenceDescription: {
     marginTop: 10,
+
     fontSize: 11.5,
+
     lineHeight: 17,
+
     color: colors.textSecondary,
   },
 
   metadataRow: {
     flexDirection: "row",
+
     marginTop: 12,
+
     gap: 10,
   },
 
@@ -1074,20 +1169,26 @@ const styles = StyleSheet.create({
 
   metaLabel: {
     fontSize: 9,
+
     color: colors.textSoft,
   },
 
   metaValue: {
     marginTop: 2,
+
     fontSize: 10.5,
+
     fontWeight: "600",
+
     color: colors.navy[700],
   },
 
   validationBadge: {
     paddingHorizontal: 8,
     paddingVertical: 5,
+
     borderRadius: 8,
+
     backgroundColor: colors.gold[50],
   },
 
@@ -1105,179 +1206,186 @@ const styles = StyleSheet.create({
 
   validationText: {
     fontSize: 9,
+
     fontWeight: "700",
+
     color: colors.navy[700],
   },
 
   reviewedBox: {
     marginTop: 12,
+
     padding: 11,
+
     borderRadius: 10,
+
     backgroundColor: colors.teal[50],
   },
 
   followUpBox: {
     marginTop: 12,
+
     padding: 11,
+
     borderRadius: 10,
+
     backgroundColor: colors.gold[50],
   },
 
   reviewStateText: {
     fontSize: 10.5,
+
     fontWeight: "700",
+
     color: colors.navy[800],
   },
 
   reviewFinding: {
     marginTop: 4,
+
     fontSize: 11,
+
     lineHeight: 16,
+
     color: colors.textSecondary,
-  },
-
-  assignmentBox: {
-    marginTop: 12,
-    padding: 11,
-    borderWidth: 1,
-    borderColor: colors.royal[100],
-    borderRadius: 10,
-    backgroundColor: colors.royal[50],
-  },
-
-  assignmentLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    color: colors.royal[700],
-  },
-
-  assignmentName: {
-    marginTop: 4,
-    fontSize: 11.5,
-    fontWeight: "700",
-    color: colors.navy[800],
-  },
-
-  assignmentMeta: {
-    marginTop: 3,
-    fontSize: 10,
-    color: colors.textSecondary,
-  },
-
-  assignEvidenceButton: {
-    minHeight: 41,
-    marginTop: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.teal[600],
-    borderRadius: 10,
-    backgroundColor: colors.teal[50],
-  },
-
-  assignEvidenceButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.teal[700],
   },
 
   actions: {
     flexDirection: "row",
+
     gap: 8,
+
     marginTop: 13,
   },
 
   secondaryButton: {
     flex: 1,
+
     minHeight: 41,
+
     alignItems: "center",
     justifyContent: "center",
+
     borderWidth: 1,
+
     borderColor: colors.royal[200],
+
     borderRadius: 10,
   },
 
   secondaryButtonText: {
     fontSize: 11,
+
     fontWeight: "700",
+
     color: colors.royal[700],
   },
 
   primaryButton: {
     flex: 1,
+
     minHeight: 41,
+
     alignItems: "center",
     justifyContent: "center",
+
     borderRadius: 10,
+
     backgroundColor: colors.royal[700],
   },
 
   primaryButtonText: {
     fontSize: 11,
+
     fontWeight: "700",
+
     color: colors.textInverse,
   },
 
   reviewComposer: {
     marginTop: 10,
+
     padding: 16,
+
     borderWidth: 1,
+
     borderColor: colors.royal[200],
+
     borderRadius: 15,
+
     backgroundColor: colors.surface,
   },
 
   composerLabel: {
     fontSize: 9.5,
+
     fontWeight: "700",
+
     letterSpacing: 0.6,
+
     color: colors.royal[700],
   },
 
   composerTitle: {
     marginTop: 4,
+
     fontSize: 15,
+
     fontWeight: "700",
+
     color: colors.navy[800],
   },
 
   composerHelp: {
     marginTop: 5,
+
     fontSize: 11,
+
     lineHeight: 16,
+
     color: colors.textSecondary,
   },
 
   stateRow: {
     flexDirection: "row",
+
     gap: 8,
+
     marginTop: 14,
   },
 
   stateButton: {
     flex: 1,
+
     minHeight: 40,
+
     alignItems: "center",
     justifyContent: "center",
+
     borderWidth: 1,
+
     borderColor: colors.border,
+
     borderRadius: 10,
   },
 
   stateButtonActive: {
     borderColor: colors.teal[600],
+
     backgroundColor: colors.teal[600],
   },
 
   stateButtonWarning: {
     borderColor: colors.warning,
+
     backgroundColor: colors.warning,
   },
 
   stateButtonText: {
     fontSize: 10.5,
+
     fontWeight: "600",
+
     color: colors.navy[700],
   },
 
@@ -1287,57 +1395,83 @@ const styles = StyleSheet.create({
 
   findingInput: {
     minHeight: 115,
+
     marginTop: 12,
+
     padding: 12,
+
     borderWidth: 1,
+
     borderColor: colors.navy[200],
+
     borderRadius: 11,
+
     fontSize: 12,
+
     lineHeight: 18,
+
     color: colors.navy[800],
+
     backgroundColor: colors.background,
   },
 
   characterCount: {
     marginTop: 4,
+
     textAlign: "right",
+
     fontSize: 9.5,
+
     color: colors.textSoft,
   },
 
   composerActions: {
     flexDirection: "row",
+
     justifyContent: "flex-end",
+
     gap: 8,
+
     marginTop: 10,
   },
 
   cancelButton: {
     minHeight: 42,
+
     paddingHorizontal: 16,
+
     alignItems: "center",
     justifyContent: "center",
   },
 
   cancelText: {
     fontSize: 11.5,
+
     fontWeight: "600",
+
     color: colors.textSecondary,
   },
 
   saveButton: {
     minHeight: 42,
+
     minWidth: 115,
+
     paddingHorizontal: 15,
+
     alignItems: "center",
     justifyContent: "center",
+
     borderRadius: 10,
+
     backgroundColor: colors.royal[700],
   },
 
   saveText: {
     fontSize: 11.5,
+
     fontWeight: "700",
+
     color: colors.textInverse,
   },
 
@@ -1347,30 +1481,43 @@ const styles = StyleSheet.create({
 
   errorBox: {
     padding: 14,
+
     borderWidth: 1,
+
     borderColor: colors.error,
+
     borderRadius: 12,
+
     backgroundColor: "#FFF2F1",
   },
 
   errorTitle: {
     fontSize: 12.5,
+
     fontWeight: "700",
+
     color: colors.error,
   },
 
   errorText: {
     marginTop: 4,
+
     fontSize: 11,
+
     color: colors.textSecondary,
   },
 
   emptyCard: {
     alignItems: "center",
+
     padding: 24,
+
     borderWidth: 1,
+
     borderColor: colors.border,
+
     borderRadius: 15,
+
     backgroundColor: colors.surface,
   },
 
@@ -1380,32 +1527,47 @@ const styles = StyleSheet.create({
 
   emptyTitle: {
     marginTop: 8,
+
     fontSize: 13,
+
     fontWeight: "700",
+
     color: colors.navy[800],
   },
 
   emptyText: {
     marginTop: 4,
+
     fontSize: 11,
+
     color: colors.textSecondary,
   },
 
   securityBox: {
     flexDirection: "row",
+
     gap: 8,
+
     marginTop: 15,
+
     padding: 13,
+
     borderWidth: 1,
+
     borderColor: colors.teal[100],
+
     borderRadius: 12,
+
     backgroundColor: colors.teal[50],
   },
 
   securityText: {
     flex: 1,
+
     fontSize: 10.5,
+
     lineHeight: 16,
+
     color: colors.textSecondary,
   },
 });

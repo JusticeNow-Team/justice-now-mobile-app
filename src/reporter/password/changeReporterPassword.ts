@@ -56,7 +56,7 @@ export async function changeReporterPassword(
   }
 
   const { error: currentError } = await supabase.auth.signInWithPassword({
-    email: user.email,
+    email: user.email ?? "",
     password: currentPassword,
   });
 
