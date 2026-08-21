@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
-import { ControlledDownloadLog, EvidenceRecord, EvidenceValidationStatus } from "./types";
+import { ControlledDownloadLog, EvidenceRecord, EvidenceStatus, EvidenceValidationStatus, StatusHistoryRecord } from "./types";
+import { validateStatusTransition, createStatusHistoryEntry } from "./statusTransitionService";
 
 // Seed mock records for offline/demo testing of all acceptance criteria
 export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
@@ -13,6 +14,19 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 4280000, // 4.2 MB
     uploadDate: "2026-08-20T14:30:00Z",
     validationStatus: "pending",
+    lastStatusChangedAt: "2026-08-20T14:30:00Z",
+    statusHistory: [
+      {
+        id: "HIST-9041-1",
+        evidenceId: "EVD-2026-9041",
+        fromStatus: "pending",
+        toStatus: "pending",
+        changedAt: "2026-08-20T14:30:00Z",
+        changedByRole: "system",
+        changedByName: "System Intake Gateway",
+        notes: "Evidence submitted by reporter. Status initialized to Pending.",
+      },
+    ],
     previewUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80",
     caseInfo: {
       id: "CASE-2026-0812",
@@ -384,26 +398,70 @@ export async function updateEvidenceValidationDecision(params: {
   rejectionReason?: string;
   notes?: string;
   checkerId?: string;
-}): Promise<{ ok: boolean; message: string }> {
+  role?: "checker" | "case_officer" | "system" | "reporter";
+}): Promise<{ ok: boolean; message: string; historyEntry?: StatusHistoryRecord }> {
   try {
-    // 1. Update in-memory store
     const idx = inMemoryStore.findIndex((e) => e.id === params.evidenceId);
-    if (idx !== -1) {
-      inMemoryStore[idx] = {
-        ...inMemoryStore[idx],
-        validationStatus: params.status,
-        rejectionReason: params.rejectionReason,
-        checkerNotes: params.notes,
-        validatedAt: new Date().toISOString(),
-        validatedBy: params.checkerId || "Evidence Checker",
+    if (idx === -1) {
+      return { ok: false, message: "Evidence record not found." };
+    }
+
+    const currentRecord = inMemoryStore[idx];
+    const currentStatus = currentRecord.validationStatus || "pending";
+    const nextStatus = params.status;
+
+    // JN-172: Validate State Transition Rules
+    const validationRes = validateStatusTransition(currentStatus, nextStatus);
+    if (!validationRes.isValid) {
+      return {
+        ok: false,
+        message: validationRes.message,
       };
     }
+
+    // JN-173 & JN-175: Construct Status History Entry
+    const now = new Date().toISOString();
+    const newHistoryEntry = createStatusHistoryEntry({
+      evidenceId: params.evidenceId,
+      fromStatus: currentStatus,
+      toStatus: nextStatus,
+      changedByRole: params.role || "checker",
+      changedById: params.checkerId || "checker-squad-1",
+      changedByName: params.checkerId || "Evidence Checker Squad #1",
+      notes: params.notes || `Status changed from '${currentStatus}' to '${nextStatus}'.`,
+      rejectionReason: params.rejectionReason,
+    });
+
+    const existingHistory = currentRecord.statusHistory || [
+      {
+        id: `HIST-INIT-${params.evidenceId}`,
+        evidenceId: params.evidenceId,
+        fromStatus: "pending",
+        toStatus: "pending",
+        changedAt: currentRecord.uploadDate || now,
+        changedByRole: "system",
+        changedByName: "System Intake",
+        notes: "Initial evidence submission.",
+      },
+    ];
+
+    // Update in-memory store
+    inMemoryStore[idx] = {
+      ...currentRecord,
+      validationStatus: nextStatus,
+      rejectionReason: params.rejectionReason || currentRecord.rejectionReason,
+      checkerNotes: params.notes || currentRecord.checkerNotes,
+      validatedAt: now,
+      validatedBy: params.checkerId || "Evidence Checker Squad #1",
+      lastStatusChangedAt: now,
+      statusHistory: [newHistoryEntry, ...existingHistory],
+    };
 
     // 2. Sync to Supabase if connected
     const { error } = await supabase
       .from("case_evidence")
       .update({
-        validation_status: params.status,
+        validation_status: nextStatus,
       })
       .eq("id", params.evidenceId);
 
@@ -413,7 +471,8 @@ export async function updateEvidenceValidationDecision(params: {
 
     return {
       ok: true,
-      message: `Evidence status successfully updated to '${params.status}'.`,
+      message: `Evidence status successfully transitioned from '${currentStatus}' to '${nextStatus}'.`,
+      historyEntry: newHistoryEntry,
     };
   } catch (err: any) {
     return {

@@ -8,6 +8,7 @@ export default function CheckerLayout() {
         contentStyle: {
           backgroundColor: "#F1F5FA",
         },
+          backgroundColor: "#F8FAFC",
       }}
     />
   );

@@ -591,6 +591,44 @@ export default function SecureRoleScreen() {
               title="Evidence Checker / Validator"
               description="Reviews submitted evidence and records validation decisions."
             />
+
+
+            <Pressable
+              onPress={() => router.push("/checker")}
+              accessibilityRole="button"
+              accessibilityLabel="Enter Evidence Checker Portal"
+            >
+              <RoleItem
+                icon="🔍"
+                title="Evidence Checker / Validator"
+                description="Reviews submitted evidence, validates metadata, and enforces acceptance criteria. (Tap to open workspace)"
+              />
+            </Pressable>
+
+            <View style={styles.divider} />
+
+            <RoleItem
+              icon="⚙️"
+              title="System Administrator"
+              description="Manages accounts, permissions, security and system configuration."
+            />
+          </View>
+
+          {/* Role Info */}
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoIcon}>ℹ️</Text>
+
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>
+                Roles are assigned by JusticeNow
+              </Text>
+
+              <Text style={styles.infoText}>
+                Staff cannot select or change their role during sign in.
+                JusticeNow loads the authorized role from the account profile.
+              </Text>
+            </View>
           </View>
 
           {/* Regular Login Link */}

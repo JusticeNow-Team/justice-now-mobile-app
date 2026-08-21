@@ -250,6 +250,7 @@ export default function TwoFactorScreen() {
     }
 
     if (normalized === "evidence_checker" || profile.role === "evidence_validator") {
+    if (normalized === "evidence_checker") {
       router.replace("/checker");
       return;
     }

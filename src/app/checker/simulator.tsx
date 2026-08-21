@@ -161,6 +161,40 @@ const PRESET_SCENARIOS: { name: string; icon: string; payload: Partial<EvidenceR
       reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
     },
   },
+  {
+    name: "9. Transition: Pending ➔ Under Review",
+    icon: "🔎",
+    payload: {
+      id: "EVD-2026-9909",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "examination_in_progress.jpg",
+      fileType: "image/jpeg",
+      evidenceType: "image",
+      fileSizeBytes: 2100000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "under_review",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "10. Invalid Direct Transition (Pending ➔ Archived)",
+    icon: "🚫",
+    payload: {
+      id: "EVD-2026-9910",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "direct_archived_attempt.pdf",
+      fileType: "application/pdf",
+      evidenceType: "document",
+      fileSizeBytes: 1200000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "archived",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
 ];
 
 export default function EvidenceMetadataSimulatorScreen() {
