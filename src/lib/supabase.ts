@@ -6,6 +6,34 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  "https://placeholder-project.supabase.co";
+
+const supabasePublishableKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder";
+
+if (
+  !process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  !process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+) {
+  console.warn(
+    "⚠️ Missing Supabase environment variables. Please add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY to your .env file."
+  );
+}
+if (typeof globalThis.WebSocket === "undefined") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    globalThis.WebSocket = require("ws");
+  } catch {
+    class DummyWebSocket {
+      addEventListener() {}
+      removeEventListener() {}
+      send() {}
+      close() {}
+    }
+    globalThis.WebSocket = DummyWebSocket as unknown as typeof WebSocket;
+  }
+}
   "https://placeholder-justicenow.supabase.co";
 
 const supabasePublishableKey =
