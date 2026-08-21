@@ -244,20 +244,7 @@ export default function TwoFactorScreen() {
         ? "evidence_checker"
         : profile.role;
 
-    if (normalized === "case_officer") {
-      router.replace("/officer");
-      return;
-    }
-
- JN-128-Configure-system-roles-and-permissions
     if (normalized === "evidence_checker") {
-
-    // ---------------------------------------------------
-    // Other team modules are not connected yet
-    // ---------------------------------------------------
-
-    if (profile.role === "evidence_validator") {
-      main
       router.replace("/checker");
       return;
     }
