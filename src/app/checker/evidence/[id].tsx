@@ -136,6 +136,14 @@ export default function EvidenceAuditDetailScreen() {
 
   const { audit } = validation;
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/checker");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
@@ -144,9 +152,9 @@ export default function EvidenceAuditDetailScreen() {
       <View style={styles.header}>
         <Pressable
           style={styles.backBtn}
-          onPress={() => router.back()}
+          onPress={handleBack}
           accessibilityRole="button"
-          accessibilityLabel="Back to Dashboard"
+          accessibilityLabel="Back to queue"
         >
           <Text style={styles.backBtnText}>‹ Back</Text>
         </Pressable>
