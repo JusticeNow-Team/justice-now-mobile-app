@@ -47,12 +47,7 @@ export default function SecureRoleScreen() {
       router.replace("/officer");
       return;
     }
-
- JN-128-Configure-system-roles-and-permissions
     if (normalized === "evidence_checker") {
-
-    if (role === "evidence_validator") {
- main
       router.replace("/checker");
       return;
     }
@@ -594,7 +589,6 @@ export default function SecureRoleScreen() {
               description="Reviews and investigates assigned human-rights cases."
             />
             <View style={styles.divider} />
-    JN-128-Configure-system-roles-and-permissions
             <RoleItem
               icon="🔍"
               title="Evidence Checker / Validator"
@@ -638,7 +632,6 @@ export default function SecureRoleScreen() {
                 JusticeNow loads the authorized role from the account profile.
               </Text>
             </View>
- main
           </View>
 
           {/* Regular Login Link */}
