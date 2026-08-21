@@ -1,3 +1,4 @@
+import { recordAuditEvent } from "../audit/auditService";
 import { supabase } from "../lib/supabase";
 import { getPermissionsForRole } from "./permissions";
 import { normalizeRole } from "./roles";
@@ -127,6 +128,29 @@ export async function updateUserRole(
   };
 
   inMemoryRoleAuditLogs.unshift(auditLog);
+
+  // Unified Audit Integration (JN-256)
+  try {
+    void recordAuditEvent({
+      eventType: "ROLE_CHANGED",
+      actorId: actorUserId,
+      actorEmail: actorUserEmail,
+      actorRole: actorRole || "system_admin",
+      targetId: targetUserId,
+      targetEmail: targetUserEmail,
+      action: "STAFF_ROLE_CHANGE",
+      description: auditLog.description,
+      details: {
+        previousRole: targetCurrentRole,
+        newRole: normalizedNewRole,
+        reason,
+        gainedPermissions: diff.gained,
+        removedPermissions: diff.removed,
+      },
+    });
+  } catch {
+    // Non-fatal if offline
+  }
 
   // 3. Database Sync
   try {

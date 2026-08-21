@@ -1,3 +1,4 @@
+import { recordAuditEvent } from "../audit/auditService";
 import { supabase } from "../lib/supabase";
 import { INITIAL_STAFF_ACCOUNTS } from "./seeds/staffSeed";
 import {
@@ -171,7 +172,7 @@ export async function createStaffAccount(
   // Add to local cache
   inMemoryStaff.unshift(newStaff);
 
-  // Record audit log event (JN-197)
+  // Record audit log event (JN-197 & JN-255)
   const auditEvent: StaffAuditLog = {
     id: `audit_${Date.now()}`,
     eventType: "STAFF_ACCOUNT_CREATED",
@@ -184,6 +185,20 @@ export async function createStaffAccount(
     timestamp: now,
   };
   inMemoryAuditLogs.unshift(auditEvent);
+
+  try {
+    void recordAuditEvent({
+      eventType: "ACCOUNT_CREATED",
+      actorEmail,
+      targetId: newId,
+      targetEmail: cleanEmail,
+      action: "STAFF_CREATE",
+      description: auditEvent.description,
+      details: { role: input.role, department: input.department, fullName: cleanName },
+    });
+  } catch {
+    // Non-fatal
+  }
 
   // Sync with Supabase
   try {
@@ -265,6 +280,20 @@ export async function toggleStaffActive(
     timestamp: now,
   };
   inMemoryAuditLogs.unshift(auditEvent);
+
+  try {
+    void recordAuditEvent({
+      eventType: isActive ? "ACCOUNT_ACTIVATED" : "ACCOUNT_DEACTIVATED",
+      actorEmail,
+      targetId: current.id,
+      targetEmail: current.email,
+      action: isActive ? "STAFF_ACTIVATE" : "STAFF_DEACTIVATE",
+      description,
+      details: { previousStatus: current.status, newStatus: updated.status, reason },
+    });
+  } catch {
+    // Non-fatal
+  }
 
   // Sync with Supabase
   try {
