@@ -240,6 +240,23 @@ export default function TwoFactorScreen() {
 
     const redirect = resolvePostLoginRedirect(profile);
 
+    const normalized =
+      profile.role === "evidence_validator"
+        ? "evidence_checker"
+        : profile.role;
+
+    if (normalized === "case_officer") {
+      router.replace("/officer");
+      return;
+    }
+
+    if (normalized === "evidence_checker") {
+      router.replace("/checker");
+      return;
+    }
+
+    if (normalized === "system_admin") {
+      router.replace("/admin");
     if (!redirect.allowed) {
       await supabase.auth.signOut();
       Alert.alert(

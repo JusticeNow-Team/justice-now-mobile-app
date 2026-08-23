@@ -209,6 +209,13 @@ export default function EvidenceReviewScreen() {
   );
 
   useEffect(() => {
+    let isMounted = true;
+    if (isMounted) {
+      void loadEvidence();
+    }
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadEvidence();
   }, [loadEvidence]);

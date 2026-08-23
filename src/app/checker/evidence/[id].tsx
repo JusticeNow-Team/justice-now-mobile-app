@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -58,7 +58,7 @@ export default function EvidenceAuditDetailScreen() {
   const [generatingSignedUrl, setGeneratingSignedUrl] = useState(false);
   const [signedUrlToken, setSignedUrlToken] = useState<string | null>(null);
 
-  const loadRecord = async () => {
+  const loadRecord = useCallback(async () => {
     try {
       const queue = await fetchEvidenceCheckerQueue();
       const match = queue.find((item) => item.id === id);
@@ -68,9 +68,17 @@ export default function EvidenceAuditDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
+    let isMounted = true;
+    if (isMounted) {
+      void loadRecord();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [loadRecord]);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRecord();
   }, [id]);

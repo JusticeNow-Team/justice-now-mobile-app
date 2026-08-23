@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-
+import { RoleGuard } from "../../auth";
 import { fetchEvidenceCheckerQueue } from "../../checker/api";
 import { formatBytes, validateEvidenceMetadata } from "../../checker/metadataValidation";
 import {
@@ -169,8 +169,9 @@ export default function EvidenceCheckerDashboard() {
   }, [validatedRecords, activeTab, searchQuery]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
+    <RoleGuard allowedRoles={["evidence_checker"]}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
 
       {/* Top Header Bar */}
       <View style={styles.header}>
@@ -437,7 +438,8 @@ export default function EvidenceCheckerDashboard() {
 
         />
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </RoleGuard>
   );
 }
 
@@ -511,6 +513,8 @@ function StatusBadge({ status }: { status: EvidenceValidationStatus }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
     backgroundColor: "#F8FAFC",
   },
 
