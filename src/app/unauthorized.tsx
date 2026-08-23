@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { formatUnauthorizedReason, getDashboardRouteForRole, getRoleConfig, useAuth } from "../auth";
 import { colors } from "../theme";
+import { shadows } from "../theme/shadows";
 
 export default function UnauthorizedAccessScreen() {
   const router = useRouter();
@@ -186,10 +187,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    boxShadow: shadows.elevated,
     elevation: 2,
   },
   iconCircle: {

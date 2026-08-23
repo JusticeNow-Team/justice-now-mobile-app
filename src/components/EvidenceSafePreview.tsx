@@ -17,6 +17,7 @@ import { requestControlledDownload } from "../checker/api";
 import { formatBytes, getPreviewKind, simulatePublicUrlAccess } from "../checker/metadataValidation";
 import { ControlledDownloadLog, EvidenceRecord } from "../checker/types";
 import { colors } from "../theme";
+import { shadows } from "../theme/shadows";
 
 interface EvidenceSafePreviewProps {
   record: EvidenceRecord;
@@ -1090,9 +1091,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
+    boxShadow: shadows.modal,
     elevation: 5,
   },
 

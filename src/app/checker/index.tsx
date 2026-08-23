@@ -23,6 +23,7 @@ import {
 } from "../../checker/types";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
+import { shadows } from "../../theme/shadows";
 
 export default function EvidenceCheckerDashboard() {
   const router = useRouter();
@@ -169,7 +170,7 @@ export default function EvidenceCheckerDashboard() {
   }, [validatedRecords, activeTab, searchQuery]);
 
   return (
-    <RoleGuard allowedRoles={["evidence_checker"]}>
+    <RoleGuard allowedRoles={["evidence_validator"]}>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
 
@@ -180,7 +181,7 @@ export default function EvidenceCheckerDashboard() {
             <View>
               <View style={styles.badgeRow}>
                 <View style={styles.roleBadge}>
-                  <Text style={styles.roleBadgeText}>Role: Evidence Checker</Text>
+                  <Text style={styles.roleBadgeText}>Role: Evidence Validator</Text>
                 </View>
                 <Text style={styles.sdgTag}>SDG 16 · Peace & Justice</Text>
               </View>
@@ -747,10 +748,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    boxShadow: shadows.elevated,
     elevation: 1,
   },
 

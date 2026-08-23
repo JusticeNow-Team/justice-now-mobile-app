@@ -3,12 +3,13 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme";
 import { isAccountActive } from "../navigation";
-import { SystemRole } from "../types";
+import { normalizeRole } from "../roles";
+import { AllRoles, SystemRole } from "../types";
 import { useAuth } from "../useAuth";
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  allowedRoles: SystemRole[];
+  allowedRoles: AllRoles[];
   fallback?: React.ReactNode;
   redirectToUnauthorized?: boolean;
 }
@@ -54,7 +55,10 @@ export function RoleGuard({
   }
 
   // 2. Check role authorization (JN-179)
-  const isAllowed = role && allowedRoles.includes(role);
+  const normalizedAllowedRoles = allowedRoles
+    .map((allowedRole) => normalizeRole(allowedRole))
+    .filter((allowedRole): allowedRole is SystemRole => allowedRole !== null);
+  const isAllowed = role ? normalizedAllowedRoles.includes(role) : false;
 
   if (!isAllowed) {
     if (fallback) {
@@ -66,14 +70,14 @@ export function RoleGuard({
       return null;
     }
 
-    const targetRole = allowedRoles[0] || "system_admin";
+    const targetRole = normalizeRole(allowedRoles[0]) || "system_admin";
     const targetLabel =
       targetRole === "system_admin"
         ? "System Admin"
         : targetRole === "case_officer"
         ? "Case Officer"
         : targetRole === "evidence_checker"
-        ? "Evidence Checker"
+        ? "Evidence Validator"
         : "Reporter";
 
     return (

@@ -4,7 +4,7 @@ import { RoleGuard } from "../../auth";
 
 export default function CheckerLayout() {
   return (
-    <RoleGuard allowedRoles={["evidence_checker"]}>
+    <RoleGuard allowedRoles={["evidence_validator"]}>
       <Stack
         screenOptions={{
           headerShown: false,

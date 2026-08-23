@@ -11,6 +11,7 @@ import {
   spacing,
   typography,
 } from "../../theme";
+import { shadows } from "../../theme/shadows";
 
 import StatusBadge, {
   StatusType,
@@ -76,14 +77,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
 
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-
+    boxShadow: shadows.card,
     elevation: 2,
   },
 

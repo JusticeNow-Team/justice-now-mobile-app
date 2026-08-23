@@ -11,6 +11,7 @@ import {
   PrimaryButton,
 } from "../../components/common";
 import { colors } from "../../theme";
+import { shadows } from "../../theme/shadows";
 import { loginReporter } from "./loginReporter";
 import {
   hasLoginErrors,
@@ -270,10 +271,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    shadowColor: "#0F1E33",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
+    boxShadow: shadows.subtle,
     elevation: 1,
   },
   noticeWrap: {

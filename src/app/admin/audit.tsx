@@ -15,6 +15,7 @@ import { AuditEvent, AuditEventType, getAuditEvents } from "../../audit";
 import { useAuth } from "../../auth";
 import { RoleGuard } from "../../auth/guards/RoleGuard";
 import { colors } from "../../theme";
+import { shadows } from "../../theme/shadows";
 
 type FilterTab = "ALL" | "ACCOUNT_CREATED" | "ACCOUNT_STATUS" | "ROLE_CHANGED";
 
@@ -619,10 +620,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
+    boxShadow: shadows.soft,
     elevation: 1,
   },
   cardHeaderRow: {

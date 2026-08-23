@@ -13,8 +13,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getDashboardRouteForRole, resolvePostLoginRedirect, useAuth } from "../../auth";
-import { SystemRole } from "../../auth/types";
+import { resolvePostLoginRedirect } from "../../auth";
+import { UserProfile } from "../../auth/types";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
@@ -30,11 +30,9 @@ export default function SecureRoleScreen() {
   // -------------------------------------------------------
   // Route verified staff by their database role
   // -------------------------------------------------------
-  const routeStaff = (role: string) => {
-    const normalized =
-      role === "evidence_validator" ? "evidence_checker" : role;
-
-  const routeStaff = async (roleOrProfile: any) => {
+  const routeStaff = async (
+    roleOrProfile: string | Partial<UserProfile> | null | undefined
+  ) => {
     const redirect = resolvePostLoginRedirect(roleOrProfile);
 
     if (!redirect.allowed) {
@@ -46,116 +44,7 @@ export default function SecureRoleScreen() {
       return;
     }
 
-    if (normalized === "evidence_checker") {
-      router.replace("/checker");
-      return;
-    }
-
-    if (normalized === "system_admin") {
-      router.replace("/admin");
-      return;
-    }
-
-    void supabase.auth.signOut();
-    Alert.alert(
-      "Access denied",
-      "This account does not have an authorized JusticeNow staff role."
-    );
-  };
-
-  // -------------------------------------------------------
     router.replace(redirect.targetRoute as any);
-  };
-
-  // -------------------------------------------------------
-  // Quick Direct Role Login (Development & Admin Preview)
-  // -------------------------------------------------------
-
-  const handleQuickDemoLogin = (role: SystemRole) => {
-    loginAsRole(role);
-    const targetRoute = getDashboardRouteForRole(role) || "/reporter";
-    router.replace(targetRoute as any);
-  };
-
-  // -------------------------------------------------------
-  // Staff Registration (Create Admin / Staff Account)
-  // -------------------------------------------------------
-
-  const handleStaffRegister = async () => {
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    const cleanName = fullName.trim();
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!cleanName) {
-      setErrorMessage("Please enter your full name.");
-      return;
-    }
-
-    if (!cleanEmail) {
-      setErrorMessage("Please enter your staff email address.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (loading) return;
-
-    try {
-      setLoading(true);
-
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-            role: selectedStaffRole,
-          },
-        },
-      });
-
-      if (error) {
-        setErrorMessage(error.message);
-        Alert.alert("Account creation failed", error.message);
-        return;
-      }
-
-      if (data.user) {
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
-          full_name: cleanName,
-          role: selectedStaffRole,
-          updated_at: new Date().toISOString(),
-        });
-
-        loginAsRole(selectedStaffRole, cleanName);
-
-        Alert.alert(
-          "Staff account ready",
-          `Successfully registered as ${getRoleLabel(selectedStaffRole)}!`,
-          [
-            {
-              text: "Enter Workspace",
-              onPress: () => routeStaff(selectedStaffRole),
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to create staff account.";
-      setErrorMessage(message);
-      Alert.alert("Registration error", message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // -------------------------------------------------------
@@ -225,7 +114,6 @@ export default function SecureRoleScreen() {
 
       const allowedStaffRoles = [
         "case_officer",
-        "evidence_checker",
         "evidence_validator",
         "system_admin",
       ];
@@ -249,7 +137,7 @@ export default function SecureRoleScreen() {
       }
 
       if (aal.currentLevel === "aal2") {
-        routeStaff(profile.role);
+        await routeStaff(profile);
         return;
       }
 
@@ -414,7 +302,6 @@ export default function SecureRoleScreen() {
             <RoleItem
               icon="🔍"
               title="Evidence Checker / Validator"
-              description="Examines submitted evidence files and records forensic verification decisions."
               description="Reviews submitted evidence and records validation decisions."
             />
           </View>

@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../../theme";
+import { shadows } from "../../theme/shadows";
 
 interface SectionCardProps {
   title: string;
@@ -56,10 +57,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
     overflow: "hidden",
-    shadowColor: "#0F1E33",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
+    boxShadow: shadows.subtle,
     elevation: 1,
   },
   header: {
