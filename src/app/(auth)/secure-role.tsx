@@ -13,24 +13,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../../auth";
-import { SystemRole } from "../../auth/types";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
-type AuthMode = "signin" | "signup";
-
 export default function SecureRoleScreen() {
   const router = useRouter();
-  const { loginAsRole } = useAuth();
 
-  const [authMode, setAuthMode] = useState<AuthMode>("signin");
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedStaffRole, setSelectedStaffRole] =
-    useState<SystemRole>("system_admin");
-
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -38,8 +28,7 @@ export default function SecureRoleScreen() {
   // -------------------------------------------------------
   // Route verified staff by their database role
   // -------------------------------------------------------
-
-  const routeStaff = async (role: string) => {
+  const routeStaff = (role: string) => {
     const normalized =
       role === "evidence_validator" ? "evidence_checker" : role;
 
@@ -48,11 +37,7 @@ export default function SecureRoleScreen() {
       return;
     }
 
- JN-128-Configure-system-roles-and-permissions
     if (normalized === "evidence_checker") {
-
-    if (role === "evidence_validator") {
- main
       router.replace("/checker");
       return;
     }
@@ -62,8 +47,7 @@ export default function SecureRoleScreen() {
       return;
     }
 
-    await supabase.auth.signOut();
-
+    void supabase.auth.signOut();
     Alert.alert(
       "Access denied",
       "This account does not have an authorized JusticeNow staff role."
@@ -71,109 +55,8 @@ export default function SecureRoleScreen() {
   };
 
   // -------------------------------------------------------
-  // Quick Direct Role Login (Development & Admin Preview)
-  // -------------------------------------------------------
-
-  const handleQuickDemoLogin = (role: SystemRole) => {
-    loginAsRole(role);
-    if (role === "system_admin") {
-      router.replace("/admin");
-    } else if (role === "case_officer") {
-      router.replace("/officer");
-    } else if (role === "evidence_checker") {
-      router.replace("/checker");
-    } else {
-      router.replace("/reporter");
-    }
-  };
-
-  // -------------------------------------------------------
-  // Staff Registration (Create Admin / Staff Account)
-  // -------------------------------------------------------
-
-  const handleStaffRegister = async () => {
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    const cleanName = fullName.trim();
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!cleanName) {
-      setErrorMessage("Please enter your full name.");
-      return;
-    }
-
-    if (!cleanEmail) {
-      setErrorMessage("Please enter your staff email address.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (loading) return;
-
-    try {
-      setLoading(true);
-
-      // Sign up in Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-            role: selectedStaffRole,
-          },
-        },
-      });
-
-      if (error) {
-        setErrorMessage(error.message);
-        Alert.alert("Account creation failed", error.message);
-        return;
-      }
-
-      if (data.user) {
-        // Upsert profile in database
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
-          full_name: cleanName,
-          role: selectedStaffRole,
-          updated_at: new Date().toISOString(),
-        });
-
-        loginAsRole(selectedStaffRole, cleanName);
-
-        Alert.alert(
-          "Staff account ready",
-          `Successfully registered as ${getRoleLabel(selectedStaffRole)}!`,
-          [
-            {
-              text: "Enter Workspace",
-              onPress: () => routeStaff(selectedStaffRole),
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to create staff account.";
-      setErrorMessage(message);
-      Alert.alert("Registration error", message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // -------------------------------------------------------
   // Staff Login
   // -------------------------------------------------------
-
   const handleStaffLogin = async () => {
     setErrorMessage("");
     setSuccessMessage("");
@@ -232,7 +115,7 @@ export default function SecureRoleScreen() {
         await supabase.auth.signOut();
         Alert.alert(
           "Staff access only",
-          "This is a Reporter account. Please use regular sign in instead."
+          "This is a Reporter account. Please use regular citizen sign in instead."
         );
         return;
       }
@@ -264,7 +147,7 @@ export default function SecureRoleScreen() {
       }
 
       if (aal.currentLevel === "aal2") {
-        await routeStaff(profile.role);
+        routeStaff(profile.role);
         return;
       }
 
@@ -312,190 +195,17 @@ export default function SecureRoleScreen() {
             </View>
             <Text style={styles.title}>JusticeNow Staff Access</Text>
             <Text style={styles.description}>
-              Access the System Admin, Case Officer, or Evidence Checker
+              Sign in to access the System Admin, Case Officer, or Evidence Checker
               workspaces.
             </Text>
           </View>
 
-          {/* Quick Demo Preview / Fast Access Bar */}
-          <View style={styles.quickAccessCard}>
-            <Text style={styles.quickAccessTitle}>
-              ⚡ Instant Role Access (Preview / Testing)
-            </Text>
-            <Text style={styles.quickAccessSubtitle}>
-              Tap to enter and test any workspace immediately:
-            </Text>
-            <View style={styles.quickButtonGrid}>
-              <Pressable
-                style={[styles.quickButton, styles.adminQuickButton]}
-                onPress={() => handleQuickDemoLogin("system_admin")}
-                accessibilityRole="button"
-              >
-                <Text style={styles.quickButtonIcon}>⚙️</Text>
-                <Text style={styles.quickButtonText}>System Admin</Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.quickButton, styles.officerQuickButton]}
-                onPress={() => handleQuickDemoLogin("case_officer")}
-                accessibilityRole="button"
-              >
-                <Text style={styles.quickButtonIcon}>⚖️</Text>
-                <Text style={styles.quickButtonText}>Case Officer</Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.quickButton, styles.checkerQuickButton]}
-                onPress={() => handleQuickDemoLogin("evidence_checker")}
-                accessibilityRole="button"
-              >
-                <Text style={styles.quickButtonIcon}>🔍</Text>
-                <Text style={styles.quickButtonText}>Evidence Checker</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Form Card with Tabs */}
+          {/* Form Card */}
           <View style={styles.loginCard}>
-            {/* Tab switch */}
-            <View style={styles.tabsRow}>
-              <Pressable
-                onPress={() => {
-                  setAuthMode("signin");
-                  setErrorMessage("");
-                  setSuccessMessage("");
-                }}
-                style={[
-                  styles.tabItem,
-                  authMode === "signin" && styles.tabItemActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabItemText,
-                    authMode === "signin" && styles.tabItemTextActive,
-                  ]}
-                >
-                  Staff Sign In
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  setAuthMode("signup");
-                  setErrorMessage("");
-                  setSuccessMessage("");
-                }}
-                style={[
-                  styles.tabItem,
-                  authMode === "signup" && styles.tabItemActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabItemText,
-                    authMode === "signup" && styles.tabItemTextActive,
-                  ]}
-                >
-                  Create Admin/Staff
-                </Text>
-              </Pressable>
-            </View>
-
-            {authMode === "signup" ? (
-              <>
-                <Text style={styles.loginTitle}>Create Staff Account</Text>
-                <Text style={styles.loginSubtitle}>
-                  Register a new administrator, investigator, or evidence
-                  checker.
-                </Text>
-
-                {/* Role Picker */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Select Staff Role</Text>
-                  <View style={styles.rolePickerRow}>
-                    <Pressable
-                      style={[
-                        styles.roleOption,
-                        selectedStaffRole === "system_admin" &&
-                          styles.roleOptionSelected,
-                      ]}
-                      onPress={() => setSelectedStaffRole("system_admin")}
-                    >
-                      <Text style={styles.roleOptionIcon}>⚙️</Text>
-                      <Text
-                        style={[
-                          styles.roleOptionText,
-                          selectedStaffRole === "system_admin" &&
-                            styles.roleOptionTextSelected,
-                        ]}
-                      >
-                        Admin
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.roleOption,
-                        selectedStaffRole === "case_officer" &&
-                          styles.roleOptionSelected,
-                      ]}
-                      onPress={() => setSelectedStaffRole("case_officer")}
-                    >
-                      <Text style={styles.roleOptionIcon}>⚖️</Text>
-                      <Text
-                        style={[
-                          styles.roleOptionText,
-                          selectedStaffRole === "case_officer" &&
-                            styles.roleOptionTextSelected,
-                        ]}
-                      >
-                        Officer
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.roleOption,
-                        selectedStaffRole === "evidence_checker" &&
-                          styles.roleOptionSelected,
-                      ]}
-                      onPress={() => setSelectedStaffRole("evidence_checker")}
-                    >
-                      <Text style={styles.roleOptionIcon}>🔍</Text>
-                      <Text
-                        style={[
-                          styles.roleOptionText,
-                          selectedStaffRole === "evidence_checker" &&
-                            styles.roleOptionTextSelected,
-                        ]}
-                      >
-                        Checker
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {/* Full Name */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Full Name</Text>
-                  <TextInput
-                    value={fullName}
-                    onChangeText={setFullName}
-                    placeholder="e.g. System Administrator"
-                    placeholderTextColor={colors.textSoft}
-                    style={styles.input}
-                  />
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.loginTitle}>Staff Sign In</Text>
-                <Text style={styles.loginSubtitle}>
-                  Enter the credentials assigned to your authorized account.
-                </Text>
-              </>
-            )}
+            <Text style={styles.loginTitle}>Staff Sign In</Text>
+            <Text style={styles.loginSubtitle}>
+              Enter the credentials assigned to your authorized account.
+            </Text>
 
             {/* Email */}
             <View style={styles.fieldGroup}>
@@ -535,11 +245,7 @@ export default function SecureRoleScreen() {
                 autoComplete="password"
                 textContentType="password"
                 editable={!loading}
-                onSubmitEditing={
-                  authMode === "signup"
-                    ? handleStaffRegister
-                    : handleStaffLogin
-                }
+                onSubmitEditing={handleStaffLogin}
                 style={styles.input}
               />
             </View>
@@ -560,9 +266,7 @@ export default function SecureRoleScreen() {
 
             {/* Submit Button */}
             <Pressable
-              onPress={
-                authMode === "signup" ? handleStaffRegister : handleStaffLogin
-              }
+              onPress={handleStaffLogin}
               disabled={loading}
               accessibilityRole="button"
               style={[styles.primaryButton, loading && styles.disabledButton]}
@@ -570,75 +274,46 @@ export default function SecureRoleScreen() {
               {loading ? (
                 <ActivityIndicator color={colors.textInverse} />
               ) : (
-                <Text style={styles.primaryText}>
-                  {authMode === "signup"
-                    ? `Create ${getRoleLabel(selectedStaffRole)} Account`
-                    : "Sign in securely"}
-                </Text>
+                <Text style={styles.primaryText}>Sign in securely</Text>
               )}
             </Pressable>
           </View>
 
-          {/* Roles Overview */}
+          {/* Role Info Notice */}
+          <View style={styles.infoCard}>
+            <Text style={styles.infoIcon}>ℹ️</Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>
+                Staff Accounts Are Provisioned by Administrators
+              </Text>
+              <Text style={styles.infoText}>
+                Staff members cannot self-register. System Administrators create
+                and invite Case Officers and Evidence Checkers through the Admin
+                Management portal.
+              </Text>
+            </View>
+          </View>
+
+          {/* Configured System Roles Card */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Configured System Roles</Text>
+            <Text style={styles.cardTitle}>Authorized Staff Roles</Text>
             <RoleItem
               icon="⚙️"
               title="System Administrator"
-              description="Manages roles, permissions, security policies, and accounts."
+              description="Manages staff accounts, roles, report categories, and security policies."
             />
             <View style={styles.divider} />
             <RoleItem
               icon="⚖️"
               title="Case Investigator / Officer"
-              description="Reviews and investigates assigned human-rights cases."
+              description="Reviews and investigates assigned human-rights cases and tracks status."
             />
             <View style={styles.divider} />
-    JN-128-Configure-system-roles-and-permissions
             <RoleItem
               icon="🔍"
               title="Evidence Checker / Validator"
-              description="Reviews submitted evidence and records validation decisions."
+              description="Examines submitted evidence files and records forensic verification decisions."
             />
-
-
-            <Pressable
-              onPress={() => router.push("/checker")}
-              accessibilityRole="button"
-              accessibilityLabel="Enter Evidence Checker Portal"
-            >
-              <RoleItem
-                icon="🔍"
-                title="Evidence Checker / Validator"
-                description="Reviews submitted evidence, validates metadata, and enforces acceptance criteria. (Tap to open workspace)"
-              />
-            </Pressable>
-
-            <View style={styles.divider} />
-
-            <RoleItem
-              icon="⚙️"
-              title="System Administrator"
-              description="Manages accounts, permissions, security and system configuration."
-            />
-          </View>
-
-          {/* Role Info */}
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>
-                Roles are assigned by JusticeNow
-              </Text>
-
-              <Text style={styles.infoText}>
-                Staff cannot select or change their role during sign in.
-                JusticeNow loads the authorized role from the account profile.
-              </Text>
-            </View>
- main
           </View>
 
           {/* Regular Login Link */}
@@ -653,19 +328,6 @@ export default function SecureRoleScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-function getRoleLabel(role: SystemRole): string {
-  switch (role) {
-    case "system_admin":
-      return "System Admin";
-    case "case_officer":
-      return "Case Officer";
-    case "evidence_checker":
-      return "Evidence Checker";
-    default:
-      return "Reporter";
-  }
 }
 
 function RoleItem({
@@ -756,97 +418,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.textSecondary,
   },
-  quickAccessCard: {
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: colors.royal[50],
-    borderWidth: 1,
-    borderColor: colors.royal[200],
-    marginBottom: 16,
-  },
-  quickAccessTitle: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: colors.royal[900],
-  },
-  quickAccessSubtitle: {
-    fontSize: 11.5,
-    color: colors.textSecondary,
-    marginTop: 2,
-    marginBottom: 10,
-  },
-  quickButtonGrid: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  quickButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  adminQuickButton: {
-    backgroundColor: "#FBF7EC",
-    borderColor: "#E9D69D",
-  },
-  officerQuickButton: {
-    backgroundColor: "#EFF4FF",
-    borderColor: "#C0D4FD",
-  },
-  checkerQuickButton: {
-    backgroundColor: "#EAF7F8",
-    borderColor: "#A2E0E4",
-  },
-  quickButtonIcon: {
-    fontSize: 18,
-    marginBottom: 2,
-  },
-  quickButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.navy[900],
-    textAlign: "center",
-  },
   loginCard: {
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
     backgroundColor: colors.surface,
-  },
-  tabsRow: {
-    flexDirection: "row",
-    backgroundColor: colors.navy[50],
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 16,
-  },
-  tabItem: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderRadius: 8,
-  },
-  tabItemActive: {
-    backgroundColor: colors.surface,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  tabItemText: {
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  tabItemTextActive: {
-    color: colors.royal[700],
-    fontWeight: "700",
+    marginBottom: 14,
   },
   loginTitle: {
     fontSize: 16,
@@ -868,38 +446,6 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "600",
     color: colors.navy[800],
-  },
-  rolePickerRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  roleOption: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-    backgroundColor: colors.navy[50],
-  },
-  roleOptionSelected: {
-    borderColor: colors.royal[600],
-    backgroundColor: colors.royal[50],
-  },
-  roleOptionIcon: {
-    fontSize: 14,
-  },
-  roleOptionText: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: colors.navy[700],
-  },
-  roleOptionTextSelected: {
-    color: colors.royal[800],
-    fontWeight: "700",
   },
   input: {
     minHeight: 48,
@@ -952,8 +498,34 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textInverse,
   },
+  infoCard: {
+    flexDirection: "row",
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.navy[50],
+    borderWidth: 1,
+    borderColor: colors.navy[100],
+    marginBottom: 14,
+    gap: 10,
+  },
+  infoIcon: {
+    fontSize: 18,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.navy[900],
+    marginBottom: 3,
+  },
+  infoText: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
   card: {
-    marginTop: 14,
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,

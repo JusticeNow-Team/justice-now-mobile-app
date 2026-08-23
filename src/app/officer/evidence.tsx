@@ -209,7 +209,13 @@ export default function EvidenceReviewScreen() {
   );
 
   useEffect(() => {
-    loadEvidence();
+    let isMounted = true;
+    if (isMounted) {
+      void loadEvidence();
+    }
+    return () => {
+      isMounted = false;
+    };
   }, [loadEvidence]);
 
   // -------------------------------------------------------
