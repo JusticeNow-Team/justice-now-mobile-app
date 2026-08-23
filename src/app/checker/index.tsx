@@ -178,7 +178,7 @@ export default function EvidenceCheckerDashboard() {
       <View style={styles.header}>
         <View style={styles.headerInner}>
           <View style={styles.headerTop}>
-            <View>
+            <View style={styles.headerTextContainer}>
               <View style={styles.badgeRow}>
                 <View style={styles.roleBadge}>
                   <Text style={styles.roleBadgeText}>Role: Evidence Validator</Text>
@@ -195,6 +195,8 @@ export default function EvidenceCheckerDashboard() {
             <Pressable
               style={styles.simulatorButton}
               onPress={() => router.push("/checker/simulator")}
+              accessibilityRole="button"
+              accessibilityLabel="Open Test Criteria Simulator"
             >
               <Text style={styles.simulatorButtonText}>🧪 Test Criteria</Text>
             </Pressable>
@@ -534,12 +536,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: 8,
+  },
+
+  headerTextContainer: {
+    flex: 1,
+    paddingRight: 4,
   },
 
   badgeRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 6,
+    flexWrap: "wrap",
+    gap: 4,
   },
 
   roleBadge: {
@@ -547,7 +557,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    marginRight: 8,
+    marginRight: 6,
   },
 
   roleBadgeText: {
@@ -575,14 +585,17 @@ const styles = StyleSheet.create({
 
   simulatorButton: {
     backgroundColor: colors.royal[600],
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexShrink: 0,
+    alignSelf: "flex-start",
+    marginTop: 2,
   },
 
   simulatorButtonText: {
     color: colors.surface,
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: "700",
   },
 
