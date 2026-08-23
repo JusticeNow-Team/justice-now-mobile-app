@@ -216,6 +216,8 @@ export default function EvidenceReviewScreen() {
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadEvidence();
   }, [loadEvidence]);
 
   // -------------------------------------------------------

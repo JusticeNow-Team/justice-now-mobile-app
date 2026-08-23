@@ -143,7 +143,7 @@ const PRESET_SCENARIOS: { name: string; icon: string; payload: Partial<EvidenceR
     },
   },
   {
-    name: "8. Missing File in Storage Vault (404)",
+    name: "8. Missing File in Storage Vault (404 Handled)",
     icon: "❓",
     payload: {
       id: "EVD-2026-9908",
@@ -156,7 +156,97 @@ const PRESET_SCENARIOS: { name: string; icon: string; payload: Partial<EvidenceR
       uploadDate: new Date().toISOString(),
       validationStatus: "pending",
       fileExistsInStorage: false, // 404 Storage Error
-      storagePath: "CASE-2026-0812/EVD-2026-9908_missing_asset.pdf",
+      storagePath: "cases/CASE-2026-0812/evidence/EVD-2026-9908_missing_asset.pdf",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "9. Private Storage Vault & Collision-Proof Slug",
+    icon: "🔒",
+    payload: {
+      id: "EVD-2026-9909",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "collision_proof_audio.m4a",
+      fileType: "audio/m4a",
+      evidenceType: "audio",
+      fileSizeBytes: 5200000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "pending",
+      isPrivateBucket: true,
+      storageBucket: "case-evidence",
+      storagePath: "cases/CASE-2026-0812/evidence/EVD-2026-9909_1771660000_collision_proof_audio.m4a",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "10. Exceeded Signed Token Expiry (>1 Hour)",
+    icon: "⏰",
+    payload: {
+      id: "EVD-2026-9910",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "excessive_token_duration.pdf",
+      fileType: "application/pdf",
+      evidenceType: "document",
+      fileSizeBytes: 1800000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "pending",
+      signedUrlExpirySeconds: 7200, // 2 Hours (Security Warning!)
+      storagePath: "cases/CASE-2026-0812/evidence/EVD-2026-9910_excessive_token.pdf",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "9. Transition: Pending ➔ Under Review",
+    icon: "🔎",
+    payload: {
+      id: "EVD-2026-9909",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "examination_in_progress.jpg",
+      fileType: "image/jpeg",
+      evidenceType: "image",
+      fileSizeBytes: 2100000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "under_review",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "10. Invalid Direct Transition (Pending ➔ Archived)",
+    icon: "🚫",
+    payload: {
+      id: "EVD-2026-9910",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "direct_archived_attempt.pdf",
+      fileType: "application/pdf",
+      evidenceType: "document",
+      fileSizeBytes: 1200000,
+      uploadDate: new Date().toISOString(),
+      validationStatus: "archived",
+      caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
+      reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
+    },
+  },
+  {
+    name: "9. Queue Submission Date Descending Order Test",
+    icon: "📅",
+    payload: {
+      id: "EVD-2026-9909",
+      caseId: "CASE-2026-0812",
+      reporterId: "REP-4402",
+      fileName: "newest_submitted_photo.jpg",
+      fileType: "image/jpeg",
+      evidenceType: "image",
+      fileSizeBytes: 3100000,
+      uploadDate: new Date(Date.now() + 60000).toISOString(), // Future timestamp (Top of Queue!)
+      validationStatus: "pending",
       caseInfo: { id: "CASE-2026-0812", caseReference: "JN-2026-0812", title: "Detention Case" },
       reporterInfo: { id: "REP-4402", fullName: "Elena Rostova" },
     },
@@ -180,6 +270,7 @@ export default function EvidenceMetadataSimulatorScreen() {
   const validation = useMemo(() => {
     return validateEvidenceMetadata(form as any);
   }, [form]);
+  const validation = useMemo(() => validateEvidenceMetadata(form), [form]);
 
   const loadPreset = (payload: Partial<EvidenceRecord>) => {
     setForm({ ...payload });
@@ -199,16 +290,18 @@ export default function EvidenceMetadataSimulatorScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={handleBack}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
-        </Pressable>
+        <View style={styles.headerInner}>
+          <Pressable style={styles.backBtn} onPress={handleBack}>
+            <Text style={styles.backBtnText}>‹ Back</Text>
+          </Pressable>
 
-        <View style={styles.headerTitleBox}>
-          <Text style={styles.headerTitle}>Metadata Rules Simulator</Text>
-          <Text style={styles.headerSub}>Test Acceptance Criteria Compliance</Text>
+          <View style={styles.headerTitleBox}>
+            <Text style={styles.headerTitle}>Metadata Rules Simulator</Text>
+            <Text style={styles.headerSub}>Test Acceptance Criteria Compliance</Text>
+          </View>
+
+          <View style={{ width: 40 }} />
         </View>
-
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -298,7 +391,14 @@ export default function EvidenceMetadataSimulatorScreen() {
             <AuditItem label="SEC-5. Missing File Errors Handled" ok={validation.audit.handlesMissingFileErrors} />
             <AuditItem label="SEC-6. Transactional Upload Integrity" ok={validation.audit.preventsIncompleteUploadRecords} />
             <AuditItem label="SEC-7. Local Server Paths Protected" ok={validation.audit.doesNotExposeLocalServerPaths} />
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6 }} />
+
+            <AuditItem label="PRV-1. Safe Preview Supported for Images/Docs" ok={validation.audit.isSupportedPreview} />
+            <AuditItem label="PRV-2. Controlled Download Workflow for Unsupported Files" ok={validation.audit.offersControlledDownloadForUnsupported || validation.audit.isSupportedPreview} />
+            <AuditItem label="PRV-3. Public URLs Do Not Expose Evidence" ok={validation.audit.preventsPublicUrlExposure} />
           </View>
+
         </View>
 
         {/* Payload Form Editor */}
@@ -443,6 +543,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navy[900],
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+
+  headerInner: {
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -477,6 +583,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 14,
     paddingBottom: 40,
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
   },
 
   // Presets

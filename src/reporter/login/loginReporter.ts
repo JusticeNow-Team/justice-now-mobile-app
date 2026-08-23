@@ -6,7 +6,7 @@ export type LoginReporterResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "invalid_credentials" | "staff" | "profile" | "generic";
+      reason: "invalid_credentials" | "staff" | "inactive" | "profile" | "generic";
       message: string;
     };
 
@@ -83,13 +83,23 @@ export async function loginReporter(
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_active, status")
       .eq("id", data.user.id)
       .single();
 
     if (profileError || !profile) {
       // In demo mode with mock session, proceed as reporter
       return { ok: true };
+    }
+
+    if (profile.is_active === false || profile.status === "inactive" || profile.status === "suspended") {
+      await supabase.auth.signOut();
+      return {
+        ok: false,
+        reason: "inactive",
+        message:
+          "Your account or assigned role is currently inactive. Please contact your system administrator.",
+      };
     }
 
     if (profile.role === "reporter") {

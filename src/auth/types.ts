@@ -51,13 +51,31 @@ export interface RoleMetadata {
   permissions: Permission[];
 }
 
+export type DashboardRoute =
+  | "/reporter"
+  | "/officer"
+  | "/checker"
+  | "/admin";
+
+export type AccountStatus = "active" | "inactive" | "suspended";
+
 export interface UserProfile {
   id: string;
   email?: string;
   full_name?: string;
   role: SystemRole;
+  is_active?: boolean;
+  status?: AccountStatus;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface PostLoginRedirectResult {
+  allowed: boolean;
+  targetRoute: string;
+  role: SystemRole | null;
+  error?: string;
+  reason?: "invalid_role" | "inactive_account" | "unauthorized";
 }
 
 export interface AuthContextValue {
@@ -71,6 +89,7 @@ export interface AuthContextValue {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   loginAsRole: (role: SystemRole, name?: string) => void;
+  updateActiveUserRole: (newRole: SystemRole) => void;
 }
 
 export interface RouteAuthorizationRule {
@@ -78,3 +97,4 @@ export interface RouteAuthorizationRule {
   allowedRoles: SystemRole[];
   requiredPermissions?: Permission[];
 }
+

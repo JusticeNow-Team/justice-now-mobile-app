@@ -81,12 +81,86 @@ export function generateCollisionProofStoragePath(
  * 14. Failed uploads prevent incomplete DB records
  * 15. Local server paths stripped & protected
  */
+export function getPreviewKind(fileName: string, fileType?: string): "image" | "document" | "audio" | "video" | "unsupported" {
+  const ext = extractFileExtension(fileName);
+  const mime = (fileType || "").toLowerCase().trim();
+
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext) || mime.startsWith("image/")) {
+    return "image";
+  }
+  if (["pdf", "txt", "doc", "docx"].includes(ext) || mime === "application/pdf" || mime.startsWith("text/")) {
+    return "document";
+  }
+  if (["m4a", "mp3", "wav", "aac"].includes(ext) || mime.startsWith("audio/")) {
+    return "audio";
+  }
+  if (["mp4", "mov", "avi", "mkv"].includes(ext) || mime.startsWith("video/")) {
+    return "video";
+  }
+  return "unsupported";
+}
+
+/**
+ * Simulates public URL access security check.
+ * Direct public bucket URLs MUST return 403 Forbidden. Access is only allowed via signed tokens.
+ */
+export function simulatePublicUrlAccess(storageBucket?: string, storagePath?: string): {
+  isPublicAccessBlocked: boolean;
+  publicUrl: string;
+  httpStatus: number;
+  message: string;
+} {
+  const bucket = storageBucket || "case-evidence";
+  const path = storagePath || "secure_object";
+  const publicUrl = `https://${bucket}.s3.amazonaws.com/${path}`;
+
+  const isPublicBucket = bucket.includes("public");
+  if (isPublicBucket) {
+    return {
+      isPublicAccessBlocked: false,
+      publicUrl,
+      httpStatus: 200,
+      message: "⚠️ SECURITY WARNING: Evidence file is accessible via public URL without authentication!",
+    };
+  }
+
+  return {
+    isPublicAccessBlocked: true,
+    publicUrl,
+    httpStatus: 403,
+    message: "🔒 HTTP 403 Forbidden: Public access blocked. Signed token required.",
+  };
+}
+
+/**
+ * Enforces all Metadata & Secure Reference Storage Criteria on an Evidence Record:
+ * 1. Unique identifier present
+ * 2. Linked to case and reporter
+ * 3. File name, type, size, upload date, status recorded
+ * 4. Allowed file types defined (JPG, PNG, MP4, M4A, PDF)
+ * 5. Maximum file size defined (100 MB)
+ * 6. Unsupported files rejected
+ * 7. Empty or invalid metadata rejected
+ * 8. New evidence receives default Pending status
+ * 
+ * --- Secure Evidence Reference Storage Criteria ---
+ * 9. Stored outside publicly accessible paths
+ * 10. Linked to correct case path
+ * 11. File names prevent collisions (unique hash/timestamp)
+ * 12. Unauthorized access prevented (signed URLs with 15-min expiry)
+ * 13. Missing-file errors handled gracefully
+ * 14. Failed uploads prevent incomplete DB records
+ * 15. Local server paths stripped & protected
+ */
 export function validateEvidenceMetadata(
   record: Partial<EvidenceRecord>
 ): MetadataValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const securityCallouts: string[] = [];
+
+  // Determine Preview Kind
+  const previewKind = getPreviewKind(record.fileName || "", record.fileType);
 
   // Criteria 1: Unique Identifier
   const hasUniqueId = Boolean(
@@ -262,12 +336,18 @@ export function validateEvidenceMetadata(
     );
   }
 
+  // Safe Preview & Public URL Exposure Audit Checks
+  const isSupportedPreview = previewKind !== "unsupported" && fileExistsInStorage;
+  const offersControlledDownloadForUnsupported = previewKind === "unsupported";
+  const preventsPublicUrlExposure = isStoredInPrivatePath;
+
   const isMetadataValid = errors.length === 0;
   const isStorageSecure = securityCallouts.length === 0 && doesNotExposeLocalServerPaths;
 
   return {
     isValid: isMetadataValid,
     isStorageSecure,
+    previewKind,
     errors,
     warnings,
     securityCallouts,
@@ -289,6 +369,10 @@ export function validateEvidenceMetadata(
       handlesMissingFileErrors,
       preventsIncompleteUploadRecords,
       doesNotExposeLocalServerPaths,
+      isSupportedPreview,
+      offersControlledDownloadForUnsupported,
+      preventsPublicUrlExposure,
     },
   };
 }
+

@@ -13,6 +13,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getDashboardRouteForRole, resolvePostLoginRedirect, useAuth } from "../../auth";
+import { SystemRole } from "../../auth/types";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
@@ -32,8 +34,15 @@ export default function SecureRoleScreen() {
     const normalized =
       role === "evidence_validator" ? "evidence_checker" : role;
 
-    if (normalized === "case_officer") {
-      router.replace("/officer");
+  const routeStaff = async (roleOrProfile: any) => {
+    const redirect = resolvePostLoginRedirect(roleOrProfile);
+
+    if (!redirect.allowed) {
+      await supabase.auth.signOut();
+      Alert.alert(
+        "Access denied",
+        redirect.error || "This account does not have an authorized JusticeNow staff role."
+      );
       return;
     }
 
@@ -52,6 +61,101 @@ export default function SecureRoleScreen() {
       "Access denied",
       "This account does not have an authorized JusticeNow staff role."
     );
+  };
+
+  // -------------------------------------------------------
+    router.replace(redirect.targetRoute as any);
+  };
+
+  // -------------------------------------------------------
+  // Quick Direct Role Login (Development & Admin Preview)
+  // -------------------------------------------------------
+
+  const handleQuickDemoLogin = (role: SystemRole) => {
+    loginAsRole(role);
+    const targetRoute = getDashboardRouteForRole(role) || "/reporter";
+    router.replace(targetRoute as any);
+  };
+
+  // -------------------------------------------------------
+  // Staff Registration (Create Admin / Staff Account)
+  // -------------------------------------------------------
+
+  const handleStaffRegister = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName) {
+      setErrorMessage("Please enter your full name.");
+      return;
+    }
+
+    if (!cleanEmail) {
+      setErrorMessage("Please enter your staff email address.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (loading) return;
+
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            full_name: cleanName,
+            role: selectedStaffRole,
+          },
+        },
+      });
+
+      if (error) {
+        setErrorMessage(error.message);
+        Alert.alert("Account creation failed", error.message);
+        return;
+      }
+
+      if (data.user) {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          full_name: cleanName,
+          role: selectedStaffRole,
+          updated_at: new Date().toISOString(),
+        });
+
+        loginAsRole(selectedStaffRole, cleanName);
+
+        Alert.alert(
+          "Staff account ready",
+          `Successfully registered as ${getRoleLabel(selectedStaffRole)}!`,
+          [
+            {
+              text: "Enter Workspace",
+              onPress: () => routeStaff(selectedStaffRole),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to create staff account.";
+      setErrorMessage(message);
+      Alert.alert("Registration error", message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // -------------------------------------------------------
@@ -94,7 +198,6 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      // Load role from profiles
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role, full_name")
@@ -136,7 +239,6 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      // Check MFA
       const { data: aal, error: aalError } =
         await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
@@ -313,6 +415,7 @@ export default function SecureRoleScreen() {
               icon="🔍"
               title="Evidence Checker / Validator"
               description="Examines submitted evidence files and records forensic verification decisions."
+              description="Reviews submitted evidence and records validation decisions."
             />
           </View>
 

@@ -1,3 +1,4 @@
+import { validateSelectedCategories } from "../../categories";
 import { CaseDraft } from "./types";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -22,8 +23,11 @@ export function validateReportStep(step: number, draft: CaseDraft): string | nul
     return "Choose how you would like to report this case.";
   }
 
-  if (step === 2 && draft.categories.length === 0) {
-    return "Select at least one incident category.";
+  if (step === 2) {
+    const categoryCheck = validateSelectedCategories(draft.categories);
+    if (!categoryCheck.isValid) {
+      return categoryCheck.error || "Select at least one incident category.";
+    }
   }
 
   if (step === 3) {

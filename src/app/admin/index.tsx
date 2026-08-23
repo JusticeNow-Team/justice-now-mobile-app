@@ -62,6 +62,32 @@ export default function AdminDashboardScreen() {
           <View style={styles.actionGrid}>
             <Pressable
               style={styles.actionCard}
+              onPress={() => router.push("/admin/staff")}
+              accessibilityRole="button"
+              accessibilityLabel="Manage Staff Accounts"
+            >
+              <Text style={styles.actionIcon}>👥</Text>
+              <Text style={styles.actionTitle}>Staff Accounts</Text>
+              <Text style={styles.actionDesc}>
+                Manage, invite, activate, or deactivate Case Officers and Evidence Checkers with full audit logging.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionCard}
+              onPress={() => router.push("/admin/categories")}
+              accessibilityRole="button"
+              accessibilityLabel="Manage Report Categories"
+            >
+              <Text style={styles.actionIcon}>📂</Text>
+              <Text style={styles.actionTitle}>Report Categories</Text>
+              <Text style={styles.actionDesc}>
+                Manage human-rights report categories, toggle active status, and configure case classifications.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionCard}
               onPress={() => router.push("/admin/roles")}
               accessibilityRole="button"
               accessibilityLabel="Manage Roles & Permissions"
@@ -70,6 +96,19 @@ export default function AdminDashboardScreen() {
               <Text style={styles.actionTitle}>Roles & Permissions</Text>
               <Text style={styles.actionDesc}>
                 Configure the 4 system roles and security capabilities.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionCard}
+              onPress={() => router.push("/admin/audit")}
+              accessibilityRole="button"
+              accessibilityLabel="View Audit Logs"
+            >
+              <Text style={styles.actionIcon}>📜</Text>
+              <Text style={styles.actionTitle}>Audit Log Trail</Text>
+              <Text style={styles.actionDesc}>
+                Inspect immutable account and role change event logs, tamper-proof history, and security traces.
               </Text>
             </Pressable>
           </View>
