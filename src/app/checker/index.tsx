@@ -515,8 +515,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-    backgroundColor: "#F8FAFC",
-  },
 
   header: {
     backgroundColor: colors.navy[900],

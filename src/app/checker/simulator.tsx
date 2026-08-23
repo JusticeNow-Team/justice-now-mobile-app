@@ -270,7 +270,6 @@ export default function EvidenceMetadataSimulatorScreen() {
   const validation = useMemo(() => {
     return validateEvidenceMetadata(form as any);
   }, [form]);
-  const validation = useMemo(() => validateEvidenceMetadata(form), [form]);
 
   const loadPreset = (payload: Partial<EvidenceRecord>) => {
     setForm({ ...payload });

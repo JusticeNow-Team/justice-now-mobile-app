@@ -2,14 +2,14 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -241,9 +241,7 @@ export default function TwoFactorScreen() {
     const redirect = resolvePostLoginRedirect(profile);
 
     const normalized =
-      profile.role === "evidence_validator"
-        ? "evidence_checker"
-        : profile.role;
+      profile.role === "evidence_validator" ? "evidence_checker" : profile.role;
 
     if (normalized === "case_officer") {
       router.replace("/officer");
@@ -257,690 +255,696 @@ export default function TwoFactorScreen() {
 
     if (normalized === "system_admin") {
       router.replace("/admin");
-    if (!redirect.allowed) {
-      await supabase.auth.signOut();
-      Alert.alert(
-        "Access denied",
-        redirect.error || "This account does not have an authorized JusticeNow staff role."
-      );
-      router.replace("/login");
-      return;
+      if (!redirect.allowed) {
+        await supabase.auth.signOut();
+        Alert.alert(
+          "Access denied",
+          redirect.error ||
+            "This account does not have an authorized JusticeNow staff role.",
+        );
+        router.replace("/login");
+        return;
+      }
+
+      router.replace(redirect.targetRoute as any);
     }
 
-    router.replace(redirect.targetRoute as any);
-  };
+    // -------------------------------------------------------
+    // Verify authenticator code
+    // -------------------------------------------------------
 
-  // -------------------------------------------------------
-  // Verify authenticator code
-  // -------------------------------------------------------
+    const verifyCode = async () => {
+      setErrorMessage("");
 
-  const verifyCode = async () => {
-    setErrorMessage("");
-
-    if (!factorId) {
-      setErrorMessage("JusticeNow could not determine your MFA factor.");
-
-      return;
-    }
-
-    if (!complete) {
-      setErrorMessage("Please enter all 6 digits from your authenticator app.");
-
-      return;
-    }
-
-    if (loading) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const code = digits.join("");
-
-      console.log("Starting MFA challenge.");
-
-      // ---------------------------------------------------
-      // Create challenge
-      // ---------------------------------------------------
-
-      const { data: challenge, error: challengeError } =
-        await supabase.auth.mfa.challenge({
-          factorId,
-        });
-
-      console.log("MFA CHALLENGE:", challenge);
-
-      console.log("MFA CHALLENGE ERROR:", challengeError);
-
-      if (challengeError) {
-        setErrorMessage(challengeError.message);
+      if (!factorId) {
+        setErrorMessage("JusticeNow could not determine your MFA factor.");
 
         return;
       }
 
-      // ---------------------------------------------------
-      // Verify the authenticator code
-      // ---------------------------------------------------
-
-      const { data: verification, error: verifyError } =
-        await supabase.auth.mfa.verify({
-          factorId,
-
-          challengeId: challenge.id,
-
-          code,
-        });
-
-      console.log("MFA VERIFICATION:", verification);
-
-      console.log("MFA VERIFY ERROR:", verifyError);
-
-      if (verifyError) {
-        setErrorMessage(verifyError.message);
-
-        Alert.alert("Verification failed", verifyError.message);
-
-        return;
-      }
-
-      // ---------------------------------------------------
-      // Confirm session reached AAL2
-      // ---------------------------------------------------
-
-      const { data: aal, error: aalError } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-      console.log("AAL AFTER MFA:", aal);
-
-      if (aalError) {
-        setErrorMessage(aalError.message);
-
-        return;
-      }
-
-      if (aal.currentLevel !== "aal2") {
+      if (!complete) {
         setErrorMessage(
-          "Multi-factor authentication was not completed successfully.",
+          "Please enter all 6 digits from your authenticator app.",
         );
 
         return;
       }
 
-      // ---------------------------------------------------
-      // MFA successful
-      // ---------------------------------------------------
+      if (loading) {
+        return;
+      }
 
-      console.log("STAFF MFA VERIFIED");
+      try {
+        setLoading(true);
 
-      await routeVerifiedStaff();
-    } catch (error) {
-      console.error("MFA verification error:", error);
+        const code = digits.join("");
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : "JusticeNow could not verify your security code.";
+        console.log("Starting MFA challenge.");
 
-      setErrorMessage(message);
-    } finally {
-      setLoading(false);
+        // ---------------------------------------------------
+        // Create challenge
+        // ---------------------------------------------------
+
+        const { data: challenge, error: challengeError } =
+          await supabase.auth.mfa.challenge({
+            factorId,
+          });
+
+        console.log("MFA CHALLENGE:", challenge);
+
+        console.log("MFA CHALLENGE ERROR:", challengeError);
+
+        if (challengeError) {
+          setErrorMessage(challengeError.message);
+
+          return;
+        }
+
+        // ---------------------------------------------------
+        // Verify the authenticator code
+        // ---------------------------------------------------
+
+        const { data: verification, error: verifyError } =
+          await supabase.auth.mfa.verify({
+            factorId,
+
+            challengeId: challenge.id,
+
+            code,
+          });
+
+        console.log("MFA VERIFICATION:", verification);
+
+        console.log("MFA VERIFY ERROR:", verifyError);
+
+        if (verifyError) {
+          setErrorMessage(verifyError.message);
+
+          Alert.alert("Verification failed", verifyError.message);
+
+          return;
+        }
+
+        // ---------------------------------------------------
+        // Confirm session reached AAL2
+        // ---------------------------------------------------
+
+        const { data: aal, error: aalError } =
+          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        console.log("AAL AFTER MFA:", aal);
+
+        if (aalError) {
+          setErrorMessage(aalError.message);
+
+          return;
+        }
+
+        if (aal.currentLevel !== "aal2") {
+          setErrorMessage(
+            "Multi-factor authentication was not completed successfully.",
+          );
+
+          return;
+        }
+
+        // ---------------------------------------------------
+        // MFA successful
+        // ---------------------------------------------------
+
+        console.log("STAFF MFA VERIFIED");
+
+        await routeVerifiedStaff();
+      } catch (error) {
+        console.error("MFA verification error:", error);
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "JusticeNow could not verify your security code.";
+
+        setErrorMessage(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // -------------------------------------------------------
+    // Cancel
+    // -------------------------------------------------------
+
+    const handleCancel = async () => {
+      await supabase.auth.signOut();
+
+      router.replace("/secure-role");
+    };
+
+    // -------------------------------------------------------
+    // Loading Screen
+    // -------------------------------------------------------
+
+    if (mode === "loading") {
+      return (
+        <SafeAreaView style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.royal[700]} />
+
+          <Text style={styles.loadingText}>
+            Preparing secure verification...
+          </Text>
+        </SafeAreaView>
+      );
     }
-  };
 
-  // -------------------------------------------------------
-  // Cancel
-  // -------------------------------------------------------
+    // -------------------------------------------------------
+    // UI
+    // -------------------------------------------------------
 
-  const handleCancel = async () => {
-    await supabase.auth.signOut();
-
-    router.replace("/secure-role");
-  };
-
-  // -------------------------------------------------------
-  // Loading Screen
-  // -------------------------------------------------------
-
-  if (mode === "loading") {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.royal[700]} />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={handleCancel}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel secure verification"
+            style={styles.backButton}
+          >
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
 
-        <Text style={styles.loadingText}>Preparing secure verification...</Text>
+          <View>
+            <Text style={styles.headerTitle}>Two-factor authentication</Text>
+
+            <Text style={styles.headerSubtitle}>Secure staff verification</Text>
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.card}>
+            <View style={styles.iconBox}>
+              <Text style={styles.icon}>🔐</Text>
+            </View>
+
+            {mode === "setup" ? (
+              <>
+                <Text style={styles.title}>Set up your authenticator</Text>
+
+                <Text style={styles.description}>
+                  This staff account does not have multi-factor authentication
+                  enabled yet. Add the secret below to an authenticator app such
+                  as Google Authenticator or Microsoft Authenticator.
+                </Text>
+
+                {/* Secret */}
+
+                <View style={styles.secretContainer}>
+                  <Text style={styles.secretLabel}>AUTHENTICATOR SECRET</Text>
+
+                  <Text selectable style={styles.secret}>
+                    {secret}
+                  </Text>
+                </View>
+
+                <Text style={styles.setupHelp}>
+                  In your authenticator app, choose to add an account manually
+                  and use this secret. Then enter the generated 6-digit code
+                  below.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.title}>Confirm it&apos;s you</Text>
+
+                <Text style={styles.description}>
+                  Open the authenticator app linked to your JusticeNow staff
+                  account and enter the current 6-digit code.
+                </Text>
+              </>
+            )}
+
+            {/* OTP Boxes */}
+
+            <View style={styles.codeRow}>
+              {digits.map((digit, index) => (
+                <TextInput
+                  key={index}
+                  ref={(ref) => {
+                    refs.current[index] = ref;
+                  }}
+                  value={digit}
+                  onChangeText={(value) => updateDigit(value, index)}
+                  onKeyPress={({ nativeEvent }) =>
+                    handleKeyPress(nativeEvent.key, index)
+                  }
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={index === 0 ? CODE_LENGTH : 1}
+                  selectTextOnFocus
+                  accessibilityLabel={`Authenticator code digit ${index + 1}`}
+                  style={[
+                    styles.codeInput,
+
+                    digit !== "" && styles.codeInputFilled,
+                  ]}
+                />
+              ))}
+            </View>
+
+            {/* Error */}
+
+            {errorMessage !== "" && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Security */}
+
+          <View style={styles.securityNotice}>
+            <Text style={styles.securityIcon}>🛡️</Text>
+
+            <View style={styles.securityContent}>
+              <Text style={styles.securityTitle}>
+                Extra protection for sensitive cases
+              </Text>
+
+              <Text style={styles.securityText}>
+                Multi-factor authentication helps protect reports, evidence and
+                investigation records even if a staff password is compromised.
+              </Text>
+            </View>
+          </View>
+
+          {/* Help */}
+
+          <View style={styles.helpCard}>
+            <Text style={styles.helpTitle}>Keep your authenticator secure</Text>
+
+            <Text style={styles.helpText}>
+              Never share your authenticator secret or verification code with
+              another person.
+            </Text>
+          </View>
+        </ScrollView>
+
+        {/* Footer */}
+
+        <View style={styles.footer}>
+          <Pressable
+            onPress={verifyCode}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Verify authenticator code"
+            style={[
+              styles.primaryButton,
+
+              (!complete || loading) && styles.disabledButton,
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text style={styles.primaryButtonText}>Verify and continue</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={handleCancel}
+            accessibilityRole="button"
+            style={styles.cancelButton}
+          >
+            <Text style={styles.cancelText}>Cancel staff sign in</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
-  }
-
-  // -------------------------------------------------------
-  // UI
-  // -------------------------------------------------------
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={handleCancel}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel secure verification"
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-
-        <View>
-          <Text style={styles.headerTitle}>Two-factor authentication</Text>
-
-          <Text style={styles.headerSubtitle}>Secure staff verification</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.card}>
-          <View style={styles.iconBox}>
-            <Text style={styles.icon}>🔐</Text>
-          </View>
-
-          {mode === "setup" ? (
-            <>
-              <Text style={styles.title}>Set up your authenticator</Text>
-
-              <Text style={styles.description}>
-                This staff account does not have multi-factor authentication
-                enabled yet. Add the secret below to an authenticator app such
-                as Google Authenticator or Microsoft Authenticator.
-              </Text>
-
-              {/* Secret */}
-
-              <View style={styles.secretContainer}>
-                <Text style={styles.secretLabel}>AUTHENTICATOR SECRET</Text>
-
-                <Text selectable style={styles.secret}>
-                  {secret}
-                </Text>
-              </View>
-
-              <Text style={styles.setupHelp}>
-                In your authenticator app, choose to add an account manually and
-                use this secret. Then enter the generated 6-digit code below.
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.title}>Confirm it&apos;s you</Text>
-
-              <Text style={styles.description}>
-                Open the authenticator app linked to your JusticeNow staff
-                account and enter the current 6-digit code.
-              </Text>
-            </>
-          )}
-
-          {/* OTP Boxes */}
-
-          <View style={styles.codeRow}>
-            {digits.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => {
-                  refs.current[index] = ref;
-                }}
-                value={digit}
-                onChangeText={(value) => updateDigit(value, index)}
-                onKeyPress={({ nativeEvent }) =>
-                  handleKeyPress(nativeEvent.key, index)
-                }
-                keyboardType="number-pad"
-                inputMode="numeric"
-                maxLength={index === 0 ? CODE_LENGTH : 1}
-                selectTextOnFocus
-                accessibilityLabel={`Authenticator code digit ${index + 1}`}
-                style={[
-                  styles.codeInput,
-
-                  digit !== "" && styles.codeInputFilled,
-                ]}
-              />
-            ))}
-          </View>
-
-          {/* Error */}
-
-          {errorMessage !== "" && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Security */}
-
-        <View style={styles.securityNotice}>
-          <Text style={styles.securityIcon}>🛡️</Text>
-
-          <View style={styles.securityContent}>
-            <Text style={styles.securityTitle}>
-              Extra protection for sensitive cases
-            </Text>
-
-            <Text style={styles.securityText}>
-              Multi-factor authentication helps protect reports, evidence and
-              investigation records even if a staff password is compromised.
-            </Text>
-          </View>
-        </View>
-
-        {/* Help */}
-
-        <View style={styles.helpCard}>
-          <Text style={styles.helpTitle}>Keep your authenticator secure</Text>
-
-          <Text style={styles.helpText}>
-            Never share your authenticator secret or verification code with
-            another person.
-          </Text>
-        </View>
-      </ScrollView>
+  };
 
-      {/* Footer */}
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
 
-      <View style={styles.footer}>
-        <Pressable
-          onPress={verifyCode}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel="Verify authenticator code"
-          style={[
-            styles.primaryButton,
+      backgroundColor: colors.background,
+    },
 
-            (!complete || loading) && styles.disabledButton,
-          ]}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text style={styles.primaryButtonText}>Verify and continue</Text>
-          )}
-        </Pressable>
+    loadingContainer: {
+      flex: 1,
 
-        <Pressable
-          onPress={handleCancel}
-          accessibilityRole="button"
-          style={styles.cancelButton}
-        >
-          <Text style={styles.cancelText}>Cancel staff sign in</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
-  );
-}
+      alignItems: "center",
+      justifyContent: "center",
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+      backgroundColor: colors.background,
+    },
 
-    backgroundColor: colors.background,
-  },
+    loadingText: {
+      marginTop: 12,
 
-  loadingContainer: {
-    flex: 1,
+      fontSize: 13,
 
-    alignItems: "center",
-    justifyContent: "center",
+      color: colors.textSecondary,
+    },
 
-    backgroundColor: colors.background,
-  },
+    header: {
+      minHeight: 66,
 
-  loadingText: {
-    marginTop: 12,
+      flexDirection: "row",
+      alignItems: "center",
 
-    fontSize: 13,
+      paddingHorizontal: 14,
 
-    color: colors.textSecondary,
-  },
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
 
-  header: {
-    minHeight: 66,
+      backgroundColor: colors.surface,
+    },
 
-    flexDirection: "row",
-    alignItems: "center",
+    backButton: {
+      width: 42,
+      height: 42,
 
-    paddingHorizontal: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backText: {
+      fontSize: 32,
 
-    backgroundColor: colors.surface,
-  },
+      color: colors.navy[700],
+    },
 
-  backButton: {
-    width: 42,
-    height: 42,
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: "700",
 
-    alignItems: "center",
-    justifyContent: "center",
-  },
+      color: colors.navy[800],
+    },
 
-  backText: {
-    fontSize: 32,
+    headerSubtitle: {
+      marginTop: 2,
 
-    color: colors.navy[700],
-  },
+      fontSize: 11.5,
 
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
+      color: colors.textSecondary,
+    },
 
-    color: colors.navy[800],
-  },
+    content: {
+      padding: 16,
 
-  headerSubtitle: {
-    marginTop: 2,
+      paddingBottom: 30,
+    },
 
-    fontSize: 11.5,
+    card: {
+      alignItems: "center",
 
-    color: colors.textSecondary,
-  },
+      padding: 20,
 
-  content: {
-    padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
 
-    paddingBottom: 30,
-  },
+      borderRadius: 16,
 
-  card: {
-    alignItems: "center",
+      backgroundColor: colors.surface,
+    },
 
-    padding: 20,
+    iconBox: {
+      width: 58,
+      height: 58,
 
-    borderWidth: 1,
-    borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
 
-    borderRadius: 16,
+      borderRadius: 18,
 
-    backgroundColor: colors.surface,
-  },
+      backgroundColor: colors.royal[50],
+    },
 
-  iconBox: {
-    width: 58,
-    height: 58,
+    icon: {
+      fontSize: 24,
+    },
 
-    alignItems: "center",
-    justifyContent: "center",
+    title: {
+      marginTop: 14,
 
-    borderRadius: 18,
+      textAlign: "center",
 
-    backgroundColor: colors.royal[50],
-  },
+      fontSize: 18,
+      fontWeight: "700",
 
-  icon: {
-    fontSize: 24,
-  },
+      color: colors.navy[800],
+    },
 
-  title: {
-    marginTop: 14,
+    description: {
+      marginTop: 6,
 
-    textAlign: "center",
+      textAlign: "center",
 
-    fontSize: 18,
-    fontWeight: "700",
+      fontSize: 13,
+      lineHeight: 19,
 
-    color: colors.navy[800],
-  },
+      color: colors.textSecondary,
+    },
 
-  description: {
-    marginTop: 6,
+    // -----------------------------------------------------
+    // Secret
+    // -----------------------------------------------------
 
-    textAlign: "center",
+    secretContainer: {
+      width: "100%",
 
-    fontSize: 13,
-    lineHeight: 19,
+      marginTop: 18,
 
-    color: colors.textSecondary,
-  },
+      padding: 14,
 
-  // -----------------------------------------------------
-  // Secret
-  // -----------------------------------------------------
+      borderWidth: 1,
 
-  secretContainer: {
-    width: "100%",
+      borderColor: colors.royal[200],
 
-    marginTop: 18,
+      borderRadius: 12,
 
-    padding: 14,
+      backgroundColor: colors.royal[50],
+    },
 
-    borderWidth: 1,
+    secretLabel: {
+      textAlign: "center",
 
-    borderColor: colors.royal[200],
+      fontSize: 9.5,
+      fontWeight: "700",
 
-    borderRadius: 12,
+      letterSpacing: 0.8,
 
-    backgroundColor: colors.royal[50],
-  },
+      color: colors.royal[700],
+    },
 
-  secretLabel: {
-    textAlign: "center",
+    secret: {
+      marginTop: 8,
 
-    fontSize: 9.5,
-    fontWeight: "700",
+      textAlign: "center",
 
-    letterSpacing: 0.8,
+      fontSize: 15,
+      fontWeight: "700",
 
-    color: colors.royal[700],
-  },
+      letterSpacing: 1,
 
-  secret: {
-    marginTop: 8,
+      color: colors.navy[800],
+    },
 
-    textAlign: "center",
+    setupHelp: {
+      marginTop: 10,
 
-    fontSize: 15,
-    fontWeight: "700",
+      textAlign: "center",
 
-    letterSpacing: 1,
+      fontSize: 11,
+      lineHeight: 16,
 
-    color: colors.navy[800],
-  },
+      color: colors.textSecondary,
+    },
 
-  setupHelp: {
-    marginTop: 10,
+    // -----------------------------------------------------
+    // Code
+    // -----------------------------------------------------
 
-    textAlign: "center",
+    codeRow: {
+      flexDirection: "row",
 
-    fontSize: 11,
-    lineHeight: 16,
+      justifyContent: "center",
 
-    color: colors.textSecondary,
-  },
+      gap: 7,
 
-  // -----------------------------------------------------
-  // Code
-  // -----------------------------------------------------
+      marginTop: 22,
+    },
 
-  codeRow: {
-    flexDirection: "row",
+    codeInput: {
+      width: 43,
+      height: 54,
 
-    justifyContent: "center",
+      textAlign: "center",
 
-    gap: 7,
+      borderWidth: 1,
+      borderColor: colors.navy[200],
 
-    marginTop: 22,
-  },
+      borderRadius: 11,
 
-  codeInput: {
-    width: 43,
-    height: 54,
+      fontSize: 20,
+      fontWeight: "700",
 
-    textAlign: "center",
+      color: colors.navy[800],
 
-    borderWidth: 1,
-    borderColor: colors.navy[200],
+      backgroundColor: colors.surface,
+    },
 
-    borderRadius: 11,
+    codeInputFilled: {
+      borderColor: colors.royal[400],
 
-    fontSize: 20,
-    fontWeight: "700",
+      backgroundColor: colors.royal[50],
+    },
 
-    color: colors.navy[800],
+    // -----------------------------------------------------
+    // Error
+    // -----------------------------------------------------
 
-    backgroundColor: colors.surface,
-  },
+    errorBox: {
+      width: "100%",
 
-  codeInputFilled: {
-    borderColor: colors.royal[400],
+      marginTop: 16,
 
-    backgroundColor: colors.royal[50],
-  },
+      padding: 10,
 
-  // -----------------------------------------------------
-  // Error
-  // -----------------------------------------------------
+      borderWidth: 1,
+      borderColor: colors.error,
 
-  errorBox: {
-    width: "100%",
+      borderRadius: 10,
 
-    marginTop: 16,
+      backgroundColor: "#FFF2F1",
+    },
 
-    padding: 10,
+    errorText: {
+      textAlign: "center",
 
-    borderWidth: 1,
-    borderColor: colors.error,
+      fontSize: 11.5,
+      lineHeight: 16,
 
-    borderRadius: 10,
+      color: colors.error,
+    },
 
-    backgroundColor: "#FFF2F1",
-  },
+    // -----------------------------------------------------
+    // Security
+    // -----------------------------------------------------
 
-  errorText: {
-    textAlign: "center",
+    securityNotice: {
+      marginTop: 14,
 
-    fontSize: 11.5,
-    lineHeight: 16,
+      flexDirection: "row",
 
-    color: colors.error,
-  },
+      padding: 14,
 
-  // -----------------------------------------------------
-  // Security
-  // -----------------------------------------------------
+      borderWidth: 1,
+      borderColor: colors.teal[100],
 
-  securityNotice: {
-    marginTop: 14,
+      borderRadius: 14,
 
-    flexDirection: "row",
+      backgroundColor: colors.teal[50],
+    },
 
-    padding: 14,
+    securityIcon: {
+      marginRight: 9,
+    },
 
-    borderWidth: 1,
-    borderColor: colors.teal[100],
+    securityContent: {
+      flex: 1,
+    },
 
-    borderRadius: 14,
+    securityTitle: {
+      fontSize: 12.5,
+      fontWeight: "700",
 
-    backgroundColor: colors.teal[50],
-  },
+      color: colors.teal[800],
+    },
 
-  securityIcon: {
-    marginRight: 9,
-  },
+    securityText: {
+      marginTop: 3,
 
-  securityContent: {
-    flex: 1,
-  },
+      fontSize: 11.5,
+      lineHeight: 17,
 
-  securityTitle: {
-    fontSize: 12.5,
-    fontWeight: "700",
+      color: colors.teal[800],
+    },
 
-    color: colors.teal[800],
-  },
+    helpCard: {
+      marginTop: 14,
 
-  securityText: {
-    marginTop: 3,
+      padding: 14,
 
-    fontSize: 11.5,
-    lineHeight: 17,
+      borderRadius: 14,
 
-    color: colors.teal[800],
-  },
+      borderWidth: 1,
+      borderColor: colors.border,
 
-  helpCard: {
-    marginTop: 14,
+      backgroundColor: colors.surface,
+    },
 
-    padding: 14,
+    helpTitle: {
+      fontSize: 12.5,
+      fontWeight: "700",
 
-    borderRadius: 14,
+      color: colors.navy[800],
+    },
 
-    borderWidth: 1,
-    borderColor: colors.border,
+    helpText: {
+      marginTop: 4,
 
-    backgroundColor: colors.surface,
-  },
+      fontSize: 11.5,
+      lineHeight: 17,
 
-  helpTitle: {
-    fontSize: 12.5,
-    fontWeight: "700",
+      color: colors.textSecondary,
+    },
 
-    color: colors.navy[800],
-  },
+    // -----------------------------------------------------
+    // Footer
+    // -----------------------------------------------------
 
-  helpText: {
-    marginTop: 4,
+    footer: {
+      padding: 14,
 
-    fontSize: 11.5,
-    lineHeight: 17,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
 
-    color: colors.textSecondary,
-  },
+      backgroundColor: colors.surface,
+    },
 
-  // -----------------------------------------------------
-  // Footer
-  // -----------------------------------------------------
+    primaryButton: {
+      minHeight: 50,
 
-  footer: {
-    padding: 14,
+      alignItems: "center",
+      justifyContent: "center",
 
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+      borderRadius: 12,
 
-    backgroundColor: colors.surface,
-  },
+      backgroundColor: colors.royal[700],
+    },
 
-  primaryButton: {
-    minHeight: 50,
+    disabledButton: {
+      opacity: 0.45,
+    },
 
-    alignItems: "center",
-    justifyContent: "center",
+    primaryButtonText: {
+      fontSize: 15,
+      fontWeight: "700",
 
-    borderRadius: 12,
+      color: colors.textInverse,
+    },
 
-    backgroundColor: colors.royal[700],
-  },
+    cancelButton: {
+      minHeight: 42,
 
-  disabledButton: {
-    opacity: 0.45,
-  },
+      marginTop: 5,
 
-  primaryButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-
-    color: colors.textInverse,
-  },
-
-  cancelButton: {
-    minHeight: 42,
-
-    marginTop: 5,
-
-    alignItems: "center",
-    justifyContent: "center",
-  },
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
   cancelText: {
     fontSize: 12,
@@ -950,3 +954,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+}

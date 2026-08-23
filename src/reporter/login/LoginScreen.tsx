@@ -150,7 +150,6 @@ export default function LoginScreen() {
 
         <View style={styles.optionsRow}>
           <CheckboxRow
-            compact
             checked={rememberMe}
             onPress={() => setRememberMe((current) => !current)}
             label="Remember me"
