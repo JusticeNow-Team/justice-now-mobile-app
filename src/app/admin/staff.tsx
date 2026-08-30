@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -8,752 +8,879 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { RoleGuard, useAuth } from "../../auth";
+
+import { useAuth } from "../../auth";
+import { AppIcon } from "../../components/AppIcon";
 import {
   canDeactivateStaff,
   checkDuplicateStaffEmail,
   createStaffAccount,
   getStaffAccounts,
-  getStaffAuditLogs,
   StaffAccount,
-  StaffAuditLog,
   StaffRole,
   toggleStaffActive,
   validateStaffInput,
 } from "../../staff";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
-type FilterTab = "all" | "case_officer" | "evidence_checker" | "system_admin" | "inactive";
+type RoleTab =
+  | "all"
+  | "reporter"
+  | "case_officer"
+  | "evidence_checker"
+  | "system_admin";
+
+type StatusFilter = "all" | "active" | "inactive" | "suspended";
+
+const CREATE_ROLES: {
+  value: StaffRole;
+  label: string;
+}[] = [
+  {
+    value: "case_officer",
+    label: "Case investigator",
+  },
+  {
+    value: "evidence_checker",
+    label: "Evidence validator",
+  },
+  {
+    value: "system_admin",
+    label: "System administrator",
+  },
+];
+
+function roleLabel(role: StaffRole) {
+  switch (role) {
+    case "reporter":
+      return "Reporter";
+    case "case_officer":
+      return "Case investigator";
+    case "evidence_checker":
+      return "Evidence validator";
+    case "system_admin":
+      return "System administrator";
+    default:
+      return "User";
+  }
+}
+
+function initials(name: string) {
+  return name
+    .replace(/[^A-Za-z ]/g, "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function statusLabel(staff: StaffAccount) {
+  if (staff.status === "suspended") {
+    return "Suspended";
+  }
+
+  return staff.isActive ? "Active" : "Inactive";
+}
+
+function formatLastActive(staff: StaffAccount) {
+  if (!staff.lastLoginAt) {
+    return "Not recorded";
+  }
+
+  const date = new Date(staff.lastLoginAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not recorded";
+  }
+
+  return date.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function AdminStaffScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const [staffList, setStaffList] = useState<StaffAccount[]>([]);
-  const [auditLogs, setAuditLogs] = useState<StaffAuditLog[]>([]);
+  const [staff, setStaff] = useState<StaffAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [roleTab, setRoleTab] = useState<RoleTab>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  // Create Staff Modal State
-  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<StaffAccount | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const [showAddModal, setShowAddModal] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<StaffRole>("case_officer");
+  const [newRole, setNewRole] = useState<StaffRole>("case_officer");
   const [department, setDepartment] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [modalSubmitting, setModalSubmitting] = useState(false);
-  const [modalError, setModalError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  // Audit Logs Modal State
-  const [auditModalVisible, setAuditModalVisible] = useState(false);
-
-  const loadData = useCallback(async () => {
+  const loadStaff = useCallback(async () => {
     try {
       setLoading(true);
-      const [staffData, auditData] = await Promise.all([
-        getStaffAccounts(),
-        getStaffAuditLogs(),
-      ]);
-      setStaffList(staffData);
-      setAuditLogs(auditData);
-    } catch (err) {
-      console.error("Failed to load staff data:", err);
+      const accounts = await getStaffAccounts();
+      setStaff(accounts);
+    } catch (error) {
+      console.error("Unable to load user accounts:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadData();
-  }, [loadData]);
+    const timer = setTimeout(() => {
+      void loadStaff();
+    }, 0);
 
-  // Filtered staff records
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [loadStaff]);
+
+  const counts = useMemo(
+    () => ({
+      all: staff.length,
+      reporter: staff.filter((item) => item.role === "reporter").length,
+      case_officer: staff.filter((item) => item.role === "case_officer").length,
+      evidence_checker: staff.filter((item) => item.role === "evidence_checker")
+        .length,
+      system_admin: staff.filter((item) => item.role === "system_admin").length,
+    }),
+    [staff],
+  );
+
   const filteredStaff = useMemo(() => {
-    let list = [...staffList];
+    const query = searchQuery.trim().toLowerCase();
 
-    if (activeTab === "inactive") {
-      list = list.filter((s) => !s.isActive);
-    } else if (activeTab !== "all") {
-      list = list.filter((s) => s.role === activeTab);
-    }
+    return staff.filter((item) => {
+      const roleMatches = roleTab === "all" || item.role === roleTab;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.fullName.toLowerCase().includes(q) ||
-          s.email.toLowerCase().includes(q) ||
-          (s.department && s.department.toLowerCase().includes(q))
-      );
-    }
+      const statusMatches =
+        statusFilter === "all" ||
+        (statusFilter === "active" && item.isActive) ||
+        (statusFilter === "inactive" &&
+          !item.isActive &&
+          item.status !== "suspended") ||
+        (statusFilter === "suspended" && item.status === "suspended");
 
-    return list;
-  }, [staffList, activeTab, searchQuery]);
+      const searchMatches =
+        !query ||
+        item.fullName.toLowerCase().includes(query) ||
+        item.email.toLowerCase().includes(query) ||
+        item.id.toLowerCase().includes(query);
 
-  // Statistics
-  const totalCount = staffList.length;
-  const activeCount = staffList.filter((s) => s.isActive).length;
-  const inactiveCount = staffList.filter((s) => !s.isActive).length;
+      return roleMatches && statusMatches && searchMatches;
+    });
+  }, [roleTab, searchQuery, staff, statusFilter]);
 
-  // Toggle Activation/Deactivation with Confirmation (AC 3 & 6)
-  const handleToggleActive = (staff: StaffAccount) => {
-    const nextState = !staff.isActive;
-    const actionWord = nextState ? "activate" : "deactivate";
+  const tabs: {
+    id: RoleTab;
+    label: string;
+    count: number;
+  }[] = [
+    {
+      id: "all",
+      label: "All users",
+      count: counts.all,
+    },
+    {
+      id: "reporter",
+      label: "Reporters",
+      count: counts.reporter,
+    },
+    {
+      id: "case_officer",
+      label: "Investigators",
+      count: counts.case_officer,
+    },
+    {
+      id: "evidence_checker",
+      label: "Validators",
+      count: counts.evidence_checker,
+    },
+    {
+      id: "system_admin",
+      label: "Admins",
+      count: counts.system_admin,
+    },
+  ];
 
-    const guard = canDeactivateStaff(staff, user?.id);
-    if (!nextState && !guard.allowed) {
-      Alert.alert("Action Blocked", guard.reason || "You cannot deactivate this account.");
+  const changeStatusFilter = () => {
+    const filters: StatusFilter[] = ["all", "active", "inactive", "suspended"];
+
+    const currentIndex = filters.indexOf(statusFilter);
+    const nextIndex = (currentIndex + 1) % filters.length;
+    setStatusFilter(filters[nextIndex]);
+  };
+
+  const resetAddForm = () => {
+    setFullName("");
+    setEmail("");
+    setNewRole("case_officer");
+    setDepartment("");
+    setPhone("");
+    setPassword("");
+    setFormError("");
+  };
+
+  const closeAddModal = () => {
+    if (creating) {
       return;
     }
 
-    const executeToggle = async () => {
-      try {
-        const result = await toggleStaffActive(
-          staff.id,
-          nextState,
-          user?.email || "admin@justicenow.org",
-          nextState ? "Admin activation" : "Admin deactivation"
-        );
-
-        if (!result.success) {
-          Alert.alert("Update Failed", result.error || "Could not update status.");
-          return;
-        }
-
-        setStaffList((prev) =>
-          prev.map((s) => (s.id === staff.id ? { ...s, isActive: nextState, status: nextState ? "active" : "inactive" } : s))
-        );
-
-        // Refresh audit log
-        const updatedLogs = await getStaffAuditLogs();
-        setAuditLogs(updatedLogs);
-
-        Alert.alert(
-          "Staff Status Updated",
-          `Account for ${staff.fullName} is now ${nextState ? "Active" : "Deactivated"}.`
-        );
-      } catch (err: any) {
-        Alert.alert("Error", err.message || "Unable to update account status.");
-      }
-    };
-
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(
-        `Are you sure you want to ${actionWord} the account for ${staff.fullName} (${staff.email})?`
-      );
-      if (confirmed) {
-        void executeToggle();
-      }
-    } else {
-      Alert.alert(
-        `Confirm ${nextState ? "Activation" : "Deactivation"}`,
-        `Are you sure you want to ${actionWord} ${staff.fullName}? ${
-          !nextState ? "They will be blocked from logging in immediately." : "They will be able to access their assigned dashboard."
-        }`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: nextState ? "Activate" : "Deactivate",
-            style: nextState ? "default" : "destructive",
-            onPress: executeToggle,
-          },
-        ]
-      );
-    }
+    setShowAddModal(false);
+    resetAddForm();
   };
 
-  // Create Staff Form Submission (AC 2, 4, 6, 7)
-  const handleCreateStaff = async () => {
-    setModalError("");
+  const createAccount = async () => {
+    setFormError("");
 
     const input = {
-      fullName,
-      email,
-      role,
-      department,
-      phone,
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      role: newRole,
+      department: department.trim(),
+      phone: phone.trim(),
       password: password || undefined,
       isActive: true,
     };
 
     const validation = validateStaffInput(input);
+
     if (!validation.isValid) {
-      setModalError(validation.errors.join(" "));
+      setFormError(validation.errors.join(" "));
       return;
     }
 
-    const dupCheck = checkDuplicateStaffEmail(email, staffList);
-    if (dupCheck.isDuplicate) {
-      setModalError(dupCheck.error || "Duplicate email address.");
+    const duplicate = checkDuplicateStaffEmail(input.email, staff);
+
+    if (duplicate.isDuplicate) {
+      setFormError(
+        duplicate.error || "This email address is already registered.",
+      );
       return;
     }
 
     try {
-      setModalSubmitting(true);
-      const result = await createStaffAccount(input, user?.email || "admin@justicenow.org");
+      setCreating(true);
+
+      const result = await createStaffAccount(
+        input,
+        user?.email || "admin@justicenow.org",
+      );
 
       if (!result.success || !result.staff) {
-        setModalError(result.error || "Failed to create staff account.");
+        setFormError(result.error || "The account could not be created.");
         return;
       }
 
-      setStaffList((prev) => [result.staff!, ...prev]);
-
-      // Refresh audit logs
-      const updatedLogs = await getStaffAuditLogs();
-      setAuditLogs(updatedLogs);
-
-      // Reset form
-      setFullName("");
-      setEmail("");
-      setDepartment("");
-      setPhone("");
-      setPassword("");
-      setCreateModalVisible(false);
+      setStaff((current) => [result.staff!, ...current]);
+      setShowAddModal(false);
+      resetAddForm();
 
       Alert.alert(
-        "Staff Account Created",
-        `Successfully added ${result.staff.fullName} as ${getRoleLabel(result.staff.role)}.`
+        "Account created",
+        `${result.staff.fullName} was added successfully.`,
       );
-    } catch (err: any) {
-      setModalError(err.message || "Failed to create staff account.");
+    } catch (error: any) {
+      setFormError(error?.message || "The account could not be created.");
     } finally {
-      setModalSubmitting(false);
+      setCreating(false);
     }
   };
 
+  const executeStatusUpdate = async (
+    account: StaffAccount,
+    active: boolean,
+  ) => {
+    try {
+      setUpdatingStatus(true);
+
+      const result = await toggleStaffActive(
+        account.id,
+        active,
+        user?.email || "admin@justicenow.org",
+        active
+          ? "Account activated by administrator"
+          : "Account suspended by administrator",
+      );
+
+      if (!result.success) {
+        Alert.alert(
+          "Update failed",
+          result.error || "The account could not be updated.",
+        );
+        return;
+      }
+
+      const updated =
+        result.staff ||
+        ({
+          ...account,
+          isActive: active,
+          status: active ? "active" : "inactive",
+        } as StaffAccount);
+
+      setStaff((current) =>
+        current.map((item) => (item.id === account.id ? updated : item)),
+      );
+
+      setSelectedStaff(updated);
+    } catch (error: any) {
+      Alert.alert(
+        "Update failed",
+        error?.message || "The account could not be updated.",
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const requestStatusUpdate = (account: StaffAccount) => {
+    const activate = !account.isActive;
+
+    if (!activate) {
+      const guard = canDeactivateStaff(account, user?.id);
+
+      if (!guard.allowed) {
+        Alert.alert(
+          "Action blocked",
+          guard.reason || "This account cannot be deactivated.",
+        );
+        return;
+      }
+    }
+
+    const message = activate
+      ? `Activate ${account.fullName}'s account?`
+      : `Suspend ${account.fullName}'s account? They will be unable to sign in.`;
+
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) {
+        void executeStatusUpdate(account, activate);
+      }
+
+      return;
+    }
+
+    Alert.alert(activate ? "Activate account" : "Suspend account", message, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: activate ? "Activate" : "Suspend",
+        style: activate ? "default" : "destructive",
+        onPress: () => {
+          void executeStatusUpdate(account, activate);
+        },
+      },
+    ]);
+  };
+
   return (
-    <RoleGuard allowedRoles={["system_admin"]}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Pressable
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              style={styles.backButton}
-            >
-              <Text style={styles.backText}>‹</Text>
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>Staff Accounts</Text>
-              <Text style={styles.headerSubtitle}>
-                Manage Case Officers & Evidence Checkers
-              </Text>
-            </View>
-          </View>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.replace("/admin")}
+          accessibilityRole="button"
+          accessibilityLabel="Back to administrator dashboard"
+        >
+          <AppIcon name="chevron-left" size={20} color={colors.navy[700]} />
+        </Pressable>
 
-          <View style={styles.headerActions}>
-            <Pressable
-              style={styles.auditButton}
-              onPress={() => setAuditModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="View Staff Audit Trail"
-            >
-              <Text style={styles.auditButtonText}>📜 Audit Trail</Text>
-            </Pressable>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>User management</Text>
+          <Text style={styles.headerSubtitle}>
+            {staff.length.toLocaleString()} accounts
+          </Text>
+        </View>
 
-            <Pressable
-              style={styles.addButton}
-              onPress={() => setCreateModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Create Staff Account"
-            >
-              <Text style={styles.addButtonText}>+ Invite Staff</Text>
+        <Pressable
+          style={styles.addButton}
+          onPress={() => setShowAddModal(true)}
+        >
+          <AppIcon name="user-plus" size={15} color={colors.textInverse} />
+          <Text style={styles.addButtonText}>Add</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.searchBar}>
+          <AppIcon name="search" size={16} color={colors.textSecondary} />
+
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={styles.searchInput}
+            placeholder="Search name, user ID or email"
+            placeholderTextColor={colors.textSoft}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {searchQuery ? (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <AppIcon name="x" size={16} color={colors.textSecondary} />
             </Pressable>
-          </View>
+          ) : null}
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}
         >
-          {/* Live Metrics Summary Bar */}
-          <View style={styles.metricsBar}>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricNumber}>{totalCount}</Text>
-              <Text style={styles.metricLabel}>Total Staff</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricNumber, styles.activeColor]}>
-                {activeCount}
-              </Text>
-              <Text style={styles.metricLabel}>Active</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricNumber, styles.inactiveColor]}>
-                {inactiveCount}
-              </Text>
-              <Text style={styles.metricLabel}>Deactivated</Text>
-            </View>
-          </View>
+          {tabs.map((tab) => {
+            const active = tab.id === roleTab;
 
-          {/* Search Bar */}
-          <View style={styles.searchBar}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search by name, email, or department..."
-              placeholderTextColor={colors.textSoft}
-              style={styles.searchInput}
-            />
-            {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery("")}>
-                <Text style={styles.clearSearch}>✕</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Filter Tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabsContainer}
-          >
-            <Pressable
-              style={[styles.tabButton, activeTab === "all" && styles.tabActive]}
-              onPress={() => setActiveTab("all")}
-            >
-              <Text style={[styles.tabText, activeTab === "all" && styles.tabTextActive]}>
-                All Staff ({totalCount})
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabButton, activeTab === "case_officer" && styles.tabActive]}
-              onPress={() => setActiveTab("case_officer")}
-            >
-              <Text style={[styles.tabText, activeTab === "case_officer" && styles.tabTextActive]}>
-                ⚖️ Officers ({staffList.filter((s) => s.role === "case_officer").length})
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabButton, activeTab === "evidence_checker" && styles.tabActive]}
-              onPress={() => setActiveTab("evidence_checker")}
-            >
-              <Text style={[styles.tabText, activeTab === "evidence_checker" && styles.tabTextActive]}>
-                🔍 Checkers ({staffList.filter((s) => s.role === "evidence_checker").length})
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabButton, activeTab === "system_admin" && styles.tabActive]}
-              onPress={() => setActiveTab("system_admin")}
-            >
-              <Text style={[styles.tabText, activeTab === "system_admin" && styles.tabTextActive]}>
-                ⚙️ Admins ({staffList.filter((s) => s.role === "system_admin").length})
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabButton, activeTab === "inactive" && styles.tabActive]}
-              onPress={() => setActiveTab("inactive")}
-            >
-              <Text style={[styles.tabText, activeTab === "inactive" && styles.tabTextActive]}>
-                🚫 Deactivated ({inactiveCount})
-              </Text>
-            </Pressable>
-          </ScrollView>
-
-          {/* Staff List */}
-          {loading ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={colors.royal[700]} />
-              <Text style={styles.loadingText}>Loading staff accounts...</Text>
-            </View>
-          ) : filteredStaff.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyIcon}>👤</Text>
-              <Text style={styles.emptyTitle}>No Staff Accounts Found</Text>
-              <Text style={styles.emptySubtitle}>
-                {searchQuery
-                  ? "No staff match your search criteria."
-                  : "Tap '+ Invite Staff' to add authorized team members."}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.staffGrid}>
-              {filteredStaff.map((staff) => (
-                <View
-                  key={staff.id}
-                  style={[
-                    styles.staffCard,
-                    !staff.isActive && styles.staffCardInactive,
-                  ]}
+            return (
+              <Pressable
+                key={tab.id}
+                style={[styles.tab, active && styles.activeTab]}
+                onPress={() => setRoleTab(tab.id)}
+              >
+                <Text
+                  style={[styles.tabLabel, active && styles.activeTabLabel]}
                 >
-                  <View style={styles.staffCardHeader}>
-                    <View style={styles.staffAvatar}>
-                      <Text style={styles.avatarIcon}>
-                        {getRoleIcon(staff.role)}
-                      </Text>
-                    </View>
+                  {tab.label}
+                </Text>
 
-                    <View style={styles.staffMainInfo}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.staffName}>{staff.fullName}</Text>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            staff.isActive
-                              ? styles.statusActiveBadge
-                              : styles.statusInactiveBadge,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              staff.isActive
-                                ? styles.statusActiveText
-                                : styles.statusInactiveText,
-                            ]}
-                          >
-                            {staff.isActive ? "● Active" : "○ Deactivated"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={styles.staffEmail}>{staff.email}</Text>
-                      {staff.department && (
-                        <Text style={styles.staffDept}>🏢 {staff.department}</Text>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={styles.divider} />
-
-                  <View style={styles.staffCardFooter}>
-                    <Pressable
-                      style={styles.roleChip}
-                      onPress={() => router.push("/admin/roles")}
-                      accessibilityRole="button"
-                      accessibilityLabel="Manage role in Roles & Permissions"
-                    >
-                      <Text style={styles.roleChipText}>
-                        {getRoleLabel(staff.role)} ✏️
-                      </Text>
-                    </Pressable>
-
-                    <View style={styles.switchRow}>
-                      <Text style={styles.switchLabel}>
-                        {staff.isActive ? "Active Access" : "Blocked"}
-                      </Text>
-                      <Switch
-                        value={staff.isActive}
-                        onValueChange={() => handleToggleActive(staff)}
-                        trackColor={{ false: "#D1D5DB", true: colors.royal[600] }}
-                        thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
-                      />
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
+                <Text
+                  style={[styles.tabCount, active && styles.activeTabCount]}
+                >
+                  {tab.count}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
 
-        {/* ================================================================= */}
-        {/* CREATE STAFF MODAL (JN-194 & JN-196) */}
-        {/* ================================================================= */}
-        <Modal
-          visible={createModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setCreateModalVisible(false)}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>+ Invite Staff Account</Text>
+          <View style={styles.filterButton}>
+            <AppIcon name="filter" size={iconSizes.xs} color={colors.navy[700]} />
+            <Text style={styles.filterStrongText}>Filters</Text>
+          </View>
+
+          <View style={styles.filterButton}>
+            <Text style={styles.filterText}>Role: All</Text>
+          </View>
+
+          <Pressable style={styles.filterButton} onPress={changeStatusFilter}>
+            <Text style={styles.filterText}>
+              Status:{" "}
+              {statusFilter === "all"
+                ? "All"
+                : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+            </Text>
+          </Pressable>
+
+          <View style={styles.filterButton}>
+            <Text style={styles.filterText}>Verification: All</Text>
+          </View>
+        </ScrollView>
+
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.loadingText}>Loading user accounts...</Text>
+          </View>
+        ) : filteredStaff.length === 0 ? (
+          <View style={styles.loadingState}>
+            <AppIcon name="users" size={28} color={colors.textSoft} />
+            <Text style={styles.emptyTitle}>No users found</Text>
+            <Text style={styles.loadingText}>
+              Change the search text or selected filters.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.userList}>
+            {filteredStaff.map((account) => {
+              const status = statusLabel(account);
+              const active = status === "Active";
+              const suspended = status === "Suspended";
+
+              return (
                 <Pressable
-                  onPress={() => setCreateModalVisible(false)}
-                  style={styles.closeModalBtn}
+                  key={account.id}
+                  style={styles.userCard}
+                  onPress={() =>
+                    router.push(`/admin/staff/${account.id}` as any)
+                  }
                 >
-                  <Text style={styles.closeModalText}>✕</Text>
-                </Pressable>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.modalForm}
-              >
-                {/* Full Name */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Full Name *</Text>
-                  <TextInput
-                    value={fullName}
-                    onChangeText={(val) => {
-                      setFullName(val);
-                      setModalError("");
-                    }}
-                    placeholder="e.g. Investigator Dilshan Perera"
-                    placeholderTextColor={colors.textSoft}
-                    style={styles.formInput}
-                  />
-                </View>
-
-                {/* Email */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Staff Email Address *</Text>
-                  <TextInput
-                    value={email}
-                    onChangeText={(val) => {
-                      setEmail(val);
-                      setModalError("");
-                    }}
-                    placeholder="staff.name@justicenow.org"
-                    placeholderTextColor={colors.textSoft}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    style={styles.formInput}
-                  />
-                </View>
-
-                {/* Role Selector */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Authorized Staff Role *</Text>
-                  <View style={styles.rolePickerGrid}>
-                    <Pressable
-                      style={[
-                        styles.rolePickBtn,
-                        role === "case_officer" && styles.rolePickActive,
-                      ]}
-                      onPress={() => setRole("case_officer")}
-                    >
-                      <Text style={styles.rolePickIcon}>⚖️</Text>
-                      <Text
-                        style={[
-                          styles.rolePickText,
-                          role === "case_officer" && styles.rolePickTextActive,
-                        ]}
-                      >
-                        Case Officer
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.rolePickBtn,
-                        role === "evidence_checker" && styles.rolePickActive,
-                      ]}
-                      onPress={() => setRole("evidence_checker")}
-                    >
-                      <Text style={styles.rolePickIcon}>🔍</Text>
-                      <Text
-                        style={[
-                          styles.rolePickText,
-                          role === "evidence_checker" && styles.rolePickTextActive,
-                        ]}
-                      >
-                        Evidence Checker
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.rolePickBtn,
-                        role === "system_admin" && styles.rolePickActive,
-                      ]}
-                      onPress={() => setRole("system_admin")}
-                    >
-                      <Text style={styles.rolePickIcon}>⚙️</Text>
-                      <Text
-                        style={[
-                          styles.rolePickText,
-                          role === "system_admin" && styles.rolePickTextActive,
-                        ]}
-                      >
-                        System Admin
-                      </Text>
-                    </Pressable>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                      {initials(account.fullName) || "U"}
+                    </Text>
                   </View>
-                </View>
 
-                {/* Department */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Department / Bureau</Text>
-                  <TextInput
-                    value={department}
-                    onChangeText={setDepartment}
-                    placeholder="e.g. Civil Rights Investigation Unit"
-                    placeholderTextColor={colors.textSoft}
-                    style={styles.formInput}
-                  />
-                </View>
+                  <View style={styles.userInformation}>
+                    <View style={styles.userNameRow}>
+                      <Text style={styles.userName} numberOfLines={1}>
+                        {account.fullName}
+                      </Text>
 
-                {/* Phone */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Contact Phone</Text>
-                  <TextInput
-                    value={phone}
-                    onChangeText={setPhone}
-                    placeholder="e.g. +94 77 123 4567"
-                    placeholderTextColor={colors.textSoft}
-                    keyboardType="phone-pad"
-                    style={styles.formInput}
-                  />
-                </View>
+                      {account.isActive ? (
+                        <AppIcon
+                          name="check-circle"
+                          size={13}
+                          color={colors.success}
+                        />
+                      ) : null}
+                    </View>
 
-                {/* Initial Password */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Initial Password</Text>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Min 6 characters (or send auto-invite)"
-                    placeholderTextColor={colors.textSoft}
-                    secureTextEntry
-                    style={styles.formInput}
-                  />
-                </View>
+                    <Text style={styles.userMeta} numberOfLines={1}>
+                      {account.id} · {roleLabel(account.role)}
+                    </Text>
 
-                {/* Modal Error */}
-                {modalError !== "" && (
-                  <View style={styles.modalErrorBox}>
-                    <Text style={styles.modalErrorText}>{modalError}</Text>
+                    <Text style={styles.lastActive}>
+                      Last active {formatLastActive(account)}
+                    </Text>
                   </View>
-                )}
 
-                {/* Actions */}
-                <View style={styles.modalActionRow}>
-                  <Pressable
-                    style={styles.modalCancelBtn}
-                    onPress={() => setCreateModalVisible(false)}
-                    disabled={modalSubmitting}
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      active
+                        ? styles.activeBadge
+                        : suspended
+                          ? styles.suspendedBadge
+                          : styles.inactiveBadge,
+                    ]}
                   >
-                    <Text style={styles.modalCancelText}>Cancel</Text>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        {
+                          backgroundColor: active
+                            ? colors.success
+                            : suspended
+                              ? colors.error
+                              : colors.textSoft,
+                        },
+                      ]}
+                    />
+
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        {
+                          color: active
+                            ? colors.success
+                            : suspended
+                              ? colors.error
+                              : colors.textSecondary,
+                        },
+                      ]}
+                    >
+                      {status}
+                    </Text>
+                  </View>
+
+                  <AppIcon
+                    name="chevron-right"
+                    size={16}
+                    color={colors.navy[300]}
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={selectedStaff !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedStaff(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.detailModal}>
+            {selectedStaff ? (
+              <>
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={styles.modalTitle}>Account details</Text>
+                    <Text style={styles.modalSubtitle}>{selectedStaff.id}</Text>
+                  </View>
+
+                  <Pressable onPress={() => setSelectedStaff(null)}>
+                    <AppIcon name="x" size={20} color={colors.navy[700]} />
                   </Pressable>
+                </View>
+
+                <ScrollView
+                  contentContainerStyle={styles.modalContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.detailIdentity}>
+                    <View style={styles.largeAvatar}>
+                      <Text style={styles.largeAvatarText}>
+                        {initials(selectedStaff.fullName)}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.detailName}>
+                      {selectedStaff.fullName}
+                    </Text>
+                    <Text style={styles.detailRole}>
+                      {roleLabel(selectedStaff.role)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRows}>
+                    <DetailRow label="Email" value={selectedStaff.email} />
+                    <DetailRow
+                      label="Department"
+                      value={selectedStaff.department || "Not provided"}
+                    />
+                    <DetailRow
+                      label="Phone"
+                      value={selectedStaff.phone || "Not provided"}
+                    />
+                    <DetailRow
+                      label="Status"
+                      value={statusLabel(selectedStaff)}
+                    />
+                    <DetailRow
+                      label="Last active"
+                      value={formatLastActive(selectedStaff)}
+                    />
+                  </View>
 
                   <Pressable
                     style={[
-                      styles.modalSubmitBtn,
-                      modalSubmitting && styles.btnDisabled,
+                      styles.statusAction,
+                      selectedStaff.isActive
+                        ? styles.deactivateButton
+                        : styles.activateButton,
                     ]}
-                    onPress={handleCreateStaff}
-                    disabled={modalSubmitting}
+                    onPress={() => requestStatusUpdate(selectedStaff)}
+                    disabled={updatingStatus}
                   >
-                    {modalSubmitting ? (
-                      <ActivityIndicator color={colors.textInverse} />
+                    {updatingStatus ? (
+                      <ActivityIndicator
+                        color={
+                          selectedStaff.isActive
+                            ? colors.error
+                            : colors.textInverse
+                        }
+                      />
                     ) : (
-                      <Text style={styles.modalSubmitText}>Create Account</Text>
+                      <Text
+                        style={[
+                          styles.statusActionText,
+                          selectedStaff.isActive
+                            ? styles.deactivateButtonText
+                            : styles.activateButtonText,
+                        ]}
+                      >
+                        {selectedStaff.isActive
+                          ? "Suspend account"
+                          : "Activate account"}
+                      </Text>
                     )}
                   </Pressable>
-                </View>
-              </ScrollView>
-            </View>
+                </ScrollView>
+              </>
+            ) : null}
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* ================================================================= */}
-        {/* VIEW AUDIT LOGS MODAL (JN-197) */}
-        {/* ================================================================= */}
-        <Modal
-          visible={auditModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setAuditModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, styles.auditModalCard]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>📜 Staff Administrative Audit Trail</Text>
-                <Pressable
-                  onPress={() => setAuditModalVisible(false)}
-                  style={styles.closeModalBtn}
-                >
-                  <Text style={styles.closeModalText}>✕</Text>
-                </Pressable>
+      <Modal
+        visible={showAddModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeAddModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.addModal}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Add staff account</Text>
+                <Text style={styles.modalSubtitle}>
+                  Create a new authorised account
+                </Text>
               </View>
 
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.auditList}
-              >
-                {auditLogs.length === 0 ? (
-                  <Text style={styles.emptyAuditText}>No audit events recorded yet.</Text>
-                ) : (
-                  auditLogs.map((log) => (
-                    <View key={log.id} style={styles.auditItem}>
-                      <View style={styles.auditItemHeader}>
-                        <View style={styles.auditTypeBadge}>
-                          <Text style={styles.auditTypeBadgeText}>
-                            {formatAuditEvent(log.eventType)}
-                          </Text>
-                        </View>
-                        <Text style={styles.auditTime}>
-                          {new Date(log.timestamp).toLocaleString()}
-                        </Text>
-                      </View>
-                      <Text style={styles.auditDesc}>{log.description}</Text>
-                      <Text style={styles.auditActor}>
-                        Actor: <Text style={styles.bold}>{log.actorEmail}</Text> ➔ Target:{" "}
-                        <Text style={styles.bold}>{log.targetStaffEmail}</Text>
-                      </Text>
-                    </View>
-                  ))
-                )}
-              </ScrollView>
+              <Pressable onPress={closeAddModal} disabled={creating}>
+                <AppIcon name="x" size={20} color={colors.navy[700]} />
+              </Pressable>
             </View>
+
+            <ScrollView
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {formError ? (
+                <View style={styles.errorNotice}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <FormField
+                label="Full name"
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Enter full name"
+              />
+
+              <FormField
+                label="Work email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@justicenow.org"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.fieldLabel}>Role</Text>
+
+              <View style={styles.roleOptions}>
+                {CREATE_ROLES.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    style={[
+                      styles.roleOption,
+                      newRole === option.value && styles.selectedRoleOption,
+                    ]}
+                    onPress={() => setNewRole(option.value)}
+                  >
+                    <View
+                      style={[
+                        styles.radio,
+                        newRole === option.value && styles.selectedRadio,
+                      ]}
+                    >
+                      {newRole === option.value ? (
+                        <View style={styles.radioInner} />
+                      ) : null}
+                    </View>
+
+                    <Text style={styles.roleOptionText}>{option.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <FormField
+                label="Department"
+                value={department}
+                onChangeText={setDepartment}
+                placeholder="e.g. Investigations"
+              />
+
+              <FormField
+                label="Phone"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+94 7X XXX XXXX"
+                keyboardType="phone-pad"
+              />
+
+              <FormField
+                label="Temporary password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Minimum 6 characters"
+                secureTextEntry
+              />
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={closeAddModal}
+                  disabled={creating}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.createButton}
+                  onPress={() => void createAccount()}
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <ActivityIndicator color={colors.textInverse} />
+                  ) : (
+                    <>
+                      <AppIcon
+                        name="user-plus"
+                        size={16}
+                        color={colors.textInverse}
+                      />
+                      <Text style={styles.createButtonText}>Create</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
-        </Modal>
-      </SafeAreaView>
-    </RoleGuard>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
-function getRoleLabel(role: StaffRole): string {
-  switch (role) {
-    case "case_officer":
-      return "Case Officer";
-    case "evidence_checker":
-      return "Evidence Checker";
-    case "system_admin":
-      return "System Admin";
-    default:
-      return role;
-  }
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailRowLabel}>{label}</Text>
+      <Text style={styles.detailRowValue}>{value}</Text>
+    </View>
+  );
 }
 
-function getRoleIcon(role: StaffRole): string {
-  switch (role) {
-    case "case_officer":
-      return "⚖️";
-    case "evidence_checker":
-      return "🔍";
-    case "system_admin":
-      return "⚙️";
-    default:
-      return "👤";
-  }
-}
-
-function formatAuditEvent(type: string): string {
-  switch (type) {
-    case "STAFF_ACCOUNT_CREATED":
-      return "ACCOUNT CREATED";
-    case "STAFF_ACCOUNT_ACTIVATED":
-      return "ACTIVATED";
-    case "STAFF_ACCOUNT_DEACTIVATED":
-      return "DEACTIVATED";
-    case "STAFF_ROLE_CHANGED":
-      return "ROLE CHANGED";
-    default:
-      return type;
-  }
+function FormField({
+  label,
+  ...inputProps
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  keyboardType?: any;
+  autoCapitalize?: any;
+  secureTextEntry?: boolean;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        {...inputProps}
+        style={styles.input}
+        placeholderTextColor={colors.textSoft}
+        autoCorrect={false}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -762,480 +889,490 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    minHeight: 64,
+    minHeight: 62,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   backButton: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: {
-    fontSize: 28,
-    color: colors.navy[700],
+  headerText: {
+    flex: 1,
+    minWidth: 0,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: "700",
-    color: colors.navy[900],
-  },
-  headerSubtitle: {
-    fontSize: 11.5,
-    color: colors.textSecondary,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  auditButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: colors.navy[50],
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-  },
-  auditButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
     color: colors.navy[800],
   },
+  headerSubtitle: {
+    marginTop: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
   addButton: {
+    minHeight: 40,
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     backgroundColor: colors.royal[700],
   },
   addButtonText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.textInverse,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 16,
-    gap: 14,
-  },
-  metricsBar: {
-    flexDirection: "row",
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-  },
-  metricItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  metricNumber: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.navy[900],
-  },
-  metricLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  activeColor: {
-    color: colors.success,
-  },
-  inactiveColor: {
-    color: colors.error,
-  },
-  metricDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.border,
+    paddingBottom: 24,
   },
   searchBar: {
+    minHeight: 44,
+    paddingHorizontal: 13,
+    borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    gap: 10,
     borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 44,
-  },
-  searchIcon: {
-    fontSize: 15,
-    marginRight: 8,
+    borderColor: colors.navy[200],
+    backgroundColor: colors.surface,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: colors.navy[900],
-  },
-  clearSearch: {
+    minHeight: 42,
+    paddingVertical: 0,
     fontSize: 14,
-    color: colors.textSoft,
-    paddingHorizontal: 4,
-  },
-  tabsContainer: {
+    color: colors.navy[800],
+    outlineStyle: "none",
+  } as any,
+  tabs: {
+    paddingTop: 12,
+    paddingBottom: 4,
     gap: 8,
   },
-  tabButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
+  tab: {
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  tabActive: {
-    backgroundColor: colors.royal[700],
-    borderColor: colors.royal[700],
+  activeTab: {
+    borderColor: colors.navy[800],
+    backgroundColor: colors.navy[800],
   },
-  tabText: {
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.navy[700],
+  },
+  activeTabLabel: {
+    color: colors.textInverse,
+  },
+  tabCount: {
     fontSize: 12,
     fontWeight: "600",
-    color: colors.textSecondary,
+    color: colors.textSoft,
   },
-  tabTextActive: {
-    color: colors.textInverse,
-    fontWeight: "700",
+  activeTabCount: {
+    color: colors.navy[100],
   },
-  loadingBox: {
-    padding: 40,
+  filters: {
+    paddingTop: 6,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  filterButton: {
+    minHeight: 34,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  emptyBox: {
-    padding: 40,
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
-    marginTop: 10,
+    backgroundColor: colors.surface,
   },
-  emptyIcon: {
-    fontSize: 36,
-    marginBottom: 8,
+  filterStrongText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.navy[700],
   },
-  emptyTitle: {
-    fontSize: 15,
+  filterText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.textSecondary,
+  },
+  userList: {
+    paddingTop: 10,
+    gap: 10,
+  },
+  userCard: {
+    minHeight: 82,
+    padding: 14,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    shadowColor: colors.navy[900],
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.navy[100],
+  },
+  avatarText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.navy[700],
+  },
+  userInformation: {
+    flex: 1,
+    minWidth: 0,
+  },
+  userNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  userName: {
+    flexShrink: 1,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.navy[800],
   },
-  emptySubtitle: {
-    fontSize: 12,
+  userMeta: {
+    marginTop: 3,
+    fontSize: 11.5,
     color: colors.textSecondary,
-    marginTop: 4,
-    textAlign: "center",
   },
-  staffGrid: {
-    gap: 12,
-  },
-  staffCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  staffCardInactive: {
-    opacity: 0.75,
-    backgroundColor: "#F9FAFB",
-    borderColor: "#E5E7EB",
-  },
-  staffCardHeader: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  staffAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.royal[50],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarIcon: {
-    fontSize: 22,
-  },
-  staffMainInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 2,
-  },
-  staffName: {
-    fontSize: 14.5,
-    fontWeight: "700",
-    color: colors.navy[900],
+  lastActive: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: colors.textSoft,
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
   },
-  statusActiveBadge: {
-    backgroundColor: "#E6F4EA",
+  activeBadge: {
+    borderColor: "#D2EDE1",
+    backgroundColor: "#EAF6F0",
   },
-  statusInactiveBadge: {
-    backgroundColor: "#FEE2E2",
+  suspendedBadge: {
+    borderColor: "#F6DAD6",
+    backgroundColor: "#FBEEEC",
+  },
+  inactiveBadge: {
+    borderColor: colors.border,
+    backgroundColor: colors.navy[50],
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   statusBadgeText: {
     fontSize: 10.5,
     fontWeight: "700",
   },
-  statusActiveText: {
-    color: "#137333",
-  },
-  statusInactiveText: {
-    color: "#B91C1C",
-  },
-  staffEmail: {
-    fontSize: 12.5,
-    color: colors.textSecondary,
-  },
-  staffDept: {
-    fontSize: 11.5,
-    color: colors.textSoft,
-    marginTop: 3,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 12,
-  },
-  staffCardFooter: {
-    flexDirection: "row",
+  loadingState: {
+    minHeight: 220,
+    marginTop: 16,
+    padding: 24,
+    borderRadius: 16,
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  roleChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: colors.navy[50],
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.navy[100],
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  roleChipText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.navy[800],
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  switchLabel: {
-    fontSize: 11.5,
-    fontWeight: "600",
+  loadingText: {
+    marginTop: 10,
+    textAlign: "center",
+    fontSize: 12,
     color: colors.textSecondary,
+  },
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.navy[800],
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(10, 27, 46, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
     padding: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10,27,46,0.58)",
   },
-  modalCard: {
+  detailModal: {
     width: "100%",
-    maxWidth: 480,
-    maxHeight: "90%",
-    backgroundColor: colors.surface,
+    maxWidth: 520,
+    maxHeight: "88%",
+    overflow: "hidden",
     borderRadius: 20,
-    padding: 20,
+    backgroundColor: colors.surface,
   },
-  auditModalCard: {
+  addModal: {
+    width: "100%",
     maxWidth: 560,
+    maxHeight: "92%",
+    overflow: "hidden",
+    borderRadius: 20,
+    backgroundColor: colors.surface,
   },
   modalHeader: {
+    minHeight: 68,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: colors.navy[900],
+    color: colors.navy[800],
   },
-  closeModalBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeModalText: {
-    fontSize: 16,
+  modalSubtitle: {
+    marginTop: 2,
+    fontSize: 11.5,
     color: colors.textSecondary,
   },
-  modalForm: {
-    gap: 12,
+  modalContent: {
+    padding: 18,
+    gap: 14,
   },
-  formGroup: {
-    gap: 5,
+  detailIdentity: {
+    alignItems: "center",
+    paddingBottom: 8,
   },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: "600",
+  largeAvatar: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.navy[100],
+  },
+  largeAvatarText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.navy[700],
+  },
+  detailName: {
+    marginTop: 10,
+    fontSize: 17,
+    fontWeight: "700",
     color: colors.navy[800],
   },
-  formInput: {
-    minHeight: 44,
+  detailRole: {
+    marginTop: 3,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  detailRows: {
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 13.5,
-    color: colors.navy[900],
     backgroundColor: colors.surface,
   },
-  rolePickerGrid: {
+  detailRow: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     flexDirection: "row",
-    gap: 6,
+    justifyContent: "space-between",
+    gap: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  rolePickBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    backgroundColor: colors.navy[50],
-  },
-  rolePickActive: {
-    borderColor: colors.royal[600],
-    backgroundColor: colors.royal[50],
-  },
-  rolePickIcon: {
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  rolePickText: {
-    fontSize: 10.5,
-    fontWeight: "600",
-    color: colors.navy[700],
-    textAlign: "center",
-  },
-  rolePickTextActive: {
-    color: colors.royal[800],
-    fontWeight: "700",
-  },
-  modalErrorBox: {
-    padding: 10,
-    backgroundColor: "#FFF2F1",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
-  modalErrorText: {
+  detailRowLabel: {
     fontSize: 12,
-    color: colors.error,
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
-  modalActionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
-  },
-  modalCancelBtn: {
+  detailRowValue: {
     flex: 1,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalCancelText: {
-    fontSize: 13,
+    textAlign: "right",
+    fontSize: 12,
     fontWeight: "600",
     color: colors.navy[800],
   },
-  modalSubmitBtn: {
-    flex: 2,
-    minHeight: 44,
+  statusAction: {
+    minHeight: 46,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 10,
+    borderWidth: 1,
+  },
+  activateButton: {
+    borderColor: colors.royal[700],
     backgroundColor: colors.royal[700],
   },
-  modalSubmitText: {
+  deactivateButton: {
+    borderColor: "#F6DAD6",
+    backgroundColor: colors.surface,
+  },
+  statusActionText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  activateButtonText: {
+    color: colors.textInverse,
+  },
+  deactivateButtonText: {
+    color: colors.error,
+  },
+  errorNotice: {
+    padding: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#F6DAD6",
+    backgroundColor: "#FBEEEC",
+  },
+  errorText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.error,
+  },
+  field: {
+    gap: 6,
+  },
+  fieldLabel: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  input: {
+    minHeight: 46,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    backgroundColor: colors.surface,
+    fontSize: 13.5,
+    color: colors.navy[800],
+    outlineStyle: "none",
+  } as any,
+  roleOptions: {
+    gap: 7,
+  },
+  roleOption: {
+    minHeight: 46,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  selectedRoleOption: {
+    borderColor: colors.royal[700],
+    backgroundColor: colors.royal[50],
+  },
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: colors.navy[200],
+  },
+  selectedRadio: {
+    borderColor: colors.royal[700],
+  },
+  radioInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: colors.royal[700],
+  },
+  roleOptionText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  modalActions: {
+    paddingTop: 4,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 9,
+  },
+  cancelButton: {
+    minHeight: 42,
+    paddingHorizontal: 18,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    backgroundColor: colors.surface,
+  },
+  cancelButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.navy[700],
+  },
+  createButton: {
+    minWidth: 110,
+    minHeight: 42,
+    paddingHorizontal: 16,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: colors.royal[700],
+  },
+  createButtonText: {
     fontSize: 13,
     fontWeight: "700",
     color: colors.textInverse,
-  },
-  btnDisabled: {
-    opacity: 0.6,
-  },
-  auditList: {
-    gap: 10,
-  },
-  emptyAuditText: {
-    textAlign: "center",
-    color: colors.textSecondary,
-    fontSize: 13,
-    paddingVertical: 20,
-  },
-  auditItem: {
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: colors.navy[50],
-    borderWidth: 1,
-    borderColor: colors.navy[100],
-    gap: 4,
-  },
-  auditItemHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  auditTypeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: colors.royal[100],
-  },
-  auditTypeBadgeText: {
-    fontSize: 9.5,
-    fontWeight: "700",
-    color: colors.royal[900],
-  },
-  auditTime: {
-    fontSize: 10.5,
-    color: colors.textSoft,
-  },
-  auditDesc: {
-    fontSize: 12,
-    color: colors.navy[900],
-  },
-  auditActor: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  bold: {
-    fontWeight: "700",
   },
 });

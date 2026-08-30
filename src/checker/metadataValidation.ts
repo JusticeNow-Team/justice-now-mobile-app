@@ -264,7 +264,6 @@ export function validateEvidenceMetadata(
 
   // --- Secure Evidence Reference Storage Validation Rules ---
   const storagePath = record.storagePath || "";
-  const storageBucket = record.storageBucket || "case-evidence";
 
   // Security Rule 1: Stored outside publicly accessible paths
   const isStoredInPrivatePath =

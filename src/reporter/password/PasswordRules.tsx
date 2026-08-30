@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../../components/AppIcon";
 import { colors } from "../../theme";
 
 interface PasswordRulesProps {
@@ -11,9 +12,14 @@ export default function PasswordRules({ rules }: PasswordRulesProps) {
     <View style={styles.list}>
       {rules.map((rule) => (
         <View key={rule.label} style={styles.row}>
-          <Text style={[styles.icon, rule.met && styles.iconMet]}>
-            {rule.met ? "✓" : "○"}
-          </Text>
+          <View style={styles.icon}>
+            <AppIcon
+              name={rule.met ? "check" : "circle"}
+              size={12}
+              color={rule.met ? colors.success : colors.navy[200]}
+              strokeWidth={rule.met ? 3 : 2}
+            />
+          </View>
           <Text style={[styles.label, rule.met && styles.labelMet]}>
             {rule.label}
           </Text>
@@ -35,12 +41,8 @@ const styles = StyleSheet.create({
   },
   icon: {
     width: 16,
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.navy[200],
-  },
-  iconMet: {
-    color: colors.success,
+    alignItems: "center",
+    justifyContent: "center",
   },
   label: {
     flex: 1,

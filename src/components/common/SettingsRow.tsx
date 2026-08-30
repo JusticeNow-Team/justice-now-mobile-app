@@ -1,12 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon, AppIconName } from "../AppIcon";
 import { colors } from "../../theme";
 
 interface SettingsRowProps {
   label: string;
   hint?: string;
   value?: string;
-  icon?: string;
+  icon?: AppIconName;
   danger?: boolean;
   last?: boolean;
   onPress: () => void;
@@ -34,7 +35,11 @@ export default function SettingsRow({
     >
       {icon ? (
         <View style={[styles.iconWrap, danger && styles.iconWrapDanger]}>
-          <Text style={styles.icon}>{icon}</Text>
+          <AppIcon
+            name={icon}
+            size={16}
+            color={danger ? colors.errorStrong : colors.navy[700]}
+          />
         </View>
       ) : null}
 
@@ -44,7 +49,7 @@ export default function SettingsRow({
       </View>
 
       {value ? <Text style={styles.value}>{value}</Text> : null}
-      <Text style={styles.chevron}>›</Text>
+      <AppIcon name="chevron-right" size={18} color={colors.navy[300]} />
     </Pressable>
   );
 }
@@ -76,9 +81,6 @@ const styles = StyleSheet.create({
   iconWrapDanger: {
     backgroundColor: "#FFF2F1",
   },
-  icon: {
-    fontSize: 16,
-  },
   content: {
     flex: 1,
     minWidth: 0,
@@ -101,9 +103,5 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "500",
     color: colors.textSecondary,
-  },
-  chevron: {
-    fontSize: 22,
-    color: colors.navy[300],
   },
 });

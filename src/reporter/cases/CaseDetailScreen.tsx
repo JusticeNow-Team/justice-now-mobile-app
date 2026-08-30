@@ -471,7 +471,7 @@ export default function CaseDetailScreen() {
               <PrimaryButton
                 title="Add more evidence"
                 variant="outline"
-                icon="⬆"
+                icon="upload"
                 onPress={() =>
                   router.push({
                     pathname: "/reporter/cases/upload",

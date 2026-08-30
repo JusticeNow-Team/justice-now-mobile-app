@@ -14,8 +14,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -89,7 +90,11 @@ export default function ForgotPasswordScreen() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon
+              name="chevron-left"
+              size={iconSizes.headerBack}
+              color={colors.navy[700]}
+            />
           </Pressable>
 
           <Text style={styles.headerTitle}>Reset your password</Text>
@@ -101,7 +106,7 @@ export default function ForgotPasswordScreen() {
         >
           <View style={styles.card}>
             <View style={styles.iconBox}>
-              <Text style={styles.icon}>🔑</Text>
+              <AppIcon name="key" size={iconSizes.lg} color={colors.royal[700]} />
             </View>
 
             <Text style={styles.title}>We will help you get back in</Text>
@@ -133,22 +138,22 @@ export default function ForgotPasswordScreen() {
               style={styles.input}
             />
 
-            {errorMessage !== "" && (
+            {errorMessage !== "" ? (
               <View style={styles.errorBox} accessibilityRole="alert">
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
-            )}
+            ) : null}
 
-            {successMessage !== "" && (
+            {successMessage !== "" ? (
               <View style={styles.successBox} accessibilityRole="alert">
                 <Text style={styles.successText}>{successMessage}</Text>
               </View>
-            )}
+            ) : null}
           </View>
 
           <View style={styles.deliveryCard}>
             <View style={styles.deliveryIconBox}>
-              <Text style={styles.deliveryIcon}>✉</Text>
+              <AppIcon name="mail" size={iconSizes.md} color={colors.royal[700]} />
             </View>
 
             <View style={styles.deliveryText}>
@@ -162,7 +167,7 @@ export default function ForgotPasswordScreen() {
           </View>
 
           <View style={styles.notice}>
-            <Text style={styles.noticeIcon}>🔒</Text>
+            <AppIcon name="lock" size={iconSizes.sm} color={colors.teal[800]} />
 
             <Text style={styles.noticeText}>
               For your safety, recovery links expire and cannot be reused after
@@ -204,11 +209,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-
   flex: {
     flex: 1,
   },
-
   header: {
     minHeight: 62,
     flexDirection: "row",
@@ -218,30 +221,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-
   backButton: {
     width: 42,
     height: 42,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  backText: {
-    fontSize: 32,
-    color: colors.navy[700],
-  },
-
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   content: {
     padding: 16,
     paddingBottom: 28,
   },
-
   card: {
     padding: 16,
     borderWidth: 1,
@@ -249,7 +243,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.surface,
   },
-
   iconBox: {
     width: 48,
     height: 48,
@@ -258,25 +251,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.royal[50],
   },
-
-  icon: {
-    fontSize: 21,
-  },
-
   title: {
     marginTop: 12,
     fontSize: 16,
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   description: {
     marginTop: 5,
     fontSize: 13,
     lineHeight: 19,
     color: colors.textSecondary,
   },
-
   label: {
     marginTop: 18,
     marginBottom: 6,
@@ -284,7 +270,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.navy[800],
   },
-
   input: {
     minHeight: 48,
     paddingHorizontal: 14,
@@ -295,7 +280,6 @@ const styles = StyleSheet.create({
     color: colors.navy[800],
     backgroundColor: colors.surface,
   },
-
   errorBox: {
     marginTop: 12,
     padding: 11,
@@ -304,13 +288,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "#FFF2F1",
   },
-
   errorText: {
     fontSize: 12,
     lineHeight: 17,
     color: colors.error,
   },
-
   successBox: {
     marginTop: 12,
     padding: 11,
@@ -319,13 +301,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.teal[50],
   },
-
   successText: {
     fontSize: 12,
     lineHeight: 18,
     color: colors.success,
   },
-
   deliveryCard: {
     minHeight: 76,
     flexDirection: "row",
@@ -337,7 +317,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.royal[50],
   },
-
   deliveryIconBox: {
     width: 36,
     height: 36,
@@ -347,71 +326,54 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: colors.surface,
   },
-
-  deliveryIcon: {
-    fontSize: 18,
-    color: colors.royal[700],
-  },
-
   deliveryText: {
     flex: 1,
     paddingVertical: 12,
   },
-
   deliveryTitle: {
     fontSize: 13.5,
     fontWeight: "600",
     color: colors.navy[800],
   },
-
   deliveryDescription: {
     marginTop: 3,
     fontSize: 12,
     lineHeight: 17,
     color: colors.textSecondary,
   },
-
   notice: {
     marginTop: 10,
     flexDirection: "row",
     padding: 14,
+    gap: 8,
     borderWidth: 1,
     borderColor: colors.teal[100],
     borderRadius: 14,
     backgroundColor: colors.teal[50],
   },
-
-  noticeIcon: {
-    marginRight: 8,
-  },
-
   noticeText: {
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
     color: colors.teal[800],
   },
-
   signInLink: {
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 10,
   },
-
   signInLinkText: {
     fontSize: 13,
     fontWeight: "600",
     color: colors.royal[700],
   },
-
   footer: {
     padding: 14,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-
   primaryButton: {
     minHeight: 50,
     alignItems: "center",
@@ -419,11 +381,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.royal[700],
   },
-
   disabled: {
     opacity: 0.6,
   },
-
   primaryText: {
     fontSize: 15,
     fontWeight: "700",

@@ -2,16 +2,22 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { Notice } from "../../components/common";
 import { colors } from "../../theme";
 import ReportStepLayout from "./ReportStepLayout";
 import { useReport } from "./ReportContext";
 import { validateReportStep } from "./validation";
 
-const options = [
+const options: {
+  id: "identified" | "anonymous";
+  icon: AppIconName;
+  title: string;
+  points: string[];
+}[] = [
   {
-    id: "identified" as const,
-    icon: "👤",
+    id: "identified",
+    icon: "user",
     title: "Report with my identity",
     points: [
       "Your officer can contact you directly for updates and questions",
@@ -20,8 +26,8 @@ const options = [
     ],
   },
   {
-    id: "anonymous" as const,
-    icon: "◌",
+    id: "anonymous",
+    icon: "circle",
     title: "Report anonymously",
     points: [
       "No name, contact number or device details are stored with the case",
@@ -68,12 +74,13 @@ export default function StepPreferenceScreen() {
                 {selected ? <View style={styles.dot} /> : null}
               </View>
               <View style={styles.content}>
-                <Text style={styles.cardTitle}>
-                  {option.icon}  {option.title}
-                </Text>
+                <View style={styles.titleRow}>
+                  <AppIcon name={option.icon} size={16} color={colors.navy[800]} />
+                  <Text style={styles.cardTitle}>{option.title}</Text>
+                </View>
                 {option.points.map((point) => (
                   <Text key={point} style={styles.point}>
-                    •  {point}
+                    • {point}
                   </Text>
                 ))}
               </View>
@@ -132,6 +139,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   cardTitle: {
     fontSize: 15,

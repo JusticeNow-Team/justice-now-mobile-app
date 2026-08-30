@@ -1,36 +1,32 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "../../theme";
+import { AppIcon, AppIconName } from "../../components/AppIcon";
+import { colors, iconSizes } from "../../theme";
 
-const slides = [
+const slides: { icon: AppIconName; title: string; body: string }[] = [
   {
-    icon: "🛡️",
+    icon: "shield",
     title: "Report human rights violations safely",
     body:
-      "You can report an incident that happened to you or to someone else. Share only what you feel comfortable sharing — you can pause and continue at any time.",
+      "You can report an incident that happened to you or to someone else. Share only what you feel comfortable sharing - you can pause and continue at any time.",
   },
   {
-    icon: "📎",
+    icon: "file-up",
     title: "Submit supporting evidence",
     body:
       "Add photos, videos, audio or documents. Files are securely handled and seen only by authorised personnel working on your case.",
   },
   {
-    icon: "📈",
+    icon: "activity",
     title: "Track your case",
     body:
       "Follow every step from submission to outcome. You will be notified when your case moves forward or when something is needed from you.",
   },
   {
-    icon: "🔒",
+    icon: "lock",
     title: "Your privacy matters",
     body:
       "You choose what is shared and with whom. Report anonymously, protect your identity and turn on discreet notifications at any time.",
@@ -74,7 +70,11 @@ export default function OnboardingScreen() {
           accessibilityLabel="Go back"
           style={styles.topButton}
         >
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon
+            name="chevron-left"
+            size={iconSizes.headerBack}
+            color={colors.navy[700]}
+          />
         </Pressable>
 
         <Pressable
@@ -89,7 +89,7 @@ export default function OnboardingScreen() {
 
       <View style={styles.content}>
         <View style={styles.iconBox}>
-          <Text style={styles.icon}>{slide.icon}</Text>
+          <AppIcon name={slide.icon} size={iconSizes.hero} color={colors.royal[700]} />
         </View>
 
         <Text style={styles.title}>{slide.title}</Text>
@@ -111,9 +111,7 @@ export default function OnboardingScreen() {
               <View
                 style={[
                   styles.progressDot,
-                  active
-                    ? styles.progressDotActive
-                    : styles.progressDotInactive,
+                  active ? styles.progressDotActive : styles.progressDotInactive,
                 ]}
               />
             </Pressable>
@@ -125,9 +123,7 @@ export default function OnboardingScreen() {
         <Pressable
           onPress={handleContinue}
           accessibilityRole="button"
-          accessibilityLabel={
-            isLastSlide ? "Get started" : "Continue"
-          }
+          accessibilityLabel={isLastSlide ? "Get started" : "Continue"}
           style={({ pressed }) => [
             styles.primaryButton,
             pressed && styles.primaryButtonPressed,
@@ -138,11 +134,11 @@ export default function OnboardingScreen() {
           </Text>
         </Pressable>
 
-        {isLastSlide && (
+        {isLastSlide ? (
           <Text style={styles.footerHint}>
             You can change your language and privacy settings later.
           </Text>
-        )}
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -153,7 +149,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -161,7 +156,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-
   topButton: {
     minWidth: 44,
     minHeight: 44,
@@ -169,25 +163,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 10,
   },
-
-  backText: {
-    fontSize: 32,
-    lineHeight: 34,
-    color: colors.navy[700],
-  },
-
   skipText: {
     fontSize: 13,
     fontWeight: "600",
     color: colors.textSecondary,
   },
-
   content: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
   },
-
   iconBox: {
     width: 88,
     height: 88,
@@ -196,11 +181,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  icon: {
-    fontSize: 34,
-  },
-
   title: {
     marginTop: 28,
     fontSize: 26,
@@ -208,36 +188,30 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.navy[800],
   },
-
   body: {
     marginTop: 12,
     fontSize: 14,
     lineHeight: 22,
     color: colors.textSecondary,
   },
-
   progressRow: {
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 24,
     marginBottom: 16,
   },
-
   progressDot: {
     height: 6,
     borderRadius: 20,
   },
-
   progressDotActive: {
     width: 28,
     backgroundColor: colors.royal[700],
   },
-
   progressDotInactive: {
     width: 12,
     backgroundColor: colors.navy[200],
   },
-
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -245,7 +219,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
-
   primaryButton: {
     minHeight: 50,
     borderRadius: 12,
@@ -253,17 +226,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.royal[700],
   },
-
   primaryButtonPressed: {
     opacity: 0.88,
   },
-
   primaryButtonText: {
     fontSize: 15,
     fontWeight: "700",
     color: colors.textInverse,
   },
-
   footerHint: {
     marginTop: 10,
     textAlign: "center",

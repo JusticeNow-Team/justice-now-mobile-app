@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../AppIcon";
 import { colors } from "../../theme";
 
 interface ChoiceCardProps {
@@ -25,7 +26,9 @@ export default function ChoiceCard({
       style={[styles.card, selected && styles.cardSelected]}
     >
       <View style={[styles.control, multi ? styles.box : styles.radio, selected && styles.controlSelected]}>
-        {selected ? <Text style={styles.mark}>{multi ? "✓" : ""}</Text> : null}
+        {selected && multi ? (
+          <AppIcon name="check" size={11} color={colors.textInverse} strokeWidth={3} />
+        ) : null}
         {selected && !multi ? <View style={styles.radioDot} /> : null}
       </View>
       <View style={styles.content}>
@@ -70,11 +73,6 @@ const styles = StyleSheet.create({
   controlSelected: {
     borderColor: colors.royal[700],
     backgroundColor: colors.royal[700],
-  },
-  mark: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.textInverse,
   },
   radioDot: {
     width: 8,

@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../../components/AppIcon";
 import {
   AuthScreen,
   ConfirmDialog,
@@ -112,9 +113,8 @@ export default function ProfileScreen() {
               <Text style={styles.name}>{profile.fullName || "Reporter"}</Text>
               <Text style={styles.email}>{maskEmail(profile.email)}</Text>
               <View style={styles.verified}>
-                <Text style={styles.verifiedText}>
-                  ✓  Verified reporter account
-                </Text>
+                <AppIcon name="check-circle" size={12} color={colors.success} />
+                <Text style={styles.verifiedText}>Verified reporter account</Text>
               </View>
             </View>
           </View>
@@ -123,19 +123,19 @@ export default function ProfileScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Account</Text>
               <SettingsRow
-                icon="👤"
+                icon="user"
                 label="Personal information"
                 hint="Name, email and mobile number"
                 onPress={() => router.push("/reporter/profile/personal")}
               />
               <SettingsRow
-                icon="🌐"
+                icon="languages"
                 label="Language"
                 value={languageLabel}
                 onPress={() => router.push("/reporter/profile/personal")}
               />
               <SettingsRow
-                icon="🔔"
+                icon="bell"
                 label="Notification preferences"
                 hint="Discreet mode is on"
                 last
@@ -146,13 +146,13 @@ export default function ProfileScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Privacy & security</Text>
               <SettingsRow
-                icon="🔒"
+                icon="lock"
                 label="Privacy controls"
                 hint="Who can see your identity and case data"
                 onPress={() => comingSoon("Privacy controls")}
               />
               <SettingsRow
-                icon="🛡"
+                icon="shield"
                 label="Security & sessions"
                 hint="Password, two-factor, active devices"
                 last
@@ -163,18 +163,18 @@ export default function ProfileScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Help & legal</Text>
               <SettingsRow
-                icon="?"
+                icon="circle-help"
                 label="Help & support"
                 hint="Guides, FAQs and contact"
                 onPress={() => comingSoon("Help & support")}
               />
               <SettingsRow
-                icon="📄"
+                icon="document"
                 label="Privacy policy"
                 onPress={() => comingSoon("Privacy policy")}
               />
               <SettingsRow
-                icon="📄"
+                icon="document"
                 label="Terms of use"
                 last
                 onPress={() => comingSoon("Terms of use")}
@@ -183,7 +183,7 @@ export default function ProfileScreen() {
 
             <View style={styles.section}>
               <SettingsRow
-                icon="→"
+                icon="log-out"
                 label="Sign out"
                 danger
                 last
@@ -269,6 +269,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#EAF8F2",
     paddingHorizontal: 8,
     paddingVertical: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   verifiedText: {
     fontSize: 11,

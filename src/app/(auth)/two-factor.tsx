@@ -13,8 +13,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { resolvePostLoginRedirect } from "../../auth";
+import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 const CODE_LENGTH = 6;
 const PREPARE_TIMEOUT_MS = 12000;
@@ -81,7 +82,7 @@ export default function TwoFactorScreen() {
       await supabase.auth.signOut();
       Alert.alert(
         "Profile error",
-        "JusticeNow could not load your authorized staff role."
+        "JusticeNow could not load your authorized staff role.",
       );
       router.replace("/secure-role");
       return;
@@ -94,7 +95,7 @@ export default function TwoFactorScreen() {
       Alert.alert(
         "Access denied",
         redirect.error ||
-          "This account does not have an authorized JusticeNow staff role."
+          "This account does not have an authorized JusticeNow staff role.",
       );
       router.replace("/login");
       return;
@@ -106,7 +107,7 @@ export default function TwoFactorScreen() {
     }
 
     if (profile.role === "evidence_validator") {
-      router.replace("/checker");
+      router.replace("/validator/dashboard");
       return;
     }
 
@@ -118,7 +119,7 @@ export default function TwoFactorScreen() {
     await supabase.auth.signOut();
     Alert.alert(
       "Access denied",
-      "This account does not have an authorized JusticeNow staff role."
+      "This account does not have an authorized JusticeNow staff role.",
     );
     router.replace("/login");
   }, [router]);
@@ -137,7 +138,7 @@ export default function TwoFactorScreen() {
       } = await withTimeout(
         supabase.auth.getUser(),
         PREPARE_TIMEOUT_MS,
-        "Timed out while checking your staff session."
+        "Timed out while checking your staff session.",
       );
 
       if (userError || !user) {
@@ -151,7 +152,7 @@ export default function TwoFactorScreen() {
       const { data: factors, error: factorError } = await withTimeout(
         supabase.auth.mfa.listFactors(),
         PREPARE_TIMEOUT_MS,
-        "Timed out while loading your multi-factor authentication settings."
+        "Timed out while loading your multi-factor authentication settings.",
       );
 
       if (factorError) {
@@ -180,7 +181,7 @@ export default function TwoFactorScreen() {
           friendlyName: "JusticeNow Staff",
         }),
         PREPARE_TIMEOUT_MS,
-        "Timed out while creating your authenticator setup."
+        "Timed out while creating your authenticator setup.",
       );
 
       if (enrollError) {
@@ -208,7 +209,13 @@ export default function TwoFactorScreen() {
   }, [router]);
 
   useEffect(() => {
-    void prepareMfa();
+    const timer = setTimeout(() => {
+      void prepareMfa();
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [prepareMfa]);
 
   const updateDigit = (value: string, index: number) => {
@@ -274,7 +281,7 @@ export default function TwoFactorScreen() {
       const { data: challenge, error: challengeError } = await withTimeout(
         supabase.auth.mfa.challenge({ factorId }),
         PREPARE_TIMEOUT_MS,
-        "Timed out while requesting your verification challenge."
+        "Timed out while requesting your verification challenge.",
       );
 
       if (challengeError) {
@@ -288,7 +295,7 @@ export default function TwoFactorScreen() {
           code,
         }),
         PREPARE_TIMEOUT_MS,
-        "Timed out while verifying your authenticator code."
+        "Timed out while verifying your authenticator code.",
       );
 
       if (verifyError) {
@@ -298,7 +305,7 @@ export default function TwoFactorScreen() {
       const { data: aal, error: aalError } = await withTimeout(
         supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
         PREPARE_TIMEOUT_MS,
-        "Timed out while confirming your secure session."
+        "Timed out while confirming your secure session.",
       );
 
       if (aalError) {
@@ -347,7 +354,11 @@ export default function TwoFactorScreen() {
           accessibilityLabel="Cancel secure verification"
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon
+            name="chevron-left"
+            size={iconSizes.headerBack}
+            color={colors.navy[700]}
+          />
         </Pressable>
 
         <View>
@@ -363,7 +374,7 @@ export default function TwoFactorScreen() {
       >
         <View style={styles.card}>
           <View style={styles.iconBox}>
-            <Text style={styles.icon}>🔐</Text>
+            <AppIcon name="lock" size={iconSizes.xl} color={colors.royal[700]} />
           </View>
 
           {mode === "setup" ? (
@@ -404,7 +415,7 @@ export default function TwoFactorScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.title}>Confirm it's you</Text>
+              <Text style={styles.title}>Confirm it&apos;s you</Text>
               <Text style={styles.description}>
                 Open the authenticator app linked to your JusticeNow staff account and
                 enter the current 6-digit code.
@@ -423,9 +434,7 @@ export default function TwoFactorScreen() {
                     }}
                     value={digit}
                     onChangeText={(value) => updateDigit(value, index)}
-                    onKeyPress={({ nativeEvent }) =>
-                      handleKeyPress(nativeEvent.key, index)
-                    }
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
                     keyboardType="number-pad"
                     inputMode="numeric"
                     maxLength={index === 0 ? CODE_LENGTH : 1}
@@ -449,7 +458,12 @@ export default function TwoFactorScreen() {
         </View>
 
         <View style={styles.securityNotice}>
-          <Text style={styles.securityIcon}>🛡️</Text>
+          <AppIcon
+            name="shield"
+            size={18}
+            color={colors.teal[800]}
+            style={styles.securityIcon}
+          />
           <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>Extra protection for sensitive cases</Text>
             <Text style={styles.securityText}>
@@ -543,10 +557,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: {
-    fontSize: 32,
-    color: colors.navy[700],
-  },
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
@@ -576,9 +586,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 18,
     backgroundColor: colors.royal[50],
-  },
-  icon: {
-    fontSize: 24,
   },
   title: {
     marginTop: 14,

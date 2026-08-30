@@ -1,4 +1,3 @@
-import { recordAuditEvent } from "../audit/auditService";
 import { supabase } from "../lib/supabase";
 import { getPermissionsForRole } from "./permissions";
 import { normalizeRole } from "./roles";
@@ -44,155 +43,123 @@ export interface UpdateRoleResult {
   error?: string;
 }
 
-/**
- * Calculates the exact permission differences between an old role and a new role.
- */
+const roleAuditLogs: RoleAssignmentAuditLog[] = [];
+
 export function getPermissionDiff(
   oldRole: SystemRole,
-  newRole: SystemRole
+  newRole: SystemRole,
 ): PermissionDiff {
-  const oldPerms = new Set(getPermissionsForRole(oldRole));
-  const newPerms = new Set(getPermissionsForRole(newRole));
+  const oldPermissions = new Set(getPermissionsForRole(oldRole));
+  const newPermissions = new Set(getPermissionsForRole(newRole));
 
-  const gained: Permission[] = [];
-  const removed: Permission[] = [];
-  const unchanged: Permission[] = [];
-
-  for (const p of newPerms) {
-    if (oldPerms.has(p)) {
-      unchanged.push(p);
-    } else {
-      gained.push(p);
-    }
-  }
-
-  for (const p of oldPerms) {
-    if (!newPerms.has(p)) {
-      removed.push(p);
-    }
-  }
-
-  return { gained, removed, unchanged };
+  return {
+    gained: [...newPermissions].filter(
+      (permission) => !oldPermissions.has(permission),
+    ),
+    removed: [...oldPermissions].filter(
+      (permission) => !newPermissions.has(permission),
+    ),
+    unchanged: [...newPermissions].filter((permission) =>
+      oldPermissions.has(permission),
+    ),
+  };
 }
 
-// In-memory audit log for role changes
-const inMemoryRoleAuditLogs: RoleAssignmentAuditLog[] = [];
+async function functionErrorMessage(error: any, data: any) {
+  if (data?.error) {
+    return String(data.error);
+  }
 
-/**
- * Updates a user's role in the database, validates permissions, and records an audit log.
- */
+  try {
+    if (error?.context && typeof error.context.json === "function") {
+      const body = await error.context.json();
+      if (body?.error) {
+        return String(body.error);
+      }
+    }
+  } catch {
+    // Fall through to the SDK error message.
+  }
+
+  return error?.message || "Unable to change the account role.";
+}
+
 export async function updateUserRole(
-  params: UpdateRoleParams
+  params: UpdateRoleParams,
 ): Promise<UpdateRoleResult> {
-  const {
-    actorUserId,
-    actorUserEmail = "admin@justicenow.org",
-    actorRole,
-    targetUserId,
-    targetUserEmail,
-    targetCurrentRole,
-    newRole,
-    reason,
-  } = params;
-
-  // 1. Validation (JN-240)
   const validation = validateRoleAssignment({
-    actorRole,
-    actorUserId,
-    targetUserId,
-    targetCurrentRole,
-    proposedRole: newRole,
+    actorRole: params.actorRole,
+    actorUserId: params.actorUserId,
+    targetUserId: params.targetUserId,
+    targetCurrentRole: params.targetCurrentRole,
+    proposedRole: params.newRole,
   });
 
   if (!validation.isValid) {
     return { success: false, error: validation.error };
   }
 
-  const normalizedNewRole = normalizeRole(newRole)!;
-  const now = new Date().toISOString();
-  const diff = getPermissionDiff(targetCurrentRole, normalizedNewRole);
-
-  // 2. Audit Event (JN-197 & AC 7)
-  const auditLog: RoleAssignmentAuditLog = {
-    id: `role_audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    eventType: "STAFF_ROLE_CHANGED",
-    actorId: actorUserId || "admin",
-    actorEmail: actorUserEmail,
-    targetUserId,
-    targetUserEmail,
-    previousRole: targetCurrentRole,
-    newRole: normalizedNewRole,
-    description: `Updated role for ${targetUserEmail} from "${targetCurrentRole}" to "${normalizedNewRole}". Gained ${diff.gained.length} perms, lost ${diff.removed.length} perms.`,
-    reason: reason || "Administrative role assignment",
-    timestamp: now,
-  };
-
-  inMemoryRoleAuditLogs.unshift(auditLog);
-
-  // Unified Audit Integration (JN-256)
-  try {
-    void recordAuditEvent({
-      eventType: "ROLE_CHANGED",
-      actorId: actorUserId,
-      actorEmail: actorUserEmail,
-      actorRole: actorRole || "system_admin",
-      targetId: targetUserId,
-      targetEmail: targetUserEmail,
-      action: "STAFF_ROLE_CHANGE",
-      description: auditLog.description,
-      details: {
-        previousRole: targetCurrentRole,
-        newRole: normalizedNewRole,
-        reason,
-        gainedPermissions: diff.gained,
-        removedPermissions: diff.removed,
-      },
-    });
-  } catch {
-    // Non-fatal if offline
+  const normalizedNewRole = normalizeRole(params.newRole);
+  if (!normalizedNewRole) {
+    return { success: false, error: "Select a valid JusticeNow role." };
   }
 
-  // 3. Database Sync
+  const permissionDiff = getPermissionDiff(
+    params.targetCurrentRole,
+    normalizedNewRole,
+  );
+
   try {
-    await supabase
-      .from("profiles")
-      .update({
+    const { data, error } = await supabase.functions.invoke("admin-staff", {
+      body: {
+        action: "set_role",
+        staffId: params.targetUserId,
         role: normalizedNewRole,
-        updated_at: now,
-      })
-      .eq("id", targetUserId);
-
-    await supabase.from("staff_audit_logs").insert({
-      id: auditLog.id,
-      event_type: auditLog.eventType,
-      actor_email: actorUserEmail,
-      target_staff_id: targetUserId,
-      target_staff_email: targetUserEmail,
-      description: auditLog.description,
-      details: {
-        previousRole: targetCurrentRole,
-        newRole: normalizedNewRole,
-        reason,
-        gainedPermissionsCount: diff.gained.length,
-        removedPermissionsCount: diff.removed.length,
+        reason: params.reason?.trim() || "Administrative role assignment",
       },
-      created_at: now,
     });
-  } catch (err) {
-    console.warn("Supabase update skipped in offline mode:", err);
-  }
 
-  return {
-    success: true,
-    newRole: normalizedNewRole,
-    auditLog,
-    permissionDiff: diff,
-  };
+    if (error || !data?.staff) {
+      return {
+        success: false,
+        error: await functionErrorMessage(error, data),
+      };
+    }
+
+    const timestamp = new Date().toISOString();
+    const auditLog: RoleAssignmentAuditLog = {
+      id: `role-${timestamp}-${params.targetUserId}`,
+      eventType: "STAFF_ROLE_CHANGED",
+      actorId: params.actorUserId || "system_admin",
+      actorEmail: params.actorUserEmail || "admin@justicenow.org",
+      targetUserId: params.targetUserId,
+      targetUserEmail: params.targetUserEmail,
+      previousRole: params.targetCurrentRole,
+      newRole: normalizedNewRole,
+      description: `Changed ${params.targetUserEmail} from ${params.targetCurrentRole} to ${normalizedNewRole}.`,
+      reason: params.reason?.trim() || "Administrative role assignment",
+      timestamp,
+    };
+
+    roleAuditLogs.unshift(auditLog);
+
+    return {
+      success: true,
+      newRole: normalizedNewRole,
+      auditLog,
+      permissionDiff,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to change the account role.",
+    };
+  }
 }
 
-/**
- * Returns role assignment audit logs.
- */
 export function getRoleAssignmentAuditLogs(): RoleAssignmentAuditLog[] {
-  return [...inMemoryRoleAuditLogs];
+  return [...roleAuditLogs];
 }

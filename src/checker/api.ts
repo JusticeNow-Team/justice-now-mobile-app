@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { ControlledDownloadLog, EvidenceRecord, EvidenceStatus, EvidenceValidationStatus, StatusHistoryRecord } from "./types";
+import { ControlledDownloadLog, EvidenceRecord, EvidenceValidationStatus, StatusHistoryRecord } from "./types";
 import { validateStatusTransition, createStatusHistoryEntry } from "./statusTransitionService";
 
 // Seed mock records for offline/demo testing of all acceptance criteria

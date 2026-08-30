@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon } from "../../components/AppIcon";
 import { Notice, PrimaryButton } from "../../components/common";
 import { colors } from "../../theme";
 import { useReport } from "./ReportContext";
@@ -43,11 +44,14 @@ export default function ConfirmationScreen() {
       <View style={styles.content}>
         <View style={styles.hero}>
           <View style={styles.check}>
-            <Text style={styles.checkMark}>✓</Text>
+            <AppIcon
+              name="check"
+              size={28}
+              color={colors.success}
+              strokeWidth={3}
+            />
           </View>
-          <Text style={styles.title}>
-            Your report has been submitted securely
-          </Text>
+          <Text style={styles.title}>Your report has been submitted securely</Text>
           <Text style={styles.copy}>
             Thank you for trusting us with this. What you shared is now
             protected and in the hands of authorised staff only.
@@ -132,11 +136,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EAF8F2",
-  },
-  checkMark: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: colors.success,
   },
   title: {
     marginTop: 16,

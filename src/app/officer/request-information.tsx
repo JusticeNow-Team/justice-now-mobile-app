@@ -14,8 +14,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 type RequestStatus = "draft" | "sent";
 
@@ -398,14 +399,14 @@ export default function RequestInformationScreen() {
             style={styles.backButton}
             accessibilityRole="button"
           >
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Request information</Text>
         </View>
 
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <AppIcon name="alert-triangle" size={iconSizes.xl} color={colors.error} />
 
           <Text style={styles.errorTitle}>Request unavailable</Text>
 
@@ -435,7 +436,7 @@ export default function RequestInformationScreen() {
             accessibilityRole="button"
             accessibilityLabel="Return to case"
           >
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
           </Pressable>
 
           <View style={styles.headerContent}>
@@ -524,7 +525,7 @@ export default function RequestInformationScreen() {
                     accessibilityLabel={`Remove information item ${index + 1}`}
                     style={styles.removeButton}
                   >
-                    <Text style={styles.removeButtonText}>×</Text>
+                    <AppIcon name="x" size={iconSizes.xl} color={colors.error} />
                   </Pressable>
                 )}
               </View>
@@ -536,7 +537,7 @@ export default function RequestInformationScreen() {
               style={styles.addButton}
               accessibilityRole="button"
             >
-              <Text style={styles.addButtonText}>＋ Add another item</Text>
+              <Text style={styles.addButtonText}>Add another item</Text>
             </Pressable>
           </View>
 
@@ -583,7 +584,7 @@ export default function RequestInformationScreen() {
           </View>
 
           <View style={styles.securityNotice}>
-            <Text style={styles.securityIcon}>🔒</Text>
+            <AppIcon name="lock" size={iconSizes.sm} color={colors.teal[800]} />
 
             <View style={styles.securityContent}>
               <Text style={styles.securityTitle}>
@@ -695,11 +696,7 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: "center",
     justifyContent: "center",
-  },
-  backText: {
-    fontSize: 32,
-    color: colors.navy[700],
-  },
+  },
   headerContent: {
     flex: 1,
   },
@@ -834,11 +831,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 5,
-  },
-  removeButtonText: {
-    fontSize: 22,
-    color: colors.error,
-  },
+  },
   addButton: {
     minHeight: 44,
     alignItems: "center",
@@ -904,11 +897,7 @@ const styles = StyleSheet.create({
     borderColor: colors.teal[100],
     borderRadius: 14,
     backgroundColor: colors.teal[50],
-  },
-  securityIcon: {
-    marginRight: 9,
-    fontSize: 16,
-  },
+  },
   securityContent: {
     flex: 1,
   },
@@ -967,10 +956,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 28,
-  },
-  errorIcon: {
-    fontSize: 30,
-  },
+  },
   errorTitle: {
     marginTop: 12,
     fontSize: 17,

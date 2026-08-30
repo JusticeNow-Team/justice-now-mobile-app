@@ -1,8 +1,7 @@
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,857 +10,708 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AuditEvent, AuditEventType, getAuditEvents } from "../../audit";
+
+import { AuditEvent, getAuditEvents } from "../../audit";
 import { useAuth } from "../../auth";
-import { RoleGuard } from "../../auth/guards/RoleGuard";
-import { colors } from "../../theme";
-import { shadows } from "../../theme/shadows";
+import { AppIcon } from "../../components/AppIcon";
+import { colors, iconSizes } from "../../theme";
 
-type FilterTab = "ALL" | "ACCOUNT_CREATED" | "ACCOUNT_STATUS" | "ROLE_CHANGED";
+type AuditResult = "Success" | "Failure";
+type AuditTab = "all" | "success" | "failure";
 
-export default function AdminAuditLogScreen() {
-  const router = useRouter();
-  const { role } = useAuth();
+const FILTERS = [
+  "User: All",
+  "Role: All",
+  "Action: All",
+  "Date: Last 7 days",
+  "Result: All",
+];
 
-  const [loading, setLoading] = useState(true);
-  const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
+function formatAction(action?: string): string {
+  if (!action) {
+    return "Audit activity";
+  }
 
-  const loadAuditEvents = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await getAuditEvents(undefined, role || "system_admin");
-      setEvents(data);
-    } catch (err) {
-      console.error("Failed to load audit events:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [role]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadAuditEvents();
-  }, [loadAuditEvents]);
-
-  const filteredEvents = useMemo(() => {
-    let list = [...events];
-
-    if (activeTab === "ACCOUNT_CREATED") {
-      list = list.filter((e) => e.eventType === "ACCOUNT_CREATED");
-    } else if (activeTab === "ACCOUNT_STATUS") {
-      list = list.filter(
-        (e) =>
-          e.eventType === "ACCOUNT_ACTIVATED" ||
-          e.eventType === "ACCOUNT_DEACTIVATED"
-      );
-    } else if (activeTab === "ROLE_CHANGED") {
-      list = list.filter(
-        (e) => e.eventType === "ROLE_CHANGED" || e.eventType === "ROLE_ASSIGNED"
-      );
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
-        (e) =>
-          e.description.toLowerCase().includes(q) ||
-          e.action.toLowerCase().includes(q) ||
-          e.actorEmail.toLowerCase().includes(q) ||
-          e.targetEmail.toLowerCase().includes(q)
-      );
-    }
-
-    return list;
-  }, [events, activeTab, searchQuery]);
-
-  const getEventBadge = (eventType: AuditEventType) => {
-    switch (eventType) {
-      case "ACCOUNT_CREATED":
-        return {
-          label: "Account Created",
-          icon: "👤",
-          bg: "#EEF3FA",
-          text: "#1F4372",
-          border: "#B5C8E1",
-        };
-      case "ACCOUNT_ACTIVATED":
-        return {
-          label: "Account Activated",
-          icon: "✅",
-          bg: "#ECFDF5",
-          text: "#047857",
-          border: "#A7F3D0",
-        };
-      case "ACCOUNT_DEACTIVATED":
-        return {
-          label: "Account Deactivated",
-          icon: "⛔",
-          bg: "#FEF2F2",
-          text: "#B91C1C",
-          border: "#FECACA",
-        };
-      case "ROLE_CHANGED":
-      case "ROLE_ASSIGNED":
-        return {
-          label: "Role Changed",
-          icon: "🔄",
-          bg: "#FBF7EC",
-          text: "#AF8722",
-          border: "#E9D69D",
-        };
-      case "SECURITY_POLICY_VIOLATION":
-        return {
-          label: "Security Alert",
-          icon: "🛡️",
-          bg: "#FFFBEB",
-          text: "#B45309",
-          border: "#FDE68A",
-        };
-      default:
-        return {
-          label: eventType,
-          icon: "📜",
-          bg: "#F1F5F9",
-          text: "#475569",
-          border: "#CBD5E1",
-        };
-    }
+  const knownActions: Record<string, string> = {
+    STAFF_INVITE: "Staff invite",
+    STAFF_INVITED: "Staff invited",
+    STAFF_CREATE: "Staff account created",
+    STAFF_CREATED: "Staff account created",
+    STAFF_ACTIVATION: "Staff activation",
+    STAFF_ACTIVATE: "Staff activated",
+    STAFF_DEACTIVATION: "Staff deactivation",
+    STAFF_DEACTIVATE: "Staff deactivated",
+    STAFF_ROLE_CHANGE: "Staff role changed",
+    ROLE_CHANGE: "Role changed",
+    ROLE_CHANGED: "Role changed",
+    CASE_STATUS_CHANGE: "Case status updated",
+    CASE_STATUS_UPDATED: "Case status updated",
+    EVIDENCE_APPROVED: "Evidence approved",
+    EVIDENCE_REJECTED: "Evidence rejected",
+    BULK_FILE_ACCESS: "Bulk file access",
+    SIGN_IN_ATTEMPT: "Sign-in attempt",
+    LOGIN_ATTEMPT: "Sign-in attempt",
+    LOGIN_SUCCESS: "Successful sign-in",
+    LOGIN_FAILED: "Failed sign-in",
+    NIGHTLY_BACKUP_COMPLETED: "Nightly backup completed",
+    SECURITY_POLICY_VIOLATION: "Security policy violation",
   };
 
-  const formatDate = (isoString: string) => {
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return isoString;
-    }
+  const normalized = action.trim().toUpperCase();
+
+  if (knownActions[normalized]) {
+    return knownActions[normalized];
+  }
+
+  const readable = action
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  return readable.charAt(0).toUpperCase() + readable.slice(1);
+}
+
+function formatRole(role?: string | null): string {
+  if (!role) {
+    return "-";
+  }
+
+  const roles: Record<string, string> = {
+    system_admin: "System administrator",
+    admin: "Administrator",
+    case_officer: "Case officer",
+    investigator: "Investigator",
+    evidence_checker: "Validator",
+    evidence_validator: "Validator",
+    validator: "Validator",
+    reporter: "Reporter",
   };
 
   return (
-    <RoleGuard allowedRoles={["system_admin"]}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
+    roles[role.toLowerCase()] ??
+    role
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase())
+  );
+}
+
+function formatTimestamp(timestamp?: string): string {
+  if (!timestamp) {
+    return "Unknown date";
+  }
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  const datePart = date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  const timePart = date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  return `${datePart} · ${timePart}`;
+}
+
+function getResult(event: AuditEvent): AuditResult {
+  const failureTypes = [
+    "SECURITY_POLICY_VIOLATION",
+    "LOGIN_FAILED",
+    "SIGN_IN_FAILED",
+    "FAILED_LOGIN",
+    "ACCESS_DENIED",
+    "UNAUTHORIZED_ACCESS",
+  ];
+
+  const eventType = String(event.eventType ?? "").toUpperCase();
+  const action = String(event.action ?? "").toUpperCase();
+
+  if (
+    failureTypes.some(
+      (type) => eventType.includes(type) || action.includes(type),
+    )
+  ) {
+    return "Failure";
+  }
+
+  return "Success";
+}
+
+function getActor(event: AuditEvent): string {
+  return event.actorEmail || event.actorId || event.targetEmail || "System";
+}
+
+function getResource(event: AuditEvent): string {
+  return event.targetId || event.targetEmail || event.actorId || event.id || "-";
+}
+
+export default function AuditLogsScreen() {
+  const { role } = useAuth();
+
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [selectedTab, setSelectedTab] = useState<AuditTab>("all");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadAuditEvents() {
+      try {
+        setLoading(true);
+        setLoadError("");
+
+        const auditEvents = await getAuditEvents(undefined, role || "system_admin");
+
+        if (mounted) {
+          setEvents(auditEvents ?? []);
+        }
+      } catch (error) {
+        console.error("Unable to load audit events:", error);
+
+        if (mounted) {
+          setLoadError("Unable to load audit logs.");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadAuditEvents();
+
+    return () => {
+      mounted = false;
+    };
+  }, [role]);
+
+  const successCount = useMemo(
+    () => events.filter((event) => getResult(event) === "Success").length,
+    [events],
+  );
+
+  const failureCount = useMemo(
+    () => events.filter((event) => getResult(event) === "Failure").length,
+    [events],
+  );
+
+  const visibleEvents = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return events.filter((event) => {
+      const result = getResult(event);
+
+      if (selectedTab === "success" && result !== "Success") {
+        return false;
+      }
+
+      if (selectedTab === "failure" && result !== "Failure") {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const searchableValue = [
+        formatAction(event.action),
+        event.action,
+        event.eventType,
+        event.actorEmail,
+        event.actorId,
+        event.actorRole,
+        event.targetId,
+        event.targetEmail,
+        event.description,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableValue.includes(normalizedSearch);
+    });
+  }, [events, search, selectedTab]);
+
+  const tabs: { id: AuditTab; label: string; count: number }[] = [
+    { id: "all", label: "All", count: events.length },
+    { id: "success", label: "Success", count: successCount },
+    { id: "failure", label: "Failure", count: failureCount },
+  ];
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.screen}>
         <View style={styles.header}>
           <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
             accessibilityRole="button"
-            accessibilityLabel="Back to Admin Dashboard"
+            accessibilityLabel="Back to dashboard"
+            style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
+            onPress={() => router.replace("/admin")}
           >
-            <Text style={styles.backButtonText}>←</Text>
+            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
           </Pressable>
 
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>Account & Role Audit Log</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Audit logs</Text>
             <Text style={styles.headerSubtitle}>
-              Immutable administrative trace & tamper-proof history
+              Every action, permanently recorded
             </Text>
           </View>
 
           <Pressable
-            style={styles.refreshButton}
-            onPress={() => void loadAuditEvents()}
             accessibilityRole="button"
-            accessibilityLabel="Refresh audit log"
+            accessibilityLabel="Export audit log"
+            style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
+            onPress={() => {
+              console.log("Export audit log");
+            }}
           >
-            <Text style={styles.refreshButtonText}>🔄</Text>
+            <AppIcon name="download" size={iconSizes.md} color={colors.navy[700]} />
           </Pressable>
         </View>
 
-        {/* Search & Filter Bar */}
-        <View style={styles.filterSection}>
-          <View style={styles.searchBar}>
-            <Text style={styles.searchIcon}>🔍</Text>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.searchContainer}>
+            <AppIcon name="search" size={iconSizes.sm} color={colors.textSecondary} />
+
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search by actor, target, or keyword..."
-              placeholderTextColor={colors.textSoft}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search user, action or resource"
+              placeholderTextColor="#8190A9"
               autoCapitalize="none"
-              accessibilityLabel="Search audit records"
+              autoCorrect={false}
+              style={styles.searchInput}
             />
-            {searchQuery ? (
-              <Pressable onPress={() => setSearchQuery("")}>
-                <Text style={styles.clearSearchText}>✕</Text>
+
+            {search.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                onPress={() => setSearch("")}
+                hitSlop={8}
+              >
+                <AppIcon name="x" size={iconSizes.sm} color={colors.textSoft} />
               </Pressable>
             ) : null}
           </View>
 
-          {/* Filter Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabsContainer}
-          >
-            <Pressable
-              style={[
-                styles.tabChip,
-                activeTab === "ALL" && styles.tabChipActive,
-              ]}
-              onPress={() => setActiveTab("ALL")}
-            >
-              <Text
-                style={[
-                  styles.tabChipText,
-                  activeTab === "ALL" && styles.tabChipTextActive,
-                ]}
-              >
-                All Events ({events.length})
-              </Text>
-            </Pressable>
+          <View style={styles.tabs}>
+            {tabs.map((tab) => {
+              const selected = selectedTab === tab.id;
 
-            <Pressable
-              style={[
-                styles.tabChip,
-                activeTab === "ACCOUNT_CREATED" && styles.tabChipActive,
-              ]}
-              onPress={() => setActiveTab("ACCOUNT_CREATED")}
-            >
-              <Text
-                style={[
-                  styles.tabChipText,
-                  activeTab === "ACCOUNT_CREATED" && styles.tabChipTextActive,
-                ]}
-              >
-                👤 Created
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.tabChip,
-                activeTab === "ACCOUNT_STATUS" && styles.tabChipActive,
-              ]}
-              onPress={() => setActiveTab("ACCOUNT_STATUS")}
-            >
-              <Text
-                style={[
-                  styles.tabChipText,
-                  activeTab === "ACCOUNT_STATUS" && styles.tabChipTextActive,
-                ]}
-              >
-                ⚡ Activation Status
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.tabChip,
-                activeTab === "ROLE_CHANGED" && styles.tabChipActive,
-              ]}
-              onPress={() => setActiveTab("ROLE_CHANGED")}
-            >
-              <Text
-                style={[
-                  styles.tabChipText,
-                  activeTab === "ROLE_CHANGED" && styles.tabChipTextActive,
-                ]}
-              >
-                🔄 Role Changes
-              </Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-
-        {/* Immutability Banner (AC 5 & AC 6) */}
-        <View style={styles.securityBanner}>
-          <Text style={styles.securityBannerIcon}>🔒</Text>
-          <Text style={styles.securityBannerText}>
-            Append-only tamper-proof audit trail. Passwords and credentials are automatically redacted.
-          </Text>
-        </View>
-
-        {/* Audit Log Stream */}
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.royal[700]} />
-            <Text style={styles.loadingText}>Loading audit logs...</Text>
-          </View>
-        ) : filteredEvents.length === 0 ? (
-          <View style={styles.centered}>
-            <Text style={styles.emptyIcon}>📜</Text>
-            <Text style={styles.emptyTitle}>No Audit Records Found</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery
-                ? "No audit records match your search criteria."
-                : "No administrative events have been recorded for this filter."}
-            </Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.listContent}>
-            {filteredEvents.map((item) => {
-              const badge = getEventBadge(item.eventType);
               return (
                 <Pressable
-                  key={item.id}
-                  style={styles.eventCard}
-                  onPress={() => setSelectedEvent(item)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Inspect audit event ${item.action}`}
+                  key={tab.id}
+                  onPress={() => setSelectedTab(tab.id)}
+                  style={({ pressed }) => [
+                    styles.tab,
+                    selected && styles.selectedTab,
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <View style={styles.cardHeaderRow}>
-                    <View
-                      style={[
-                        styles.eventBadge,
-                        {
-                          backgroundColor: badge.bg,
-                          borderColor: badge.border,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.badgeIcon}>{badge.icon}</Text>
-                      <Text style={[styles.badgeText, { color: badge.text }]}>
-                        {badge.label}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.timestampText}>
-                      {formatDate(item.timestamp)}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.eventDescription}>
-                    {item.description}
+                  <Text style={[styles.tabText, selected && styles.selectedTabText]}>
+                    {tab.label} {tab.count}
                   </Text>
-
-                  {/* Actor & Target Row */}
-                  <View style={styles.metadataGrid}>
-                    <View style={styles.metaCol}>
-                      <Text style={styles.metaLabel}>Actor:</Text>
-                      <Text style={styles.metaValue} numberOfLines={1}>
-                        👤 {item.actorEmail}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metaCol}>
-                      <Text style={styles.metaLabel}>Target:</Text>
-                      <Text style={styles.metaValue} numberOfLines={1}>
-                        🎯 {item.targetEmail}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.inspectHint}>
-                      🔍 Tap to inspect metadata & payload →
-                    </Text>
-                  </View>
                 </Pressable>
               );
             })}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}
+          >
+            <Pressable style={styles.primaryFilter}>
+              <AppIcon name="filter" size={iconSizes.sm} color={colors.navy[700]} />
+              <Text style={styles.primaryFilterText}>Filters</Text>
+            </Pressable>
+
+            {FILTERS.map((filter) => (
+              <Pressable key={filter} style={styles.filter}>
+                <Text style={styles.filterText}>{filter}</Text>
+              </Pressable>
+            ))}
           </ScrollView>
-        )}
 
-        {/* Detailed Event Inspection Modal */}
-        <Modal
-          visible={selectedEvent !== null}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setSelectedEvent(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Audit Event Details</Text>
-                <Pressable
-                  style={styles.modalCloseButton}
-                  onPress={() => setSelectedEvent(null)}
-                >
-                  <Text style={styles.modalCloseText}>✕</Text>
-                </Pressable>
-              </View>
+          {loading ? (
+            <View style={styles.messageContainer}>
+              <ActivityIndicator size="small" color={colors.royal[700]} />
+              <Text style={styles.messageText}>Loading audit logs...</Text>
+            </View>
+          ) : loadError ? (
+            <View style={styles.messageContainer}>
+              <AppIcon name="alert-circle" size={iconSizes.xl} color={colors.error} />
+              <Text style={styles.errorText}>{loadError}</Text>
+            </View>
+          ) : visibleEvents.length === 0 ? (
+            <View style={styles.messageContainer}>
+              <AppIcon name="document" size={iconSizes.xl} color={colors.textSoft} />
+              <Text style={styles.messageText}>
+                No matching audit entries found.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.auditList}>
+              {visibleEvents.map((event) => {
+                const result = getResult(event);
 
-              {selectedEvent && (
-                <ScrollView contentContainerStyle={styles.modalBody}>
-                  {/* Event Type Header */}
-                  <View
-                    style={[
-                      styles.modalBadgeBanner,
-                      {
-                        backgroundColor: getEventBadge(selectedEvent.eventType)
-                          .bg,
-                        borderColor: getEventBadge(selectedEvent.eventType)
-                          .border,
-                      },
+                return (
+                  <Pressable
+                    key={event.id}
+                    style={({ pressed }) => [
+                      styles.auditCard,
+                      pressed && styles.cardPressed,
                     ]}
+                    onPress={() => router.push(`/admin/audit/${event.id}` as never)}
                   >
-                    <Text style={styles.modalBadgeText}>
-                      {getEventBadge(selectedEvent.eventType).icon}{" "}
-                      {getEventBadge(selectedEvent.eventType).label}
-                    </Text>
-                    <Text style={styles.modalTimestamp}>
-                      {formatDate(selectedEvent.timestamp)}
-                    </Text>
-                  </View>
+                    <View style={styles.auditDetails}>
+                      <Text style={styles.timestamp}>
+                        {formatTimestamp(event.timestamp)}
+                      </Text>
 
-                  <Text style={styles.modalDescription}>
-                    {selectedEvent.description}
-                  </Text>
+                      <Text style={styles.action}>{formatAction(event.action)}</Text>
 
-                  {/* Core Attribute Table */}
-                  <View style={styles.detailTable}>
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableKey}>Event ID</Text>
-                      <Text style={styles.tableVal}>{selectedEvent.id}</Text>
-                    </View>
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableKey}>Action</Text>
-                      <Text style={styles.tableVal}>{selectedEvent.action}</Text>
-                    </View>
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableKey}>Actor Email</Text>
-                      <Text style={styles.tableVal}>{selectedEvent.actorEmail}</Text>
-                    </View>
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableKey}>Actor Role</Text>
-                      <Text style={styles.tableVal}>{selectedEvent.actorRole}</Text>
-                    </View>
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableKey}>Target Email</Text>
-                      <Text style={styles.tableVal}>{selectedEvent.targetEmail}</Text>
-                    </View>
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableKey}>IP Address</Text>
-                      <Text style={styles.tableVal}>
-                        {selectedEvent.ipAddress || "127.0.0.1"}
+                      <Text style={styles.actor} numberOfLines={1}>
+                        {getActor(event)} · {formatRole(event.actorRole)}
+                      </Text>
+
+                      <Text style={styles.resource} numberOfLines={1}>
+                        {getResource(event)}
                       </Text>
                     </View>
-                  </View>
 
-                  {/* Payload Details */}
-                  <View style={styles.payloadCard}>
-                    <View style={styles.payloadHeader}>
-                      <Text style={styles.payloadTitle}>
-                        📦 Event Payload Details
-                      </Text>
-                      <View style={styles.redactionPill}>
-                        <Text style={styles.redactionPillText}>
-                          🛡️ Passwords Redacted
+                    <View style={styles.cardRight}>
+                      <View
+                        style={[
+                          styles.resultBadge,
+                          result === "Success"
+                            ? styles.successBadge
+                            : styles.failureBadge,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.resultDot,
+                            result === "Success"
+                              ? styles.successDot
+                              : styles.failureDot,
+                          ]}
+                        />
+
+                        <Text
+                          style={[
+                            styles.resultText,
+                            result === "Success"
+                              ? styles.successText
+                              : styles.failureText,
+                          ]}
+                        >
+                          {result}
                         </Text>
                       </View>
+
+                      <AppIcon name="chevron-right" size={iconSizes.sm} color={colors.navy[300]} />
                     </View>
-
-                    <Text style={styles.payloadJson}>
-                      {JSON.stringify(selectedEvent.details, null, 2)}
-                    </Text>
-                  </View>
-
-                  {/* Security Assurance */}
-                  <View style={styles.immutableNotice}>
-                    <Text style={styles.immutableNoticeText}>
-                      🔒 This audit entry is permanently recorded. Modification or deletion is blocked by database security rules.
-                    </Text>
-                  </View>
-                </ScrollView>
-              )}
-
-              <View style={styles.modalFooter}>
-                <Pressable
-                  style={styles.modalPrimaryButton}
-                  onPress={() => setSelectedEvent(null)}
-                >
-                  <Text style={styles.modalPrimaryButtonText}>Close Viewer</Text>
-                </Pressable>
-              </View>
+                  </Pressable>
+                );
+              })}
             </View>
-          </View>
-        </Modal>
-      </SafeAreaView>
-    </RoleGuard>
+          )}
+
+          <Text style={styles.retentionText}>
+            Audit entries cannot be edited or deleted. Retention: 7 years.
+          </Text>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: "#F3F6FB",
   },
   header: {
+    minHeight: 64,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: "#DCE4EF",
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.navy[50],
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
   },
-  backButtonText: {
-    fontSize: 18,
-    color: colors.navy[800],
-    fontWeight: "700",
-  },
-  headerTextWrap: {
+  headerText: {
     flex: 1,
+    paddingHorizontal: 3,
   },
   headerTitle: {
+    color: "#102A4C",
     fontSize: 17,
+    lineHeight: 22,
     fontWeight: "700",
-    color: colors.navy[900],
   },
   headerSubtitle: {
-    fontSize: 11.5,
-    color: colors.textSecondary,
     marginTop: 1,
+    color: "#526783",
+    fontSize: 11.5,
+    lineHeight: 16,
   },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.navy[50],
-    alignItems: "center",
-    justifyContent: "center",
+  pressed: {
+    opacity: 0.68,
   },
-  refreshButtonText: {
-    fontSize: 15,
+  scrollView: {
+    flex: 1,
   },
-  filterSection: {
-    backgroundColor: colors.surface,
+  content: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingTop: 16,
+    paddingBottom: 30,
   },
-  searchBar: {
+  searchContainer: {
+    minHeight: 44,
+    paddingHorizontal: 13,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.navy[50],
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 9,
     borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 10,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
+    borderColor: "#AFC2DD",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
   },
   searchInput: {
     flex: 1,
+    minHeight: 42,
+    paddingVertical: 0,
+    color: "#183153",
     fontSize: 13,
-    color: colors.textPrimary,
-    padding: 0,
   },
-  clearSearchText: {
-    fontSize: 14,
-    color: colors.textSoft,
-    paddingHorizontal: 4,
-  },
-  tabsContainer: {
-    gap: 8,
-    paddingVertical: 2,
-  },
-  tabChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: colors.navy[50],
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  tabChipActive: {
-    backgroundColor: colors.royal[700],
-    borderColor: colors.royal[700],
-  },
-  tabChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.navy[700],
-  },
-  tabChipTextActive: {
-    color: colors.textInverse,
-  },
-  securityBanner: {
+  tabs: {
+    marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F0F9FF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#BAE6FD",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    gap: 8,
   },
-  securityBannerIcon: {
-    fontSize: 13,
-    marginRight: 8,
-  },
-  securityBannerText: {
-    fontSize: 11.5,
-    color: "#0369A1",
-    fontWeight: "500",
-    flex: 1,
-  },
-  listContent: {
-    padding: 16,
-    gap: 12,
-  },
-  eventCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
+  tab: {
+    minHeight: 38,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.border,
-    boxShadow: shadows.soft,
+    borderColor: "#DCE4EF",
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  selectedTab: {
+    borderColor: "#102A4C",
+    backgroundColor: "#102A4C",
+  },
+  tabText: {
+    color: "#183153",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  selectedTabText: {
+    color: "#FFFFFF",
+  },
+  filters: {
+    paddingTop: 11,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  primaryFilter: {
+    minHeight: 34,
+    paddingHorizontal: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#C6D4E6",
+    borderRadius: 9,
+    backgroundColor: "#FFFFFF",
+  },
+  primaryFilterText: {
+    color: "#183153",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  filter: {
+    minHeight: 34,
+    paddingHorizontal: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#DCE4EF",
+    borderRadius: 9,
+    backgroundColor: "#FFFFFF",
+  },
+  filterText: {
+    color: "#526783",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  auditList: {
+    marginTop: 10,
+    gap: 10,
+  },
+  auditCard: {
+    minHeight: 104,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderWidth: 1,
+    borderColor: "#DCE4EF",
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#102A4C",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.035,
+    shadowRadius: 5,
     elevation: 1,
   },
-  cardHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
+  cardPressed: {
+    opacity: 0.76,
+    borderColor: "#91AFE6",
   },
-  eventBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
+  auditDetails: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
   },
-  badgeIcon: {
-    fontSize: 11,
-    marginRight: 4,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  timestampText: {
-    fontSize: 11,
-    color: colors.textSoft,
+  timestamp: {
+    color: "#647792",
+    fontSize: 11.5,
+    lineHeight: 16,
     fontWeight: "500",
+    fontVariant: ["tabular-nums"],
   },
-  eventDescription: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.navy[900],
+  action: {
+    marginTop: 2,
+    color: "#102A4C",
+    fontSize: 13.5,
     lineHeight: 18,
-    marginBottom: 10,
-  },
-  metadataGrid: {
-    backgroundColor: colors.navy[50],
-    borderRadius: 8,
-    padding: 10,
-    gap: 6,
-    marginBottom: 8,
-  },
-  metaCol: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  metaLabel: {
-    fontSize: 11.5,
     fontWeight: "700",
-    color: colors.textSecondary,
-    width: 55,
   },
-  metaValue: {
+  actor: {
+    marginTop: 1,
+    color: "#60738F",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  resource: {
+    marginTop: 4,
+    color: "#174EB6",
     fontSize: 11.5,
-    color: colors.navy[800],
-    flex: 1,
+    lineHeight: 16,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
-  cardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: colors.navy[100],
-    paddingTop: 8,
+  cardRight: {
+    minWidth: 72,
     alignItems: "flex-end",
+    justifyContent: "space-between",
+    alignSelf: "stretch",
   },
-  inspectHint: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.royal[700],
-  },
-  centered: {
-    flex: 1,
+  resultBadge: {
+    minHeight: 27,
+    paddingHorizontal: 9,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.navy[900],
-    marginBottom: 4,
-  },
-  emptySubtitle: {
-    fontSize: 12.5,
-    color: colors.textSecondary,
-    textAlign: "center",
-    maxWidth: 280,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "85%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.navy[900],
-  },
-  modalCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.navy[50],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCloseText: {
-    fontSize: 14,
-    color: colors.navy[800],
-    fontWeight: "700",
-  },
-  modalBody: {
-    padding: 16,
-    gap: 12,
-  },
-  modalBadgeBanner: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 8,
+    gap: 5,
     borderWidth: 1,
+    borderRadius: 9,
   },
-  modalBadgeText: {
-    fontSize: 12.5,
+  successBadge: {
+    borderColor: "#C9E7DA",
+    backgroundColor: "#EDF8F3",
+  },
+  failureBadge: {
+    borderColor: "#F2CFCB",
+    backgroundColor: "#FFF1EF",
+  },
+  resultDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  successDot: {
+    backgroundColor: "#14845C",
+  },
+  failureDot: {
+    backgroundColor: "#C2413B",
+  },
+  resultText: {
+    fontSize: 10.5,
     fontWeight: "700",
   },
-  modalTimestamp: {
-    fontSize: 11,
-    color: colors.textSecondary,
+  successText: {
+    color: "#147453",
   },
-  modalDescription: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.navy[900],
-    lineHeight: 20,
+  failureText: {
+    color: "#B63A35",
   },
-  detailTable: {
-    backgroundColor: colors.navy[50],
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  tableKey: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  tableVal: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.navy[900],
-    maxWidth: "60%",
-    textAlign: "right",
-  },
-  payloadCard: {
-    backgroundColor: "#1E293B",
-    borderRadius: 10,
-    padding: 12,
-  },
-  payloadHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  payloadTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#94A3B8",
-  },
-  redactionPill: {
-    backgroundColor: "rgba(16, 185, 129, 0.2)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  redactionPillText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#34D399",
-  },
-  payloadJson: {
+  retentionText: {
+    marginTop: 14,
+    color: "#647792",
     fontSize: 11.5,
-    fontFamily: "monospace",
-    color: "#E2E8F0",
-  },
-  immutableNotice: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  immutableNoticeText: {
-    fontSize: 11,
-    color: colors.textSoft,
+    lineHeight: 17,
     textAlign: "center",
   },
-  modalFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  modalPrimaryButton: {
-    backgroundColor: colors.royal[700],
-    borderRadius: 10,
-    paddingVertical: 12,
+  messageContainer: {
+    minHeight: 180,
+    marginTop: 12,
+    padding: 24,
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#DCE4EF",
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
   },
-  modalPrimaryButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textInverse,
+  messageText: {
+    color: "#647792",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  errorText: {
+    color: "#B63A35",
+    fontSize: 13,
+    textAlign: "center",
   },
 });

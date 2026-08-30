@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import {
   canDeactivateStaff,
-  checkDuplicateStaffEmail,
   createStaffAccount,
   getStaffAccountById,
   getStaffAccounts,

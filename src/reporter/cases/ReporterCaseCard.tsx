@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../../components/AppIcon";
 import { colors } from "../../theme";
 import { formatCaseDate, formatCaseDateTime } from "./filterReporterCases";
 import ReporterStatusBadge from "./ReporterStatusBadge";
@@ -18,13 +19,16 @@ export default function ReporterCaseCard({
       </View>
       <Text style={styles.title}>{record.title}</Text>
       <Text style={styles.category}>{record.category || "Uncategorised"}</Text>
-      <Text style={styles.meta}>📅  {formatCaseDate(record.incidentDate || record.createdAt)}</Text>
+      <View style={styles.metaRow}>
+        <AppIcon name="history" size={12} color={colors.textSecondary} />
+        <Text style={styles.meta}>{formatCaseDate(record.incidentDate || record.createdAt)}</Text>
+      </View>
       <View style={styles.footer}>
         <Text style={styles.update} numberOfLines={1}>
           <Text style={styles.updateLabel}>Last update: </Text>
           {formatCaseDateTime(record.updatedAt)}
         </Text>
-        <Text style={styles.chevron}>›</Text>
+        <AppIcon name="chevron-right" size={16} color={colors.navy[300]} />
       </View>
     </View>
   );
@@ -82,8 +86,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
   },
-  meta: {
+  metaRow: {
     marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  meta: {
     fontSize: 11.5,
     color: colors.textSecondary,
   },
@@ -104,9 +113,5 @@ const styles = StyleSheet.create({
   updateLabel: {
     fontWeight: "600",
     color: colors.navy[700],
-  },
-  chevron: {
-    fontSize: 20,
-    color: colors.navy[300],
   },
 });

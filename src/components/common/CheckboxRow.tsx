@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../AppIcon";
 import { colors } from "../../theme";
 
 interface CheckboxRowProps {
@@ -25,7 +26,14 @@ export default function CheckboxRow({
       style={[styles.row, compact && styles.rowCompact]}
     >
       <View style={[styles.box, checked && styles.boxChecked]}>
-        {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+        {checked ? (
+          <AppIcon
+            name="check"
+            size={12}
+            color={colors.textInverse}
+            strokeWidth={3}
+          />
+        ) : null}
       </View>
 
       <View style={[styles.content, compact && styles.contentCompact]}>
@@ -57,11 +65,6 @@ const styles = StyleSheet.create({
   boxChecked: {
     backgroundColor: colors.royal[700],
     borderColor: colors.royal[700],
-  },
-  checkmark: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textInverse,
   },
   rowCompact: {
     paddingVertical: 0,

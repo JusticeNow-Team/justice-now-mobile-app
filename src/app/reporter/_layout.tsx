@@ -1,15 +1,18 @@
 import { Stack } from "expo-router";
-import React from "react";
-import { RoleGuard } from "../../auth";
+import { View } from "react-native";
+
+import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
 
 export default function ReporterLayout() {
   return (
-    <RoleGuard allowedRoles={["reporter"]}>
+    <View style={{ flex: 1 }}>
       <Stack
         screenOptions={{
           headerShown: false,
         }}
       />
-    </RoleGuard>
+
+      <RoleBottomNavigation role="reporter" />
+    </View>
   );
 }

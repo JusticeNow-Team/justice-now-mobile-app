@@ -12,8 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 type CaseStatus =
   | "submitted"
@@ -212,7 +213,7 @@ export default function AssignedCasesScreen() {
           accessibilityLabel="Go back"
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
         </Pressable>
 
         <View style={styles.headerContent}>
@@ -246,7 +247,7 @@ export default function AssignedCasesScreen() {
         </View>
 
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔎</Text>
+          <AppIcon name="search" size={iconSizes.sm} color={colors.textSoft} />
 
           <TextInput
             value={search}
@@ -259,7 +260,7 @@ export default function AssignedCasesScreen() {
 
           {search !== "" && (
             <Pressable onPress={() => setSearch("")} accessibilityRole="button">
-              <Text style={styles.clearText}>×</Text>
+              <AppIcon name="x" size={iconSizes.sm} color={colors.textSoft} />
             </Pressable>
           )}
         </View>
@@ -337,7 +338,7 @@ export default function AssignedCasesScreen() {
         {errorMessage === "" && filteredCases.length === 0 && (
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconBox}>
-              <Text style={styles.emptyIcon}>📁</Text>
+              <AppIcon name="folder-open" size={iconSizes.xl} color={colors.royal[700]} />
             </View>
 
             <Text style={styles.emptyTitle}>No matching cases</Text>
@@ -351,7 +352,7 @@ export default function AssignedCasesScreen() {
         )}
 
         <View style={styles.securityNotice}>
-          <Text style={styles.securityIcon}>🔒</Text>
+          <AppIcon name="lock" size={iconSizes.sm} color={colors.teal[800]} />
 
           <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>Restricted case access</Text>
@@ -436,7 +437,10 @@ function CaseCard({
       <View style={styles.caseFooter}>
         <StatusBadge status={caseItem.status} />
 
-        <Text style={styles.openText}>Open case ›</Text>
+        <View style={styles.openAction}>
+          <Text style={styles.openText}>Open case</Text>
+          <AppIcon name="chevron-right" size={iconSizes.md} color={colors.royal[700]} />
+        </View>
       </View>
     </Pressable>
   );
@@ -535,11 +539,7 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: "center",
     justifyContent: "center",
-  },
-  backText: {
-    fontSize: 32,
-    color: colors.navy[700],
-  },
+  },
   headerContent: {
     flex: 1,
   },
@@ -590,20 +590,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 12,
     backgroundColor: colors.surface,
-  },
-  searchIcon: {
-    marginRight: 8,
-    fontSize: 14,
-  },
+  },
   searchInput: {
     flex: 1,
     fontSize: 13,
     color: colors.navy[800],
-  },
-  clearText: {
-    paddingHorizontal: 5,
-    fontSize: 22,
-    color: colors.textSoft,
   },
   filters: {
     gap: 7,
@@ -707,6 +698,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 14,
   },
+  openAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
   openText: {
     fontSize: 11.5,
     fontWeight: "600",
@@ -773,10 +769,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 17,
     backgroundColor: colors.royal[50],
-  },
-  emptyIcon: {
-    fontSize: 24,
-  },
+  },
   emptyTitle: {
     marginTop: 13,
     fontSize: 14.5,
@@ -829,11 +822,7 @@ const styles = StyleSheet.create({
     borderColor: colors.teal[100],
     borderRadius: 14,
     backgroundColor: colors.teal[50],
-  },
-  securityIcon: {
-    marginRight: 9,
-    fontSize: 15,
-  },
+  },
   securityContent: {
     flex: 1,
   },
@@ -849,3 +838,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+

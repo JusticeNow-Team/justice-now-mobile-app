@@ -7,6 +7,7 @@ import {
   ViewStyle,
 } from "react-native";
 
+import { AppIcon, AppIconName } from "../AppIcon";
 import { colors, spacing, typography } from "../../theme";
 
 interface PrimaryButtonProps {
@@ -15,7 +16,7 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   loading?: boolean;
   variant?: "primary" | "outline" | "destructive";
-  icon?: string;
+  icon?: AppIconName;
   style?: ViewStyle;
 }
 
@@ -29,6 +30,12 @@ export default function PrimaryButton({
   style,
 }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
+  const iconColor =
+    variant === "outline"
+      ? colors.navy[700]
+      : variant === "destructive"
+        ? colors.errorStrong
+        : colors.textInverse;
 
   return (
     <Pressable
@@ -48,24 +55,10 @@ export default function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator
-          color={
-            variant === "outline" ? colors.navy[700] : colors.textInverse
-          }
-        />
+        <ActivityIndicator color={variant === "outline" ? colors.navy[700] : colors.textInverse} />
       ) : (
         <>
-          {icon ? (
-            <Text
-              style={[
-                styles.icon,
-                variant === "outline" && styles.outlineText,
-                variant === "destructive" && styles.destructiveText,
-              ]}
-            >
-              {icon}
-            </Text>
-          ) : null}
+          {icon ? <AppIcon name={icon} size={16} color={iconColor} /> : null}
           <Text
             style={[
               styles.text,
@@ -95,47 +88,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-
   outline: {
     backgroundColor: colors.surface,
     borderColor: colors.navy[200],
   },
-
   destructive: {
     backgroundColor: colors.surface,
     borderColor: "#F4C7C3",
   },
-
   pressed: {
     opacity: 0.85,
   },
-
   disabled: {
     backgroundColor: colors.disabled,
     borderColor: colors.disabled,
   },
-
   outlineDisabled: {
     backgroundColor: colors.navy[50],
     borderColor: colors.border,
   },
-
   text: {
     ...typography.body,
     fontWeight: "600",
     color: colors.textInverse,
   },
-
   outlineText: {
     color: colors.navy[700],
   },
-
   destructiveText: {
     color: colors.errorStrong,
-  },
-
-  icon: {
-    fontSize: 16,
-    color: colors.textInverse,
   },
 });

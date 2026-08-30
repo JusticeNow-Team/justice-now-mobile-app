@@ -17,8 +17,9 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 type EvidenceType = "document" | "image" | "audio" | "video" | "text";
 
@@ -209,15 +210,13 @@ export default function EvidenceReviewScreen() {
   );
 
   useEffect(() => {
-    let isMounted = true;
-    if (isMounted) {
+    const timer = setTimeout(() => {
       void loadEvidence();
-    }
+    }, 0);
+
     return () => {
-      isMounted = false;
+      clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadEvidence();
   }, [loadEvidence]);
 
   // -------------------------------------------------------
@@ -413,7 +412,7 @@ export default function EvidenceReviewScreen() {
 
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
         </Pressable>
 
         <View style={styles.headerContent}>
@@ -447,7 +446,7 @@ export default function EvidenceReviewScreen() {
         {/* Important Boundary */}
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoIcon}>ℹ️</Text>
+          <AppIcon name="info" size={16} color={colors.royal[700]} />
 
           <Text style={styles.infoText}>
             Case Officers record investigation findings. Evidence verification
@@ -458,7 +457,7 @@ export default function EvidenceReviewScreen() {
         {/* Search */}
 
         <View style={styles.searchBox}>
-          <Text>🔎</Text>
+          <AppIcon name="search" size={16} color={colors.textSoft} />
 
           <TextInput
             value={search}
@@ -470,7 +469,7 @@ export default function EvidenceReviewScreen() {
 
           {search !== "" && (
             <Pressable onPress={() => setSearch("")}>
-              <Text style={styles.clearText}>×</Text>
+              <AppIcon name="x" size={16} color={colors.textSoft} />
             </Pressable>
           )}
         </View>
@@ -539,9 +538,7 @@ export default function EvidenceReviewScreen() {
 
               <View style={styles.evidenceTop}>
                 <View style={styles.typeIcon}>
-                  <Text style={styles.typeIconText}>
-                    {getEvidenceIcon(item.evidence_type)}
-                  </Text>
+                  <AppIcon name={getEvidenceIcon(item.evidence_type)} size={19} color={colors.royal[700]} />
                 </View>
 
                 <View
@@ -597,8 +594,7 @@ export default function EvidenceReviewScreen() {
                 >
                   <Text style={styles.reviewStateText}>
                     {review.review_state === "follow_up_required"
-                      ? "⚠ Follow-up required"
-                      : "✓ Reviewed"}
+                      ? "Follow-up required" : "Reviewed"}
                   </Text>
 
                   <Text style={styles.reviewFinding}>
@@ -634,7 +630,7 @@ export default function EvidenceReviewScreen() {
 
         {errorMessage === "" && filteredEvidence.length === 0 && (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🔎</Text>
+            <AppIcon name="search" size={iconSizes.xl} color={colors.navy[700]} />
 
             <Text style={styles.emptyTitle}>No evidence found</Text>
 
@@ -741,7 +737,7 @@ export default function EvidenceReviewScreen() {
         {/* Security */}
 
         <View style={styles.securityBox}>
-          <Text>🔒</Text>
+          <AppIcon name="lock" size={16} color={colors.teal[800]} />
 
           <Text style={styles.securityText}>
             Evidence access is restricted to cases currently assigned to your
@@ -808,23 +804,23 @@ function ValidationBadge({ status }: { status: ValidationStatus }) {
 // Formatting
 // ---------------------------------------------------------
 
-function getEvidenceIcon(type: EvidenceType) {
+function getEvidenceIcon(type: EvidenceType): AppIconName {
   switch (type) {
     case "image":
-      return "🖼️";
+      return "image";
 
     case "audio":
-      return "🎧";
+      return "mic";
 
     case "video":
-      return "🎥";
+      return "video";
 
     case "text":
-      return "📝";
+      return "notebook-pen";
 
     case "document":
     default:
-      return "📄";
+      return "file-text";
   }
 }
 
@@ -900,13 +896,7 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  backText: {
-    fontSize: 32,
-
-    color: colors.navy[700],
-  },
+  },
 
   headerContent: {
     flex: 1,
@@ -984,11 +974,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
 
     backgroundColor: colors.royal[50],
-  },
-
-  infoIcon: {
-    marginRight: 8,
-  },
+  },
 
   infoText: {
     flex: 1,
@@ -1028,11 +1014,6 @@ const styles = StyleSheet.create({
     color: colors.navy[800],
   },
 
-  clearText: {
-    fontSize: 22,
-
-    color: colors.textSoft,
-  },
 
   filters: {
     gap: 7,
@@ -1129,11 +1110,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
 
     backgroundColor: colors.royal[50],
-  },
-
-  typeIconText: {
-    fontSize: 19,
-  },
+  },
 
   caseReference: {
     fontSize: 9.5,
@@ -1527,11 +1504,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
 
     backgroundColor: colors.surface,
-  },
-
-  emptyIcon: {
-    fontSize: 25,
-  },
+  },
 
   emptyTitle: {
     marginTop: 8,
@@ -1579,3 +1552,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+

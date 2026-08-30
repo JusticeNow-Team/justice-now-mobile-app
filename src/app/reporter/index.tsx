@@ -13,10 +13,11 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon } from "../../components/AppIcon";
 import { ConfirmDialog } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { logoutReporter } from "../../reporter/login";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 export default function ReporterDashboard() {
   const router = useRouter();
@@ -158,10 +159,10 @@ export default function ReporterDashboard() {
               accessibilityRole="button"
               accessibilityLabel="Your profile"
             >
-              <Text style={styles.logoutText}>Profile</Text>
+              <AppIcon name="user" size={iconSizes.sm} color={colors.navy[700]} />
             </Pressable>
             <Pressable onPress={() => setShowLogoutConfirm(true)} style={styles.logoutButton}>
-              <Text style={styles.logoutText}>Sign out</Text>
+              <AppIcon name="log-out" size={iconSizes.sm} color={colors.navy[700]} />
             </Pressable>
           </View>
         </View>
@@ -186,7 +187,12 @@ export default function ReporterDashboard() {
           style={styles.reportButton}
         >
           <View style={styles.reportIcon}>
-            <Text style={styles.reportIconText}>+</Text>
+            <AppIcon
+              name="plus"
+              size={iconSizes.navProminent}
+              color={colors.textInverse}
+              strokeWidth={2.2}
+            />
           </View>
 
           <View style={{ flex: 1 }}>
@@ -197,7 +203,7 @@ export default function ReporterDashboard() {
             </Text>
           </View>
 
-          <Text style={styles.arrow}>›</Text>
+          <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.textInverse} />
         </Pressable>
 
         {/* Section */}
@@ -208,7 +214,7 @@ export default function ReporterDashboard() {
 
         <Pressable onPress={() => router.push("/reporter/cases")} style={styles.card}>
           <View style={styles.cardIconBlue}>
-            <Text style={styles.cardIconText}>📄</Text>
+            <AppIcon name="file-text" size={iconSizes.lg} color={colors.royal[700]} />
           </View>
 
           <View style={styles.cardContent}>
@@ -219,7 +225,7 @@ export default function ReporterDashboard() {
             </Text>
           </View>
 
-          <Text style={styles.cardArrow}>›</Text>
+          <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.navy[400]} />
         </Pressable>
 
         {/* Support */}
@@ -229,7 +235,7 @@ export default function ReporterDashboard() {
           style={styles.card}
         >
           <View style={styles.cardIconTeal}>
-            <Text style={styles.cardIconText}>🤝</Text>
+            <AppIcon name="users" size={iconSizes.lg} color={colors.teal[800]} />
           </View>
 
           <View style={styles.cardContent}>
@@ -240,7 +246,7 @@ export default function ReporterDashboard() {
             </Text>
           </View>
 
-          <Text style={styles.cardArrow}>›</Text>
+          <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.navy[400]} />
         </Pressable>
 
         {/* Rights */}
@@ -250,7 +256,7 @@ export default function ReporterDashboard() {
           style={styles.card}
         >
           <View style={styles.cardIconGold}>
-            <Text style={styles.cardIconText}>⚖️</Text>
+            <AppIcon name="balance" size={iconSizes.lg} color={colors.gold[500]} />
           </View>
 
           <View style={styles.cardContent}>
@@ -262,13 +268,13 @@ export default function ReporterDashboard() {
             </Text>
           </View>
 
-          <Text style={styles.cardArrow}>›</Text>
+          <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.navy[400]} />
         </Pressable>
 
         {/* Security */}
 
         <View style={styles.securityNotice}>
-          <Text style={styles.securityIcon}>🔒</Text>
+          <AppIcon name="lock" size={iconSizes.sm} color={colors.teal[800]} />
 
           <View style={{ flex: 1 }}>
             <Text style={styles.securityTitle}>Your privacy matters</Text>
@@ -460,15 +466,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
 
     backgroundColor: "rgba(255,255,255,0.16)",
-  },
-
-  reportIconText: {
-    fontSize: 27,
-
-    fontWeight: "300",
-
-    color: colors.textInverse,
-  },
+  },
 
   reportTitle: {
     fontSize: 16,
@@ -486,15 +484,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
 
     color: "#DCE7FF",
-  },
-
-  arrow: {
-    marginLeft: 8,
-
-    fontSize: 30,
-
-    color: colors.textInverse,
-  },
+  },
 
   // -----------------------------------------------------
   // Cards
@@ -575,11 +565,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
 
     backgroundColor: colors.gold[50],
-  },
-
-  cardIconText: {
-    fontSize: 20,
-  },
+  },
 
   cardTitle: {
     fontSize: 14,
@@ -597,15 +583,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
 
     color: colors.textSecondary,
-  },
-
-  cardArrow: {
-    marginLeft: 8,
-
-    fontSize: 27,
-
-    color: colors.navy[400],
-  },
+  },
 
   // -----------------------------------------------------
   // Security
@@ -625,13 +603,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
 
     backgroundColor: colors.teal[50],
-  },
-
-  securityIcon: {
-    marginRight: 10,
-
-    fontSize: 16,
-  },
+  },
 
   securityTitle: {
     fontSize: 12.5,

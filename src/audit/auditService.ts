@@ -1,45 +1,53 @@
 import { AuthorizationError } from "../auth/middleware";
 import { normalizeRole } from "../auth/roles";
+import { SystemRole } from "../auth/types";
 import { supabase } from "../lib/supabase";
-import { INITIAL_AUDIT_EVENTS } from "./seeds/auditSeed";
 import { AuditEvent, AuditFilterOptions, CreateAuditEventInput } from "./types";
 
-const SENSITIVE_KEYS = new Set([
+const SENSITIVE_WORDS = [
   "password",
-  "confirmPassword",
   "token",
-  "refreshToken",
-  "accessToken",
   "secret",
-  "apiKey",
+  "apikey",
+  "api_key",
   "pin",
   "otp",
-  "hash",
-  "authHeader",
   "authorization",
-  "creditCard",
-]);
+  "creditcard",
+  "credit_card",
+];
 
-/**
- * Deeply sanitizes an object to redact sensitive passwords, secrets, or tokens (JN-254 & AC 6).
- */
-export function sanitizeAuditDetails(data?: Record<string, any>): Record<string, any> {
-  if (!data || typeof data !== "object") return {};
+function isUuid(value?: string) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
+}
 
-  const clean: Record<string, any> = {};
+export function sanitizeAuditDetails(
+  data?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!data || typeof data !== "object") {
+    return {};
+  }
+
+  const clean: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
-    const lowerKey = key.toLowerCase();
+    const normalizedKey = key.toLowerCase().replace(/[^a-z0-9_]/g, "");
 
-    // Check if key is sensitive
-    if (SENSITIVE_KEYS.has(key) || Array.from(SENSITIVE_KEYS).some((s) => lowerKey.includes(s.toLowerCase()))) {
+    if (SENSITIVE_WORDS.some((word) => normalizedKey.includes(word))) {
       clean[key] = "[REDACTED]";
-    } else if (value && typeof value === "object" && !Array.isArray(value)) {
-      clean[key] = sanitizeAuditDetails(value);
     } else if (Array.isArray(value)) {
       clean[key] = value.map((item) =>
-        typeof item === "object" ? sanitizeAuditDetails(item) : item
+        item && typeof item === "object"
+          ? sanitizeAuditDetails(item as Record<string, unknown>)
+          : item,
       );
+    } else if (value && typeof value === "object") {
+      clean[key] = sanitizeAuditDetails(value as Record<string, unknown>);
     } else {
       clean[key] = value;
     }
@@ -48,102 +56,137 @@ export function sanitizeAuditDetails(data?: Record<string, any>): Record<string,
   return clean;
 }
 
-let inMemoryAuditLogs: AuditEvent[] = [...INITIAL_AUDIT_EVENTS];
+function mapAuditRow(row: any): AuditEvent {
+  const role = normalizeRole(row.actor_role) || "system_admin";
 
-/**
- * Records a new immutable audit event (JN-254, AC 1-4, AC 6).
- */
-export async function recordAuditEvent(input: CreateAuditEventInput): Promise<AuditEvent> {
-  const sanitizedDetails = sanitizeAuditDetails(input.details);
-
-  const event: AuditEvent = {
-    id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    eventType: input.eventType,
-    actorId: input.actorId || "00000000-0000-0000-0000-000000000001",
-    actorEmail: input.actorEmail,
-    actorRole: input.actorRole || "system_admin",
-    targetId: input.targetId || "00000000-0000-0000-0000-000000000000",
-    targetEmail: input.targetEmail,
-    action: input.action,
-    description: input.description,
-    details: sanitizedDetails,
-    ipAddress: input.ipAddress || "127.0.0.1",
-    userAgent: input.userAgent || "JusticeNow System Admin Client",
-    timestamp: new Date().toISOString(),
+  return {
+    id: String(row.id),
+    eventType: String(row.event_type || "SECURITY_POLICY_VIOLATION") as AuditEvent["eventType"],
+    actorId: row.actor_id || "system",
+    actorEmail: row.actor_email || "system@justicenow.org",
+    actorRole: role as SystemRole,
+    targetId:
+      row.target_user_id || row.target_staff_id || row.target_id || "system",
+    targetEmail:
+      row.target_user_email ||
+      row.target_staff_email ||
+      row.target_email ||
+      "unknown@justicenow.org",
+    action: row.action || row.event_type || "AUDIT_EVENT",
+    description: row.description || "System activity was recorded.",
+    details:
+      row.details && typeof row.details === "object" ? row.details : {},
+    ipAddress: row.ip_address || undefined,
+    userAgent: row.user_agent || undefined,
+    timestamp: row.created_at || new Date().toISOString(),
   };
-
-  // Prepend to in-memory store
-  inMemoryAuditLogs = [event, ...inMemoryAuditLogs];
-
-  // If Supabase is connected, write to audit_events table
-  if (supabase) {
-    try {
-      await supabase.from("staff_audit_logs").insert([
-        {
-          id: event.id,
-          event_type: event.eventType,
-          actor_id: event.actorId,
-          actor_email: event.actorEmail,
-          target_user_id: event.targetId,
-          target_user_email: event.targetEmail,
-          action: event.action,
-          description: event.description,
-          details: event.details,
-          created_at: event.timestamp,
-        },
-      ]);
-    } catch (err) {
-      console.warn("Supabase audit log insert fallback to in-memory:", err);
-    }
-  }
-
-  return event;
 }
 
-/**
- * Retrieves audit log entries with administrator access control (JN-254 & AC 7).
- */
+function requireAdministrator(actorRole: string) {
+  if (normalizeRole(actorRole) !== "system_admin") {
+    throw new AuthorizationError(
+      "Only System Administrators can access system audit entries.",
+      "UNAUTHORIZED_AUDIT_ACCESS",
+      403,
+    );
+  }
+}
+
+export async function recordAuditEvent(
+  input: CreateAuditEventInput,
+): Promise<AuditEvent> {
+  const { data, error } = await supabase.rpc("record_staff_audit_event", {
+    p_event_type: input.eventType,
+    p_target_user_id: isUuid(input.targetId) ? input.targetId : null,
+    p_target_user_email: input.targetEmail || null,
+    p_action: input.action || null,
+    p_description: input.description || null,
+    p_details: sanitizeAuditDetails(input.details),
+  });
+
+  if (error) {
+    throw new Error(`Unable to record audit event: ${error.message}`);
+  }
+
+  return mapAuditRow(data);
+}
+
 export async function getAuditEvents(
   filter?: AuditFilterOptions,
-  actorRole: string = "system_admin"
+  actorRole = "system_admin",
 ): Promise<AuditEvent[]> {
-  const normalized = normalizeRole(actorRole);
+  requireAdministrator(actorRole);
 
-  // AC 7: Only authorized administrators can view audit entries
-  if (normalized !== "system_admin") {
-    throw new AuthorizationError(
-      "Unauthorized: Only System Administrators can access system audit entries.",
-      "UNAUTHORIZED_AUDIT_ACCESS",
-      403
+  const offset = Math.max(filter?.offset ?? 0, 0);
+  const limit = Math.min(Math.max(filter?.limit ?? 200, 1), 500);
+
+  let query = supabase
+    .from("staff_audit_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (filter?.eventType && filter.eventType !== "ALL") {
+    query = query.eq("event_type", filter.eventType);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Unable to load audit logs: ${error.message}`);
+  }
+
+  let events = (data ?? []).map(mapAuditRow);
+
+  if (filter?.actorEmail?.trim()) {
+    const value = filter.actorEmail.trim().toLowerCase();
+    events = events.filter((event) =>
+      event.actorEmail.toLowerCase().includes(value),
     );
   }
 
-  let events = [...inMemoryAuditLogs];
-
-  if (filter?.eventType && filter.eventType !== "ALL") {
-    events = events.filter((e) => e.eventType === filter.eventType);
-  }
-
-  if (filter?.actorEmail) {
-    const email = filter.actorEmail.toLowerCase();
-    events = events.filter((e) => e.actorEmail.toLowerCase().includes(email));
-  }
-
-  if (filter?.targetEmail) {
-    const email = filter.targetEmail.toLowerCase();
-    events = events.filter((e) => e.targetEmail.toLowerCase().includes(email));
+  if (filter?.targetEmail?.trim()) {
+    const value = filter.targetEmail.trim().toLowerCase();
+    events = events.filter((event) =>
+      event.targetEmail.toLowerCase().includes(value),
+    );
   }
 
   if (filter?.searchQuery?.trim()) {
-    const query = filter.searchQuery.toLowerCase().trim();
-    events = events.filter(
-      (e) =>
-        e.description.toLowerCase().includes(query) ||
-        e.action.toLowerCase().includes(query) ||
-        e.actorEmail.toLowerCase().includes(query) ||
-        e.targetEmail.toLowerCase().includes(query)
+    const value = filter.searchQuery.trim().toLowerCase();
+    events = events.filter((event) =>
+      [
+        event.eventType,
+        event.action,
+        event.description,
+        event.actorEmail,
+        event.targetEmail,
+        event.targetId,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(value),
     );
   }
 
   return events;
+}
+
+export async function getAuditEventById(
+  id: string,
+  actorRole = "system_admin",
+): Promise<AuditEvent | null> {
+  requireAdministrator(actorRole);
+
+  const { data, error } = await supabase
+    .from("staff_audit_logs")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load the audit entry: ${error.message}`);
+  }
+
+  return data ? mapAuditRow(data) : null;
 }

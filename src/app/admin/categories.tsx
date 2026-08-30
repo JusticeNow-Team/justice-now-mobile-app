@@ -1,10 +1,8 @@
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,404 +12,467 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { RoleGuard } from "../../auth";
+
 import {
   createCategory,
   getCategories,
   ReportCategory,
   toggleCategoryActive,
 } from "../../categories";
-import { colors } from "../../theme";
+import { AppIcon, AppIconName, isAppIconName } from "../../components/AppIcon";
+import { colors, iconSizes } from "../../theme";
 
 export default function AdminCategoriesScreen() {
-  const router = useRouter();
   const [categories, setCategories] = useState<ReportCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterActiveOnly, setFilterActiveOnly] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(false);
 
-  // Create Modal State
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newCode, setNewCode] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [newHint, setNewHint] = useState("");
-  const [newIcon, setNewIcon] = useState("📋");
-  const [newIsActive, setNewIsActive] = useState(true);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalError, setModalError] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [hint, setHint] = useState("");
+  const [icon, setIcon] = useState<AppIconName>("category");
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  const loadCategoriesData = useCallback(async () => {
+  const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getCategories({ activeOnly: filterActiveOnly });
-      setCategories(data);
-    } catch (err) {
-      console.error("Failed to load categories:", err);
+
+      const records = await getCategories({
+        activeOnly,
+      });
+
+      setCategories(records);
+    } catch (error) {
+      console.error("Unable to load categories:", error);
     } finally {
       setLoading(false);
     }
-  }, [filterActiveOnly]);
+  }, [activeOnly]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadCategoriesData();
-  }, [loadCategoriesData]);
+    const timer = setTimeout(() => {
+      void loadCategories();
+    }, 0);
 
-  const handleToggle = async (cat: ReportCategory) => {
-    const nextState = !cat.isActive;
-    const result = await toggleCategoryActive(cat.id, nextState);
-    if (result.success) {
-      setCategories((prev) =>
-        prev.map((item) =>
-          item.id === cat.id ? { ...item, isActive: nextState } : item
-        )
-      );
-    } else {
-      Alert.alert("Action Failed", result.error || "Could not update category status.");
-    }
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [loadCategories]);
+
+  const resetForm = () => {
+    setName("");
+    setCode("");
+    setDescription("");
+    setHint("");
+    setIcon("category");
+    setFormError("");
   };
 
-  const handleCreateCategory = async () => {
-    setModalError("");
-
-    if (!newName.trim()) {
-      setModalError("Category name is required.");
+  const closeModal = () => {
+    if (creating) {
       return;
     }
 
-    const autoCode =
-      newCode.trim().toLowerCase() ||
-      newName
+    setShowModal(false);
+    resetForm();
+  };
+
+  const createNewCategory = async () => {
+    setFormError("");
+
+    if (!name.trim()) {
+      setFormError("Category name is required.");
+      return;
+    }
+
+    if (!description.trim()) {
+      setFormError("Category description is required.");
+      return;
+    }
+
+    const generatedCode =
+      code.trim().toLowerCase() ||
+      name
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_+|_+$/g, "");
 
-    if (!autoCode) {
-      setModalError("Category code is required.");
-      return;
-    }
-
-    if (!newDescription.trim()) {
-      setModalError("Category description is required.");
-      return;
-    }
-
     try {
-      setModalLoading(true);
-      const res = await createCategory({
-        name: newName.trim(),
-        code: autoCode,
-        description: newDescription.trim(),
-        hint: newHint.trim() || undefined,
-        icon: newIcon.trim() || "📋",
-        isActive: newIsActive,
+      setCreating(true);
+
+      const result = await createCategory({
+        name: name.trim(),
+        code: generatedCode,
+        description: description.trim(),
+        hint: hint.trim() || undefined,
+        icon: icon || "category",
+        isActive: true,
+        displayOrder: categories.length + 1,
       });
 
-      if (!res.success) {
-        setModalError(res.error || "Could not create category.");
+      if (!result.success) {
+        setFormError(result.error || "The category could not be created.");
         return;
       }
 
-      setShowAddModal(false);
-      setNewName("");
-      setNewCode("");
-      setNewDescription("");
-      setNewHint("");
-      setNewIcon("📋");
-      setNewIsActive(true);
-      await loadCategoriesData();
-      Alert.alert("Success", `Category "${newName}" has been created.`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to create category.";
-      setModalError(msg);
+      setShowModal(false);
+      resetForm();
+      await loadCategories();
+
+      Alert.alert("Category created", `${name.trim()} was added successfully.`);
+    } catch (error: any) {
+      setFormError(error?.message || "The category could not be created.");
     } finally {
-      setModalLoading(false);
+      setCreating(false);
+    }
+  };
+
+  const toggleCategory = async (category: ReportCategory) => {
+    const nextValue = !category.isActive;
+
+    const result = await toggleCategoryActive(category.id, nextValue);
+
+    if (!result.success) {
+      Alert.alert(
+        "Update failed",
+        result.error || "The category status could not be updated.",
+      );
+      return;
+    }
+
+    if (activeOnly && !nextValue) {
+      setCategories((current) =>
+        current.filter((item) => item.id !== category.id),
+      );
+    } else {
+      setCategories((current) =>
+        current.map((item) =>
+          item.id === category.id
+            ? {
+                ...item,
+                isActive: nextValue,
+              }
+            : item,
+        ),
+      );
     }
   };
 
   return (
-    <RoleGuard allowedRoles={["system_admin"]}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <View style={styles.headerIcon}>
+          <AppIcon name="settings" size={20} color={colors.navy[700]} />
+        </View>
+
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>System configuration</Text>
+          <Text style={styles.headerSubtitle}>
+            Categories and case classifications
+          </Text>
+        </View>
+
+        <Pressable style={styles.addButton} onPress={() => setShowModal(true)}>
+          <AppIcon name="plus" size={16} color={colors.textInverse} />
+          <Text style={styles.addButtonText}>Add</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.filterRow}>
           <Pressable
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={styles.backButton}
+            style={[styles.filterPill, !activeOnly && styles.activeFilterPill]}
+            onPress={() => setActiveOnly(false)}
           >
-            <Text style={styles.backText}>‹</Text>
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle}>Report Categories</Text>
-            <Text style={styles.headerSubtitle}>
-              JN-135 Category Management & Active Filters
+            <Text
+              style={[
+                styles.filterPillText,
+                !activeOnly && styles.activeFilterPillText,
+              ]}
+            >
+              All categories
             </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.filterPill, activeOnly && styles.activeFilterPill]}
+            onPress={() => setActiveOnly(true)}
+          >
+            <Text
+              style={[
+                styles.filterPillText,
+                activeOnly && styles.activeFilterPillText,
+              ]}
+            >
+              Active only
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.configurationCard}>
+          <View style={styles.groupHeader}>
+            <Text style={styles.groupHeaderText}>CASE HANDLING</Text>
           </View>
-          <Pressable
-            onPress={() => {
-              setModalError("");
-              setShowAddModal(true);
-            }}
-            style={styles.addButton}
-          >
-            <Text style={styles.addButtonText}>+ Add</Text>
-          </Pressable>
-        </View>
 
-        {/* Filter bar */}
-        <View style={styles.filterBar}>
-          <Pressable
-            style={[
-              styles.filterPill,
-              !filterActiveOnly && styles.filterPillActive,
-            ]}
-            onPress={() => setFilterActiveOnly(false)}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                !filterActiveOnly && styles.filterPillTextActive,
-              ]}
-            >
-              All Categories ({categories.length})
-            </Text>
-          </Pressable>
+          <View style={styles.configurationSummary}>
+            <View style={styles.summaryIcon}>
+              <AppIcon name="category" size={18} color={colors.royal[700]} />
+            </View>
 
-          <Pressable
-            style={[
-              styles.filterPill,
-              filterActiveOnly && styles.filterPillActive,
-            ]}
-            onPress={() => setFilterActiveOnly(true)}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                filterActiveOnly && styles.filterPillTextActive,
-              ]}
-            >
-              Active Only
-            </Text>
-          </Pressable>
-        </View>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryTitle}>Case categories</Text>
+              <Text style={styles.summaryHint}>
+                {categories.filter((category) => category.isActive).length}{" "}
+                active categories
+              </Text>
+            </View>
+          </View>
 
-        {/* Category List */}
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
           {loading ? (
-            <View style={styles.centerBox}>
-              <ActivityIndicator size="large" color={colors.royal[600]} />
-              <Text style={styles.loadingText}>Loading categories...</Text>
+            <View style={styles.loadingState}>
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : categories.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyIcon}>📂</Text>
+            <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No categories found</Text>
             </View>
           ) : (
-            <View style={styles.cardList}>
-              {categories.map((cat) => (
-                <View key={cat.id} style={styles.categoryCard}>
-                  <View style={styles.categoryHeader}>
-                    <View style={styles.iconCircle}>
-                      <Text style={styles.categoryIcon}>{cat.icon || "📋"}</Text>
-                    </View>
-                    <View style={styles.categoryInfo}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.categoryName}>{cat.name}</Text>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            cat.isActive
-                              ? styles.activeBadge
-                              : styles.inactiveBadge,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              cat.isActive
-                                ? styles.activeBadgeText
-                                : styles.inactiveBadgeText,
-                            ]}
-                          >
-                            {cat.isActive ? "ACTIVE" : "INACTIVE"}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.categoryCode}>code: {cat.code}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.categoryDescription}>
-                    {cat.description}
-                  </Text>
-                  {cat.hint ? (
-                    <Text style={styles.categoryHint}>Hint: {cat.hint}</Text>
-                  ) : null}
-
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.toggleLabel}>
-                      {cat.isActive
-                        ? "Visible in Reporter form"
-                        : "Hidden from Reporter form"}
-                    </Text>
-                    <Switch
-                      value={cat.isActive}
-                      onValueChange={() => handleToggle(cat)}
-                      trackColor={{
-                        false: colors.navy[200],
-                        true: colors.royal[400],
-                      }}
-                      thumbColor={
-                        cat.isActive ? colors.royal[700] : colors.navy[400]
+            <View style={styles.categoriesList}>
+              {categories.map((category, index) => (
+                <View
+                  key={category.id}
+                  style={[
+                    styles.categoryRow,
+                    index === categories.length - 1 && styles.lastCategoryRow,
+                  ]}
+                >
+                  <View style={styles.categoryIcon}>
+                    <AppIcon
+                      name={
+                        isAppIconName(category.icon ?? "")
+                          ? ((category.icon ?? "category") as AppIconName)
+                          : "category"
                       }
+                      size={20}
+                      color={colors.navy[700]}
                     />
                   </View>
+
+                  <View style={styles.categoryInformation}>
+                    <View style={styles.categoryNameRow}>
+                      <Text style={styles.categoryName}>{category.name}</Text>
+
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          category.isActive
+                            ? styles.activeBadge
+                            : styles.inactiveBadge,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.statusDot,
+                            {
+                              backgroundColor: category.isActive
+                                ? colors.success
+                                : colors.textSoft,
+                            },
+                          ]}
+                        />
+
+                        <Text
+                          style={[
+                            styles.statusText,
+                            {
+                              color: category.isActive
+                                ? colors.success
+                                : colors.textSecondary,
+                            },
+                          ]}
+                        >
+                          {category.isActive ? "Active" : "Inactive"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.categoryDescription} numberOfLines={2}>
+                      {category.description}
+                    </Text>
+
+                    <Text style={styles.categoryCode}>{category.code}</Text>
+                  </View>
+
+                  <Switch
+                    value={category.isActive}
+                    onValueChange={() => void toggleCategory(category)}
+                    trackColor={{
+                      false: colors.border,
+                      true: colors.teal[200],
+                    }}
+                    thumbColor={
+                      category.isActive ? colors.teal[600] : colors.textSoft
+                    }
+                  />
                 </View>
               ))}
             </View>
           )}
-        </ScrollView>
+        </View>
 
-        {/* Add Category Modal */}
-        <Modal
-          visible={showAddModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowAddModal(false)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add Report Category</Text>
-                <Pressable
-                  onPress={() => setShowAddModal(false)}
-                  style={styles.closeButton}
-                >
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </Pressable>
+        <View style={styles.notice}>
+          <AppIcon name="warning" size={iconSizes.md} color={colors.warning} />
+
+          <View style={styles.noticeContent}>
+            <Text style={styles.noticeTitle}>
+              Changes take effect immediately
+            </Text>
+
+            <Text style={styles.noticeText}>
+              Editing or disabling categories affects new reports. Existing case
+              records keep their original category for the audit trail.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Add report category</Text>
+                <Text style={styles.modalSubtitle}>
+                  Configure a new case classification
+                </Text>
               </View>
 
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.modalForm}
-              >
-                {modalError ? (
-                  <View style={styles.modalErrorBox}>
-                    <Text style={styles.modalErrorText}>{modalError}</Text>
-                  </View>
-                ) : null}
+              <Pressable onPress={closeModal} disabled={creating}>
+                <AppIcon name="x" size={20} color={colors.navy[700]} />
+              </Pressable>
+            </View>
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Category Name *</Text>
-                  <TextInput
-                    value={newName}
-                    onChangeText={(val) => {
-                      setNewName(val);
-                      if (!newCode) {
-                        setNewCode(
-                          val
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]+/g, "_")
-                            .replace(/^_+|_+$/g, "")
-                        );
-                      }
-                    }}
-                    placeholder="e.g. Environmental Rights"
-                    placeholderTextColor={colors.textSoft}
-                    style={styles.textInput}
-                  />
+            <ScrollView
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {formError ? (
+                <View style={styles.errorNotice}>
+                  <Text style={styles.errorText}>{formError}</Text>
                 </View>
+              ) : null}
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>
-                    Code Identifier * (Must be unique)
-                  </Text>
-                  <TextInput
-                    value={newCode}
-                    onChangeText={setNewCode}
-                    placeholder="e.g. environmental_rights"
-                    placeholderTextColor={colors.textSoft}
-                    autoCapitalize="none"
-                    style={styles.textInput}
-                  />
-                </View>
+              <FormField
+                label="Category name"
+                value={name}
+                onChangeText={setName}
+                placeholder="e.g. Unlawful detention"
+              />
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Icon Emoji</Text>
-                  <TextInput
-                    value={newIcon}
-                    onChangeText={setNewIcon}
-                    placeholder="e.g. 🌿"
-                    placeholderTextColor={colors.textSoft}
-                    style={[styles.textInput, { width: 80 }]}
-                  />
-                </View>
+              <FormField
+                label="Category code"
+                value={code}
+                onChangeText={setCode}
+                placeholder="Generated automatically if empty"
+                autoCapitalize="none"
+              />
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Description *</Text>
-                  <TextInput
-                    value={newDescription}
-                    onChangeText={setNewDescription}
-                    placeholder="Full explanation of rights covered..."
-                    placeholderTextColor={colors.textSoft}
-                    multiline
-                    numberOfLines={3}
-                    style={[styles.textInput, styles.textArea]}
-                  />
-                </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Description</Text>
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Reporter Hint</Text>
-                  <TextInput
-                    value={newHint}
-                    onChangeText={setNewHint}
-                    placeholder="Short summary displayed to reporters..."
-                    placeholderTextColor={colors.textSoft}
-                    style={styles.textInput}
-                  />
-                </View>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  style={styles.textArea}
+                  placeholder="Explain when this category should be selected"
+                  placeholderTextColor={colors.textSoft}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
 
-                <View style={styles.switchRow}>
-                  <Text style={styles.formLabel}>Active & Visible Now</Text>
-                  <Switch
-                    value={newIsActive}
-                    onValueChange={setNewIsActive}
-                    trackColor={{
-                      false: colors.navy[200],
-                      true: colors.royal[400],
-                    }}
-                    thumbColor={
-                      newIsActive ? colors.royal[700] : colors.navy[400]
-                    }
-                  />
-                </View>
+              <FormField
+                label="Reporter guidance"
+                value={hint}
+                onChangeText={setHint}
+                placeholder="Optional guidance for reporters"
+              />
+
+              <FormField
+                label="Icon"
+                value={icon}
+                onChangeText={(value) => setIcon(isAppIconName(value) ? value : "category")}
+                placeholder="category"
+              />
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                  disabled={creating}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
 
                 <Pressable
-                  onPress={handleCreateCategory}
-                  disabled={modalLoading}
-                  style={[
-                    styles.createButton,
-                    modalLoading && styles.disabledButton,
-                  ]}
+                  style={styles.createButton}
+                  onPress={() => void createNewCategory()}
+                  disabled={creating}
                 >
-                  {modalLoading ? (
+                  {creating ? (
                     <ActivityIndicator color={colors.textInverse} />
                   ) : (
-                    <Text style={styles.createButtonText}>Save Category</Text>
+                    <>
+                      <AppIcon
+                        name="plus"
+                        size={16}
+                        color={colors.textInverse}
+                      />
+                      <Text style={styles.createButtonText}>Create</Text>
+                    </>
                   )}
                 </Pressable>
-              </ScrollView>
-            </View>
+              </View>
+            </ScrollView>
           </View>
-        </Modal>
-      </SafeAreaView>
-    </RoleGuard>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+function FormField({
+  label,
+  ...props
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  autoCapitalize?: any;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        {...props}
+        style={styles.input}
+        placeholderTextColor={colors.textSoft}
+      />
+    </View>
   );
 }
 
@@ -422,26 +483,25 @@ const styles = StyleSheet.create({
   },
   header: {
     minHeight: 62,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
+    gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  backButton: {
-    width: 38,
-    height: 38,
+  headerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.navy[50],
   },
-  backText: {
-    fontSize: 30,
-    color: colors.navy[700],
-  },
-  headerTitleWrap: {
+  headerText: {
     flex: 1,
-    marginLeft: 6,
   },
   headerTitle: {
     fontSize: 16,
@@ -449,13 +509,17 @@ const styles = StyleSheet.create({
     color: colors.navy[800],
   },
   headerSubtitle: {
-    fontSize: 11,
+    marginTop: 2,
+    fontSize: 12,
     color: colors.textSecondary,
   },
   addButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: colors.royal[700],
   },
   addButtonText: {
@@ -463,172 +527,221 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textInverse,
   },
-  filterBar: {
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 28,
+    gap: 13,
+  },
+  filterRow: {
     flexDirection: "row",
-    padding: 12,
     gap: 8,
+  },
+  filterPill: {
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.surface,
+  },
+  activeFilterPill: {
+    borderColor: colors.navy[800],
+    backgroundColor: colors.navy[800],
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.navy[700],
+  },
+  activeFilterPillText: {
+    color: colors.textInverse,
+  },
+  configurationCard: {
+    overflow: "hidden",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  groupHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: colors.navy[50],
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-  },
-  filterPillActive: {
-    backgroundColor: colors.royal[700],
-    borderColor: colors.royal[700],
-  },
-  filterPillText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.navy[700],
-  },
-  filterPillTextActive: {
-    color: colors.textInverse,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  centerBox: {
-    paddingVertical: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 13,
+  groupHeaderText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    letterSpacing: 0.5,
     color: colors.textSecondary,
   },
-  emptyBox: {
-    paddingVertical: 50,
+  configurationSummary: {
+    minHeight: 68,
+    paddingHorizontal: 14,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 8,
+  summaryIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.royal[50],
+  },
+  summaryContent: {
+    flex: 1,
+  },
+  summaryTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  summaryHint: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: colors.textSecondary,
+  },
+  loadingState: {
+    minHeight: 160,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyState: {
+    minHeight: 140,
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.navy[800],
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textSecondary,
   },
-  cardList: {
-    gap: 12,
+  categoriesList: {
+    paddingHorizontal: 14,
   },
-  categoryCard: {
-    padding: 16,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryHeader: {
+  categoryRow: {
+    minHeight: 94,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: colors.royal[50],
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
+  lastCategoryRow: {
+    borderBottomWidth: 0,
   },
   categoryIcon: {
-    fontSize: 20,
-  },
-  categoryInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  categoryName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.navy[800],
-  },
-  categoryCode: {
-    fontSize: 11.5,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  activeBadge: {
-    backgroundColor: "#E6F4EA",
-  },
-  inactiveBadge: {
-    backgroundColor: "#FCE8E6",
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  activeBadgeText: {
-    color: "#137333",
-  },
-  inactiveBadgeText: {
-    color: "#C5221F",
-  },
-  categoryDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.navy[800],
-    marginBottom: 6,
-  },
-  categoryHint: {
-    fontSize: 12,
-    fontStyle: "italic",
-    color: colors.textSecondary,
-    marginBottom: 10,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  toggleLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    backgroundColor: colors.navy[50],
   },
-  modalCard: {
+  categoryInformation: {
+    flex: 1,
+    minWidth: 0,
+  },
+  categoryNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  categoryName: {
+    flexShrink: 1,
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  categoryDescription: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  categoryCode: {
+    marginTop: 4,
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.royal[700],
+  },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  activeBadge: {
+    backgroundColor: "#EAF6F0",
+  },
+  inactiveBadge: {
+    backgroundColor: colors.navy[50],
+  },
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 9.5,
+    fontWeight: "700",
+  },
+  notice: {
+    padding: 13,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#FAEBC8",
+    backgroundColor: "#FDF6E7",
+  },
+  noticeContent: {
+    flex: 1,
+  },
+  noticeTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.warning,
+  },
+  noticeText: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    padding: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10,27,46,0.58)",
+  },
+  modal: {
     width: "100%",
-    maxWidth: 480,
-    maxHeight: "90%",
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+    maxWidth: 560,
+    maxHeight: "92%",
     overflow: "hidden",
+    borderRadius: 20,
+    backgroundColor: colors.surface,
   },
   modalHeader: {
+    padding: 17,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -637,71 +750,90 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.navy[800],
   },
-  closeButton: {
-    padding: 4,
-  },
-  closeButtonText: {
-    fontSize: 18,
+  modalSubtitle: {
+    marginTop: 2,
+    fontSize: 11.5,
     color: colors.textSecondary,
   },
-  modalForm: {
-    padding: 16,
-    gap: 14,
+  modalContent: {
+    padding: 17,
+    gap: 13,
   },
-  modalErrorBox: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: "#FCE8E6",
+  errorNotice: {
+    padding: 11,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#F5C2C7",
+    borderColor: "#F6DAD6",
+    backgroundColor: "#FBEEEC",
   },
-  modalErrorText: {
-    fontSize: 12,
-    color: "#C5221F",
+  errorText: {
+    fontSize: 11.5,
+    color: colors.error,
   },
-  formGroup: {
+  field: {
     gap: 6,
   },
-  formLabel: {
+  fieldLabel: {
     fontSize: 12.5,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.navy[800],
   },
-  textInput: {
-    minHeight: 44,
-    paddingHorizontal: 12,
+  input: {
+    minHeight: 46,
+    paddingHorizontal: 13,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.navy[200],
-    borderRadius: 10,
     fontSize: 13.5,
     color: colors.navy[800],
-    backgroundColor: colors.surface,
-  },
+    outlineStyle: "none",
+  } as any,
   textArea: {
-    minHeight: 70,
-    paddingVertical: 8,
-    textAlignVertical: "top",
-  },
-  switchRow: {
+    minHeight: 90,
+    padding: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    fontSize: 13.5,
+    color: colors.navy[800],
+    outlineStyle: "none",
+  } as any,
+  modalActions: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 6,
+    justifyContent: "flex-end",
+    gap: 9,
   },
-  createButton: {
-    minHeight: 48,
-    borderRadius: 10,
-    backgroundColor: colors.royal[700],
+  cancelButton: {
+    minHeight: 42,
+    paddingHorizontal: 17,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
   },
-  disabledButton: {
-    opacity: 0.6,
+  cancelButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.navy[700],
+  },
+  createButton: {
+    minWidth: 110,
+    minHeight: 42,
+    paddingHorizontal: 16,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: colors.royal[700],
   },
   createButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.textInverse,
   },
 });
+
+
+

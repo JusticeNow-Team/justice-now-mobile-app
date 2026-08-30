@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
@@ -445,42 +446,42 @@ export default function OfficerDashboardScreen() {
 
         <View style={styles.statsGrid}>
           <StatCard
-            icon="📁"
+            icon="folder-open"
             value={stats.assigned}
             label="Assigned Cases"
             tone="blue"
           />
 
           <StatCard
-            icon="🔎"
+            icon="search"
             value={stats.investigating}
             label="Investigating"
             tone="teal"
           />
 
           <StatCard
-            icon="📎"
+            icon="file-up"
             value={stats.awaitingEvidence}
             label="Awaiting Evidence"
             tone="gold"
           />
 
           <StatCard
-            icon="⚠️"
+            icon="alert-triangle"
             value={stats.urgent}
             label="Urgent Cases"
             tone="red"
           />
 
           <StatCard
-            icon="📄"
+            icon="file-text"
             value={stats.evidenceToReview}
             label="Evidence to Review"
             tone="blue"
           />
 
           <StatCard
-            icon="↻"
+            icon="refresh-cw"
             value={stats.followUps}
             label="Follow-ups"
             tone="gold"
@@ -490,7 +491,7 @@ export default function OfficerDashboardScreen() {
         <Text style={styles.actionsSectionTitle}>Quick actions</Text>
 
         <ActionCard
-          icon="📁"
+          icon="folder-open"
           title="Assigned Cases"
           description="Review cases currently assigned to your officer account."
           onPress={() => router.push("/officer/cases")}
@@ -498,7 +499,7 @@ export default function OfficerDashboardScreen() {
         />
 
         <ActionCard
-          icon="🔎"
+          icon="search"
           title="Evidence Review"
           description="View case evidence and record investigation findings."
           onPress={() => router.push("/officer/evidence")}
@@ -506,7 +507,7 @@ export default function OfficerDashboardScreen() {
         />
 
         <ActionCard
-          icon="📝"
+          icon="notebook-pen"
           title="Case Updates"
           description="Review the latest investigation status changes."
           onPress={() =>
@@ -518,7 +519,7 @@ export default function OfficerDashboardScreen() {
         />
 
         <ActionCard
-          icon="🔔"
+          icon="bell"
           title="Notifications"
           description="Review case assignments, evidence activity and officer alerts."
           onPress={() => router.push("/officer/notifications")}
@@ -536,7 +537,7 @@ export default function OfficerDashboardScreen() {
 
         {recentUpdates.length === 0 ? (
           <View style={styles.emptyActivity}>
-            <Text style={styles.emptyActivityIcon}>🕘</Text>
+            <AppIcon name="history" size={22} color={colors.navy[700]} />
 
             <Text style={styles.emptyActivityTitle}>No recent updates</Text>
 
@@ -589,7 +590,7 @@ export default function OfficerDashboardScreen() {
                       </Text>
                     </View>
 
-                    <Text style={styles.activityArrow}>›</Text>
+                    <AppIcon name="chevron-right" size={24} color={colors.royal[700]} />
                   </Pressable>
 
                   {index < recentUpdates.length - 1 && (
@@ -602,7 +603,7 @@ export default function OfficerDashboardScreen() {
         )}
 
         <View style={styles.securityCard}>
-          <Text style={styles.securityIcon}>🔒</Text>
+          <AppIcon name="lock" size={16} color={colors.teal[800]} />
 
           <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>Protected staff workspace</Text>
@@ -624,7 +625,7 @@ function StatCard({
   label,
   tone,
 }: {
-  icon: string;
+  icon: AppIconName;
   value: number;
   label: string;
   tone: "blue" | "teal" | "gold" | "red";
@@ -640,7 +641,7 @@ function StatCard({
           tone === "red" && styles.statRed,
         ]}
       >
-        <Text style={styles.statIcon}>{icon}</Text>
+        <AppIcon name={icon} size={16} color={colors.navy[700]} />
       </View>
 
       <Text style={styles.statValue}>{value}</Text>
@@ -656,7 +657,7 @@ function ActionCard({
   onPress,
   badge,
 }: {
-  icon: string;
+  icon: AppIconName;
   title: string;
   description: string;
   onPress: () => void;
@@ -670,7 +671,7 @@ function ActionCard({
       style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
     >
       <View style={styles.actionIconBox}>
-        <Text style={styles.actionIcon}>{icon}</Text>
+        <AppIcon name={icon} size={18} color={colors.royal[700]} />
       </View>
 
       <View style={styles.actionContent}>
@@ -687,7 +688,7 @@ function ActionCard({
         <Text style={styles.actionDescription}>{description}</Text>
       </View>
 
-      <Text style={styles.actionArrow}>›</Text>
+      <AppIcon name="chevron-right" size={26} color={colors.royal[700]} />
     </Pressable>
   );
 }
@@ -861,10 +862,7 @@ const styles = StyleSheet.create({
   },
   statRed: {
     backgroundColor: "#FFF0EF",
-  },
-  statIcon: {
-    fontSize: 16,
-  },
+  },
   statValue: {
     marginTop: 10,
     fontSize: 23,
@@ -903,10 +901,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     backgroundColor: colors.royal[50],
-  },
-  actionIcon: {
-    fontSize: 18,
-  },
+  },
   actionContent: {
     flex: 1,
   },
@@ -925,12 +920,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 15,
     color: colors.textSecondary,
-  },
-  actionArrow: {
-    marginLeft: 8,
-    fontSize: 26,
-    color: colors.royal[700],
-  },
+  },
   actionBadge: {
     minWidth: 20,
     height: 20,
@@ -990,11 +980,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontSize: 9.5,
     color: colors.textSoft,
-  },
-  activityArrow: {
-    fontSize: 24,
-    color: colors.royal[700],
-  },
+  },
   activityDivider: {
     height: 1,
     backgroundColor: colors.border,
@@ -1006,10 +992,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 14,
     backgroundColor: colors.surface,
-  },
-  emptyActivityIcon: {
-    fontSize: 22,
-  },
+  },
   emptyActivityTitle: {
     marginTop: 7,
     fontSize: 12.5,
@@ -1031,10 +1014,7 @@ const styles = StyleSheet.create({
     borderColor: colors.teal[100],
     borderRadius: 14,
     backgroundColor: colors.teal[50],
-  },
-  securityIcon: {
-    marginRight: 9,
-  },
+  },
   securityContent: {
     flex: 1,
   },

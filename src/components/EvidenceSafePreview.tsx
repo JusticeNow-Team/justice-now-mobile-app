@@ -14,9 +14,10 @@ import {
 } from "react-native";
 
 import { requestControlledDownload } from "../checker/api";
-import { formatBytes, getPreviewKind, simulatePublicUrlAccess } from "../checker/metadataValidation";
+import { getPreviewKind, simulatePublicUrlAccess } from "../checker/metadataValidation";
 import { ControlledDownloadLog, EvidenceRecord } from "../checker/types";
-import { colors } from "../theme";
+import { AppIcon } from "./AppIcon";
+import { colors, iconSizes } from "../theme";
 import { shadows } from "../theme/shadows";
 
 interface EvidenceSafePreviewProps {
@@ -78,7 +79,7 @@ export function EvidenceSafePreview({
   const handleRequestControlledDownload = async () => {
     if (!isAuthorized) {
       Alert.alert(
-        "🔒 Authorization Required",
+        "Authorization Required",
         "Controlled file download is restricted to authorized Evidence Checkers."
       );
       return;
@@ -113,7 +114,7 @@ export function EvidenceSafePreview({
           setDownloadProgress(100);
           setDownloading(false);
           Alert.alert(
-            "🔒 Controlled Download Authorized",
+            "Controlled Download Authorized",
             `Single-use download token generated & audit logged.\n\nDownload ID: ${res.log?.downloadId || "N/A"}\nToken expires in 5 minutes.`
           );
         }, 700);
@@ -135,7 +136,7 @@ export function EvidenceSafePreview({
     return (
       <View style={styles.errorBox}>
         <View style={styles.errorHeader}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <AppIcon name="warning" size={24} color={colors.error} style={styles.errorIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.errorTitle}>HTTP 404 Storage Error: File Missing</Text>
             <Text style={styles.errorSub}>
@@ -166,7 +167,7 @@ export function EvidenceSafePreview({
               )
             }
           >
-            <Text style={styles.errorActionBtnText}>🔄 Re-check Vault</Text>
+            <Text style={styles.errorActionBtnText}>Re-check Vault</Text>
           </Pressable>
 
           <Pressable
@@ -178,7 +179,7 @@ export function EvidenceSafePreview({
               )
             }
           >
-            <Text style={styles.errorActionBtnText}>📩 Notify Reporter</Text>
+            <Text style={styles.errorActionBtnText}>Notify Reporter</Text>
           </Pressable>
         </View>
       </View>
@@ -192,7 +193,12 @@ export function EvidenceSafePreview({
         <View style={styles.mediaContainer}>
           {!isRevealed ? (
             <View style={styles.blurredPreviewBox}>
-              <Text style={styles.blurredEyeIcon}>👁️‍🗨️</Text>
+              <AppIcon
+                name="eye-off"
+                size={iconSizes.xl}
+                color={colors.surface}
+                style={styles.blurredEyeIcon}
+              />
               <Text style={styles.blurredTitle}>Secure preview blurred</Text>
               <Text style={styles.blurredSub}>Content may be distressing</Text>
 
@@ -217,14 +223,17 @@ export function EvidenceSafePreview({
                 resizeMode="cover"
               />
               <View style={styles.zoomOverlayBadge}>
-                <Text style={styles.zoomOverlayText}>🔍 Tap for Full Screen Zoom</Text>
+                <View style={styles.zoomOverlayRow}>
+                  <AppIcon name="search" size={11} color={colors.surface} />
+                  <Text style={styles.zoomOverlayText}>Tap for Full Screen Zoom</Text>
+                </View>
               </View>
             </Pressable>
           )}
 
           <View style={styles.secureStorageFooter}>
             <Text style={styles.secureStorageFooterText}>
-              🔒 Streamed from secure storage · downloads are blocked and logged
+              Streamed from secure storage · downloads are blocked and logged
             </Text>
             {isRevealed && (
               <Pressable onPress={() => setIsRevealed(false)} style={styles.reblurBtn}>
@@ -270,7 +279,7 @@ Digital Seal Verified by Authorized System Squad.`}
               disabled={activeDocPage <= 1}
               onPress={() => setActiveDocPage((p) => Math.max(1, p - 1))}
             >
-              <Text style={styles.docPageBtnText}>‹ Previous Page</Text>
+              <Text style={styles.docPageBtnText}>Previous Page</Text>
             </Pressable>
 
             <Text style={styles.docPageIndicator}>Page {activeDocPage}</Text>
@@ -283,7 +292,7 @@ Digital Seal Verified by Authorized System Squad.`}
               disabled={activeDocPage >= (record.documentPageCount || 8)}
               onPress={() => setActiveDocPage((p) => Math.min(record.documentPageCount || 8, p + 1))}
             >
-              <Text style={styles.docPageBtnText}>Next Page ›</Text>
+              <Text style={styles.docPageBtnText}>Next Page</Text>
             </Pressable>
           </View>
         </View>
@@ -294,7 +303,7 @@ Digital Seal Verified by Authorized System Squad.`}
         <View style={styles.mediaContainer}>
           {previewKind === "video" && (
             <View style={styles.videoScreenBox}>
-              <Text style={styles.videoPlaceholderIcon}>🎥</Text>
+              <AppIcon name="video" size={40} color={colors.surface} style={styles.videoPlaceholderIcon} />
               <Text style={styles.videoPlaceholderTitle}>Video Stream Preview Sandbox</Text>
               <Text style={styles.videoPlaceholderSub}>
                 Format: {record.fileType} · 1080p HD Video
@@ -329,7 +338,7 @@ Digital Seal Verified by Authorized System Squad.`}
                 }
               }}
             >
-              <Text style={styles.playBtnText}>{isPlaying ? "⏸ Pause" : "▶ Play Preview"}</Text>
+              <Text style={styles.playBtnText}>{isPlaying ? "Pause" : "Play Preview"}</Text>
             </Pressable>
 
             <View style={styles.timelineContainer}>
@@ -351,7 +360,7 @@ Digital Seal Verified by Authorized System Squad.`}
       {previewKind === "unsupported" && (
         <View style={styles.unsupportedCard}>
           <Text style={styles.unsupportedTitle}>
-            {`🚫 Live Inline Preview Disabled for '${record.fileName.split(".").pop()}' Format`}
+            {`Live Inline Preview Disabled for '${record.fileName.split(".").pop()}' Format`}
           </Text>
           <Text style={styles.unsupportedSub}>
             Executable binary files (`.exe`, `.dll`, `.zip`) cannot be rendered inline in order to protect client devices from executing unauthorized code.
@@ -363,7 +372,7 @@ Digital Seal Verified by Authorized System Squad.`}
             accessibilityRole="button"
           >
             <Text style={styles.controlledDownloadBtnText}>
-              🔒 Request Controlled Download & Audit Log
+              Request Controlled Download & Audit Log
             </Text>
           </Pressable>
         </View>
@@ -372,7 +381,7 @@ Digital Seal Verified by Authorized System Squad.`}
       {/* 6. PUBLIC URL PROTECTION AUDIT CARD */}
       <View style={styles.publicUrlCard}>
         <View style={styles.publicUrlHeader}>
-          <Text style={styles.publicUrlIcon}>🔒</Text>
+          <AppIcon name="lock" size={16} color={colors.navy[900]} style={styles.publicUrlIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.publicUrlTitle}>Public URL Exposure Protection</Text>
             <Text style={styles.publicUrlSub}>
@@ -390,7 +399,7 @@ Digital Seal Verified by Authorized System Squad.`}
             <ActivityIndicator color={colors.navy[800]} size="small" />
           ) : (
             <Text style={styles.testPublicUrlBtnText}>
-              🧪 Test Direct Public Access URL (HTTP 403 Audit)
+              Test Direct Public Access URL (HTTP 403 Audit)
             </Text>
           )}
         </Pressable>
@@ -422,7 +431,7 @@ Digital Seal Verified by Authorized System Squad.`}
             <View style={styles.fullModalHeader}>
               <Text style={styles.fullModalTitle}>{record.fileName}</Text>
               <Pressable style={styles.closeBtn} onPress={() => setImageModalVisible(false)}>
-                <Text style={styles.closeBtnText}>✕ Close</Text>
+                <Text style={styles.closeBtnText}>Close</Text>
               </Pressable>
             </View>
 
@@ -440,7 +449,7 @@ Digital Seal Verified by Authorized System Squad.`}
 
             <View style={styles.fullModalFooter}>
               <Text style={styles.fullModalFooterText}>
-                🔒 Full Resolution Evidence Inspection (EXIF Metadata Sanitized)
+                Full Resolution Evidence Inspection (EXIF Metadata Sanitized)
               </Text>
             </View>
           </SafeAreaView>
@@ -661,6 +670,11 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontSize: 11,
     fontWeight: "600",
+  },
+  zoomOverlayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
 
   mediaInfoBar: {
@@ -1204,3 +1218,5 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
 });
+
+

@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { AppIcon, AppIconName } from "../AppIcon";
 import { colors } from "../../theme";
 import PrimaryButton from "./PrimaryButton";
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: AppIconName;
   title: string;
   body: string;
   actionLabel?: string;
@@ -12,7 +13,7 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({
-  icon = "📁",
+  icon = "folder-open",
   title,
   body,
   actionLabel,
@@ -21,7 +22,7 @@ export default function EmptyState({
   return (
     <View style={styles.box}>
       <View style={styles.iconWrap}>
-        <Text style={styles.icon}>{icon}</Text>
+        <AppIcon name={icon} size={24} color={colors.navy[700]} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.body}>{body}</Text>
@@ -52,9 +53,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.navy[50],
-  },
-  icon: {
-    fontSize: 24,
   },
   title: {
     marginTop: 14,

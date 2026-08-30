@@ -1,0 +1,1 @@
+export { ConfigurationScreen as default } from "../../admin/AdminScreens";
