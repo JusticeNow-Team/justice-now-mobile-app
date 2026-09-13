@@ -20,6 +20,14 @@ const requirements = [
     /create unique index[\s\S]*evidence_id[\s\S]*where status in \('assigned', 'under_review'\)/i,
   ],
   [
+    "existing Evidence Checker column compatibility",
+    /evidence_checker_id uuid not null references public\.profiles\(id\)/,
+  ],
+  [
+    "non-destructive timeline visibility upgrade",
+    /alter table public\.case_timeline_events[\s\S]*add column if not exists reporter_visible/,
+  ],
+  [
     "pending evidence enforcement",
     /evidence\.validation_status::text = 'pending'/,
   ],

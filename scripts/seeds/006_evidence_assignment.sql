@@ -7,7 +7,7 @@ create table if not exists public.evidence_assignments (
   id uuid primary key default gen_random_uuid(),
   evidence_id uuid not null references public.case_evidence(id) on delete cascade,
   case_id uuid not null references public.cases(id) on delete cascade,
-  assigned_checker_id uuid not null references public.profiles(id),
+  evidence_checker_id uuid not null references public.profiles(id),
   assigned_by_officer_id uuid not null references public.profiles(id),
   status text not null default 'assigned'
     check (status in ('assigned', 'under_review', 'completed', 'cancelled')),
@@ -24,7 +24,7 @@ on public.evidence_assignments (evidence_id)
 where status in ('assigned', 'under_review');
 
 create index if not exists evidence_assignments_checker_queue_idx
-on public.evidence_assignments (assigned_checker_id, status, assigned_at desc);
+on public.evidence_assignments (evidence_checker_id, status, assigned_at desc);
 
 create index if not exists evidence_assignments_case_history_idx
 on public.evidence_assignments (case_id, assigned_at desc);
@@ -36,12 +36,19 @@ create table if not exists public.case_timeline_events (
   title text not null,
   description text,
   actor_id uuid references public.profiles(id),
+  evidence_id uuid references public.case_evidence(id) on delete set null,
+  metadata jsonb not null default '{}'::jsonb,
   reporter_visible boolean not null default false,
   created_at timestamptz not null default now()
 );
 
 create index if not exists case_timeline_events_case_created_idx
 on public.case_timeline_events (case_id, created_at desc);
+
+-- Older JusticeNow environments already contain the timeline table without
+-- this visibility flag. Adding it is non-destructive and keeps those records.
+alter table public.case_timeline_events
+add column if not exists reporter_visible boolean not null default false;
 
 alter table public.evidence_assignments enable row level security;
 alter table public.case_timeline_events enable row level security;
@@ -57,7 +64,7 @@ on public.evidence_assignments
 for select
 to authenticated
 using (
-  assigned_checker_id = (select auth.uid())
+  evidence_checker_id = (select auth.uid())
   or exists (
     select 1
     from public.case_assignments as officer_assignment
@@ -120,7 +127,7 @@ using (
     select 1
     from public.evidence_assignments as validator_assignment
     where validator_assignment.evidence_id = case_evidence.id
-      and validator_assignment.assigned_checker_id = (select auth.uid())
+      and validator_assignment.evidence_checker_id = (select auth.uid())
       and validator_assignment.status in ('assigned', 'under_review')
   )
 );
@@ -143,7 +150,7 @@ using (
       on validator_assignment.evidence_id = assigned_evidence.id
     where assigned_evidence.storage_bucket = objects.bucket_id
       and assigned_evidence.storage_path = objects.name
-      and validator_assignment.assigned_checker_id = (select auth.uid())
+      and validator_assignment.evidence_checker_id = (select auth.uid())
       and validator_assignment.status in ('assigned', 'under_review')
   )
 );
@@ -200,7 +207,7 @@ begin
     )::bigint as active_assignment_count
   from public.profiles as checker
   left join public.evidence_assignments as assignment
-    on assignment.assigned_checker_id = checker.id
+    on assignment.evidence_checker_id = checker.id
   where checker.role::text = 'evidence_validator'
     and checker.is_active = true
   group by checker.id, checker.full_name
@@ -248,13 +255,13 @@ begin
   select
     assignment.id,
     assignment.evidence_id,
-    assignment.assigned_checker_id,
+    assignment.evidence_checker_id,
     checker.full_name,
     assignment.status,
     assignment.assigned_at
   from public.evidence_assignments as assignment
   join public.profiles as checker
-    on checker.id = assignment.assigned_checker_id
+    on checker.id = assignment.evidence_checker_id
   join public.case_assignments as officer_assignment
     on officer_assignment.case_id = assignment.case_id
    and officer_assignment.assigned_officer_id = v_officer_id
@@ -352,7 +359,7 @@ begin
     insert into public.evidence_assignments (
       evidence_id,
       case_id,
-      assigned_checker_id,
+      evidence_checker_id,
       assigned_by_officer_id
     )
     values (
@@ -370,17 +377,25 @@ begin
   insert into public.case_timeline_events (
     case_id,
     event_type,
+    evidence_id,
     title,
     description,
     actor_id,
+    metadata,
     reporter_visible
   )
   values (
     v_case_id,
     'evidence_assigned',
+    p_evidence_id,
     'Evidence assigned for validation',
     format('%s was assigned to %s.', v_evidence_title, v_checker_name),
     v_officer_id,
+    jsonb_build_object(
+      'evidence_title', v_evidence_title,
+      'evidence_validator_id', p_checker_id,
+      'evidence_validator_name', v_checker_name
+    ),
     false
   );
 
@@ -388,7 +403,7 @@ begin
   select
     v_assignment.id,
     v_assignment.evidence_id,
-    v_assignment.assigned_checker_id,
+    v_assignment.evidence_checker_id,
     v_checker_name,
     v_assignment.status,
     v_assignment.assigned_at;
@@ -480,7 +495,7 @@ begin
     on case_record.id = assignment.case_id
   join public.profiles as officer
     on officer.id = assignment.assigned_by_officer_id
-  where assignment.assigned_checker_id = v_checker_id
+  where assignment.evidence_checker_id = v_checker_id
     and assignment.status in ('assigned', 'under_review')
   order by assignment.assigned_at desc;
 end;
@@ -560,7 +575,7 @@ begin
     started_at = coalesce(assignment.started_at, now()),
     updated_at = now()
   where assignment.id = p_assignment_id
-    and assignment.assigned_checker_id = v_checker_id
+    and assignment.evidence_checker_id = v_checker_id
     and assignment.status in ('assigned', 'under_review')
   returning assignment.case_id, assignment.evidence_id
   into v_case_id, v_evidence_id;
@@ -580,22 +595,26 @@ begin
     where timeline_event.case_id = v_case_id
       and timeline_event.event_type = 'evidence_review_started'
       and timeline_event.actor_id = v_checker_id
-      and timeline_event.description = v_evidence_id::text
+      and timeline_event.evidence_id = v_evidence_id
   ) then
     insert into public.case_timeline_events (
       case_id,
       event_type,
+      evidence_id,
       title,
       description,
       actor_id,
+      metadata,
       reporter_visible
     )
     values (
       v_case_id,
       'evidence_review_started',
+      v_evidence_id,
       'Evidence validation started',
-      v_evidence_id::text,
+      'The assigned Evidence Validator opened this evidence for review.',
       v_checker_id,
+      '{}'::jsonb,
       false
     );
   end if;
