@@ -61,6 +61,14 @@ type StatusHistory = {
   changed_at: string;
 };
 
+type CaseTimelineEvent = {
+  id: string;
+  event_type: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+};
+
 type InformationAnswer = {
   question: string;
   answer: string;
@@ -140,6 +148,7 @@ export default function CaseDetailsScreen() {
   const [caseData, setCaseData] = useState<JusticeCase | null>(null);
   const [notes, setNotes] = useState<InvestigationNote[]>([]);
   const [history, setHistory] = useState<StatusHistory[]>([]);
+  const [timelineEvents, setTimelineEvents] = useState<CaseTimelineEvent[]>([]);
   const [informationRequests, setInformationRequests] = useState<
     InformationRequestRecord[]
   >([]);
@@ -258,6 +267,19 @@ export default function CaseDetailsScreen() {
           console.error("HISTORY ERROR:", historyError);
         } else {
           setHistory((historyData ?? []) as StatusHistory[]);
+        }
+
+        const { data: timelineData, error: timelineError } = await supabase
+          .from("case_timeline_events")
+          .select("id, event_type, title, description, created_at")
+          .eq("case_id", caseId)
+          .order("created_at", { ascending: false });
+
+        if (timelineError) {
+          console.error("CASE TIMELINE ERROR:", timelineError);
+          setTimelineEvents([]);
+        } else {
+          setTimelineEvents((timelineData ?? []) as CaseTimelineEvent[]);
         }
 
         const { data: requestData, error: requestError } = await supabase
@@ -1001,6 +1023,40 @@ export default function CaseDetailsScreen() {
           )}
         </View>
 
+        {timelineEvents.length > 0 ? (
+          <>
+            <Text style={styles.sectionTitle}>Case activity</Text>
+
+            <View style={styles.sectionCard}>
+              {timelineEvents.map((item, index) => (
+                <View key={item.id}>
+                  <View style={styles.historyRow}>
+                    <View style={styles.timelineDot} />
+
+                    <View style={styles.historyContent}>
+                      <Text style={styles.historyTitle}>{item.title}</Text>
+
+                      {item.description ? (
+                        <Text style={styles.timelineDescription}>
+                          {item.description}
+                        </Text>
+                      ) : null}
+
+                      <Text style={styles.historyDate}>
+                        {formatDateTime(item.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {index < timelineEvents.length - 1 ? (
+                    <View style={styles.historyDivider} />
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
         <View style={styles.securityNotice}>
           <AppIcon
             name="lock"
@@ -1596,6 +1652,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textSoft,
   },
+  timelineDescription: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
   historyDivider: {
     height: 1,
     marginVertical: 12,
@@ -1665,5 +1727,4 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
 });
-
 
