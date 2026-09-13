@@ -401,13 +401,11 @@ export default function OfficerDashboardScreen() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoMark}>
-            <Text style={styles.logoText}>JN</Text>
+            <AppIcon name="scale" size={18} color={colors.textInverse} />
           </View>
 
           <View>
-            <Text style={styles.workspaceLabel}>
-              Case investigator dashboard
-            </Text>
+            <Text style={styles.workspaceLabel}>Case Officer workspace</Text>
 
             <Text style={styles.brandName}>{officerName}</Text>
           </View>
@@ -440,15 +438,15 @@ export default function OfficerDashboardScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.welcomeCard}>
-          <Text style={styles.welcomeLabel}>CASE OFFICER</Text>
+          <Text style={styles.welcomeLabel}>Today’s focus</Text>
 
-          <Text style={styles.welcomeTitle}>Priority workload</Text>
+          <Text style={styles.welcomeTitle}>Review, assign and follow up</Text>
 
           <Text style={styles.welcomeText}>
             {stats.urgent} urgent case{stats.urgent === 1 ? " is" : "s are"}{" "}
             active and {stats.evidenceToReview} evidence item
             {stats.evidenceToReview === 1 ? "" : "s"} need officer attention.
-            Critical cases are shown first in your queue.
+            Work through the queue from highest risk to routine follow-up.
           </Text>
         </View>
 
@@ -886,14 +884,9 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: colors.royal[600],
   },
-  logoText: {
-    fontSize: 11,
-    fontWeight: "900",
-    color: colors.textInverse,
-  },
   brandName: {
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   workspaceLabel: {
@@ -916,7 +909,7 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   pressed: {
@@ -934,14 +927,14 @@ const styles = StyleSheet.create({
   },
   welcomeLabel: {
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.8,
     color: "#AFC5DE",
   },
   welcomeTitle: {
     marginTop: 6,
     fontSize: 21,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   welcomeText: {
@@ -959,7 +952,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   sectionSubtitle: {
@@ -1011,7 +1004,7 @@ const styles = StyleSheet.create({
   statValue: {
     marginTop: 8,
     fontSize: 24,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   statLabel: {
@@ -1024,7 +1017,7 @@ const styles = StyleSheet.create({
     marginTop: 25,
     marginBottom: 10,
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.7,
     color: colors.textSecondary,
@@ -1064,7 +1057,7 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   actionDescription: {
@@ -1092,13 +1085,13 @@ const styles = StyleSheet.create({
   },
   priorityReference: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   priorityTitle: {
     marginTop: 3,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   priorityMeta: {
@@ -1133,7 +1126,7 @@ const styles = StyleSheet.create({
   },
   priorityBadgeText: {
     fontSize: 10.5,
-    fontWeight: "800",
+    fontWeight: "600",
     textTransform: "capitalize",
     color: colors.navy[700],
   },
@@ -1150,7 +1143,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 10.5,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   actionBadge: {
@@ -1164,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   actionBadgeText: {
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   activityHeader: {
@@ -1199,7 +1192,7 @@ const styles = StyleSheet.create({
   },
   activityReference: {
     fontSize: 9.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   activityTitle: {
@@ -1228,7 +1221,7 @@ const styles = StyleSheet.create({
   emptyActivityTitle: {
     marginTop: 7,
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   emptyActivityText: {
@@ -1252,7 +1245,7 @@ const styles = StyleSheet.create({
   },
   securityTitle: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   securityText: {
@@ -1271,7 +1264,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.error,
   },
   errorText: {
@@ -1290,7 +1283,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
 });

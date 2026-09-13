@@ -398,20 +398,17 @@ export default function OfficerTasksScreen() {
             <AppIcon
               name="chevron-left"
               size={iconSizes.headerBack}
-              color={colors.textInverse}
+              color={colors.navy[700]}
             />
           </Pressable>
 
           <View style={styles.headerText}>
-            <Text style={styles.headerEyebrow}>Case management</Text>
             <Text style={styles.headerTitle}>Investigation tasks</Text>
+            <Text style={styles.headerSubtitle}>
+              Evidence, follow-ups and priority case work
+            </Text>
           </View>
         </View>
-
-        <Text style={styles.headerNotice}>
-          Sprint 3 evidence review actions stay with the Case Officer: assign
-          pending evidence, review findings and follow up on reporter requests.
-        </Text>
       </View>
 
       <ScrollView
@@ -556,10 +553,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   header: {
+    minHeight: 72,
+    justifyContent: "center",
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 26,
-    backgroundColor: colors.navy[900],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   headerTop: {
     flexDirection: "row",
@@ -576,27 +575,15 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
   },
-  headerEyebrow: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: colors.navy[300],
-  },
   headerTitle: {
-    marginTop: 2,
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.textInverse,
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.navy[800],
   },
-  headerNotice: {
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    overflow: "hidden",
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.navy[100],
-    backgroundColor: colors.navy[800],
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: colors.textSecondary,
   },
   content: {
     paddingHorizontal: 16,
@@ -605,7 +592,7 @@ const styles = StyleSheet.create({
   summaryGrid: {
     flexDirection: "row",
     gap: 8,
-    marginTop: -13,
+    marginTop: 16,
     marginBottom: 18,
   },
   summaryCard: {
@@ -620,7 +607,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 21,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   summaryTeal: {
@@ -632,7 +619,7 @@ const styles = StyleSheet.create({
   summaryLabel: {
     marginTop: 3,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textSecondary,
   },
   sectionHeader: {
@@ -643,14 +630,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.6,
     color: colors.textSecondary,
   },
   sectionCount: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   taskCard: {
@@ -693,7 +680,7 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   taskDescription: {
@@ -705,7 +692,7 @@ const styles = StyleSheet.create({
   taskMeta: {
     marginTop: 8,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   taskAction: {
@@ -717,7 +704,7 @@ const styles = StyleSheet.create({
     maxWidth: 70,
     textAlign: "right",
     fontSize: 10.5,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   errorCard: {
@@ -730,7 +717,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.error,
   },
   errorText: {
@@ -750,7 +737,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 11.5,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   emptyCard: {
@@ -764,7 +751,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 10,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   emptyText: {

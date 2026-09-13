@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   headerSubtitle: {
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   identityText: {
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   email: {
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   unitBadgeText: {
     fontSize: 10.5,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   metricsRow: {
@@ -392,14 +392,14 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     fontSize: 10.5,
-    fontWeight: "800",
+    fontWeight: "600",
     textTransform: "uppercase",
     color: colors.textSecondary,
   },
   metricValue: {
     marginTop: 7,
     fontSize: 19,
-    fontWeight: "900",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   metricTeal: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.6,
     color: colors.textSecondary,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
   },
   settingsLabel: {
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   settingsHint: {
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   },
   noticeTitle: {
     fontSize: 12.5,
-    fontWeight: "900",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   noticeBody: {

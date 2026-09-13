@@ -540,7 +540,7 @@ export default function CaseDetailsScreen() {
             <AppIcon
               name="chevron-left"
               size={iconSizes.headerBack}
-              color={colors.textInverse}
+              color={colors.navy[700]}
             />
           </Pressable>
 
@@ -580,7 +580,7 @@ export default function CaseDetailsScreen() {
             <AppIcon
               name="chevron-left"
               size={iconSizes.headerBack}
-              color={colors.textInverse}
+              color={colors.navy[700]}
             />
         </Pressable>
 
@@ -835,7 +835,7 @@ export default function CaseDetailsScreen() {
                       accessibilityRole="button"
                       style={styles.responseEvidenceButton}
                     >
-                      <Text style={styles.r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8}>
+                      <Text style={styles.responseEvidenceButtonText}>
                         Review submitted evidence
                       </Text>
                     </Pressable>
@@ -1193,7 +1193,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    backgroundColor: colors.navy[900],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   backButton: {
     width: 42,
@@ -1206,13 +1208,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "800",
-    color: colors.textInverse,
+    fontWeight: "600",
+    color: colors.navy[800],
   },
   headerSubtitle: {
     marginTop: 2,
     fontSize: 11.5,
-    color: colors.navy[300],
+    color: colors.textSecondary,
   },
   scrollContent: {
     padding: 16,
@@ -1230,7 +1232,7 @@ const styles = StyleSheet.create({
   },
   reference: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.5,
     color: "#BBD0E8",
   },
@@ -1238,7 +1240,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 12,
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "600",
     lineHeight: 26,
     color: colors.textInverse,
   },
@@ -1260,7 +1262,7 @@ const styles = StyleSheet.create({
   },
   currentStatusText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   priorityBadge: {
@@ -1277,7 +1279,7 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   priorityUrgentText: {
@@ -1287,7 +1289,7 @@ const styles = StyleSheet.create({
     marginTop: 23,
     marginBottom: 9,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   sectionCard: {
@@ -1351,7 +1353,7 @@ const styles = StyleSheet.create({
   },
   evidenceButtonTitle: {
     fontSize: 13.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   evidenceButtonText: {
@@ -1381,7 +1383,7 @@ const styles = StyleSheet.create({
   },
   requestHistoryStatus: {
     fontSize: 9.5,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0.5,
     color: colors.warning,
   },
@@ -1395,7 +1397,7 @@ const styles = StyleSheet.create({
   requestHistoryTitle: {
     marginTop: 9,
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   requestHistoryMessage: {
@@ -1413,7 +1415,7 @@ const styles = StyleSheet.create({
   requestedItemsLabel: {
     marginBottom: 6,
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   requestedItemText: {
@@ -1443,7 +1445,7 @@ const styles = StyleSheet.create({
   },
   reporterResponseHeading: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   reporterResponseDate: {
@@ -1457,7 +1459,7 @@ const styles = StyleSheet.create({
   },
   reporterAnswerQuestion: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     lineHeight: 15,
     color: colors.navy[700],
   },
@@ -1481,9 +1483,9 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: colors.royal[700],
   },
-  r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8: {
+  responseEvidenceButtonText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   awaitingResponseBox: {
@@ -1542,7 +1544,7 @@ const styles = StyleSheet.create({
   noteLabel: {
     marginBottom: 8,
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   noteInput: {
@@ -1577,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   saveNoteText: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   disabledButton: {
@@ -1599,7 +1601,7 @@ const styles = StyleSheet.create({
   },
   noteOfficer: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   noteDate: {
@@ -1623,7 +1625,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 8,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   emptyText: {
@@ -1691,7 +1693,7 @@ const styles = StyleSheet.create({
   },
   securityTitle: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   securityText: {
@@ -1709,7 +1711,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     marginTop: 10,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   errorText: {
@@ -1729,7 +1731,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
 });
