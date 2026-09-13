@@ -1,6 +1,8 @@
 import { useRouter } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { AppIcon } from "../../components/AppIcon";
 import { colors } from "../../theme";
 import { isAccountActive } from "../navigation";
 import { normalizeRole } from "../roles";
@@ -27,15 +29,15 @@ export function RoleGuard({
     return null;
   }
 
-  // 1. Check account active status (JN-182)
   if (user && !isAccountActive(user)) {
     return (
       <View style={styles.container}>
         <View style={styles.card}>
-          <Text style={styles.icon}>⚠️</Text>
+          <AppIcon name="alert-triangle" size={44} color={colors.error} />
           <Text style={styles.title}>Account Inactive</Text>
           <Text style={styles.message}>
-            Your account or assigned role is currently inactive. Please contact your system administrator at{" "}
+            Your account or assigned role is currently inactive. Please contact
+            your system administrator at{" "}
             <Text style={styles.bold}>admin@justicenow.org</Text>.
           </Text>
 
@@ -54,7 +56,6 @@ export function RoleGuard({
     );
   }
 
-  // 2. Check role authorization (JN-179)
   const normalizedAllowedRoles = allowedRoles
     .map((allowedRole) => normalizeRole(allowedRole))
     .filter((allowedRole): allowedRole is SystemRole => allowedRole !== null);
@@ -75,15 +76,15 @@ export function RoleGuard({
       targetRole === "system_admin"
         ? "System Admin"
         : targetRole === "case_officer"
-        ? "Case Officer"
-        : targetRole === "evidence_checker"
-        ? "Evidence Validator"
-        : "Reporter";
+          ? "Case Officer"
+          : targetRole === "evidence_checker"
+            ? "Evidence Validator"
+            : "Reporter";
 
     return (
       <View style={styles.container}>
         <View style={styles.card}>
-          <Text style={styles.icon}>🔒</Text>
+          <AppIcon name="lock" size={44} color={colors.navy[800]} />
           <Text style={styles.title}>Access Restricted</Text>
           <Text style={styles.message}>
             You must be authenticated as a{" "}
@@ -96,7 +97,7 @@ export function RoleGuard({
             accessibilityRole="button"
           >
             <Text style={styles.authButtonText}>
-              ⚙️ Authenticate as {targetLabel}
+              Authenticate as {targetLabel}
             </Text>
           </Pressable>
 
@@ -105,9 +106,7 @@ export function RoleGuard({
             onPress={() => router.push("/secure-role")}
             accessibilityRole="button"
           >
-            <Text style={styles.loginLinkText}>
-              Go to Staff & Admin Login
-            </Text>
+            <Text style={styles.loginLinkText}>Go to Staff & Admin Login</Text>
           </Pressable>
 
           <Pressable
@@ -145,14 +144,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: "center",
   },
-  icon: {
-    fontSize: 44,
-    marginBottom: 12,
-  },
   title: {
     fontSize: 18,
     fontWeight: "700",
     color: colors.navy[800],
+    marginTop: 12,
     marginBottom: 8,
     textAlign: "center",
   },

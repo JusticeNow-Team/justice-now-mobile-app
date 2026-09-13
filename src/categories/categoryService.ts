@@ -15,7 +15,6 @@ let localCategoriesCache: ReportCategory[] = [
 /**
  * Normalizes raw database record into typed ReportCategory.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDbRecordToCategory(row: any): ReportCategory {
   return {
     id: row.id,

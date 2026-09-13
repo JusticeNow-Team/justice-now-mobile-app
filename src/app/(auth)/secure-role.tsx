@@ -13,10 +13,39 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import { resolvePostLoginRedirect } from "../../auth";
 import { UserProfile } from "../../auth/types";
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
+
+type StaffRoleItem = {
+  icon: AppIconName;
+  title: string;
+  description: string;
+};
+
+const STAFF_ROLES: StaffRoleItem[] = [
+  {
+    icon: "settings",
+    title: "System Administrator",
+    description:
+      "Manages staff accounts, roles, report categories, and security policies.",
+  },
+  {
+    icon: "balance",
+    title: "Case Investigator / Officer",
+    description:
+      "Reviews and investigates assigned human-rights cases and tracks status.",
+  },
+  {
+    icon: "search",
+    title: "Evidence Checker / Validator",
+    description:
+      "Reviews submitted evidence and records validation decisions.",
+  },
+];
 
 export default function SecureRoleScreen() {
   const router = useRouter();
@@ -27,11 +56,8 @@ export default function SecureRoleScreen() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // -------------------------------------------------------
-  // Route verified staff by their database role
-  // -------------------------------------------------------
   const routeStaff = async (
-    roleOrProfile: string | Partial<UserProfile> | null | undefined
+    roleOrProfile: string | Partial<UserProfile> | null | undefined,
   ) => {
     const redirect = resolvePostLoginRedirect(roleOrProfile);
 
@@ -39,7 +65,8 @@ export default function SecureRoleScreen() {
       await supabase.auth.signOut();
       Alert.alert(
         "Access denied",
-        redirect.error || "This account does not have an authorized JusticeNow staff role."
+        redirect.error ||
+          "This account does not have an authorized JusticeNow staff role.",
       );
       return;
     }
@@ -47,9 +74,6 @@ export default function SecureRoleScreen() {
     router.replace(redirect.targetRoute as any);
   };
 
-  // -------------------------------------------------------
-  // Staff Login
-  // -------------------------------------------------------
   const handleStaffLogin = async () => {
     setErrorMessage("");
     setSuccessMessage("");
@@ -98,7 +122,7 @@ export default function SecureRoleScreen() {
         setErrorMessage("JusticeNow could not load your staff profile.");
         Alert.alert(
           "Staff profile error",
-          "JusticeNow could not load your authorized staff profile."
+          "JusticeNow could not load your authorized staff profile.",
         );
         return;
       }
@@ -107,7 +131,7 @@ export default function SecureRoleScreen() {
         await supabase.auth.signOut();
         Alert.alert(
           "Staff access only",
-          "This is a Reporter account. Please use regular citizen sign in instead."
+          "This is a Reporter account. Please use regular citizen sign in instead.",
         );
         return;
       }
@@ -122,7 +146,7 @@ export default function SecureRoleScreen() {
         await supabase.auth.signOut();
         Alert.alert(
           "Access denied",
-          "This account does not have an authorized JusticeNow staff role."
+          "This account does not have an authorized JusticeNow staff role.",
         );
         return;
       }
@@ -160,7 +184,6 @@ export default function SecureRoleScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Pressable
             onPress={() => router.back()}
@@ -168,7 +191,11 @@ export default function SecureRoleScreen() {
             accessibilityLabel="Go back"
             style={styles.backButton}
           >
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon
+              name="chevron-left"
+              size={iconSizes.headerBack}
+              color={colors.navy[600]}
+            />
           </Pressable>
           <Text style={styles.headerTitle}>Staff & Admin Portal</Text>
         </View>
@@ -178,26 +205,23 @@ export default function SecureRoleScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero */}
           <View style={styles.hero}>
             <View style={styles.iconBox}>
-              <Text style={styles.icon}>🛡️</Text>
+              <AppIcon name="shield" size={iconSizes.xl} color={colors.royal[700]} />
             </View>
             <Text style={styles.title}>JusticeNow Staff Access</Text>
             <Text style={styles.description}>
-              Sign in to access the System Admin, Case Officer, or Evidence Checker
-              workspaces.
+              Sign in to access the System Admin, Case Officer, or Evidence
+              Checker workspaces.
             </Text>
           </View>
 
-          {/* Form Card */}
           <View style={styles.loginCard}>
             <Text style={styles.loginTitle}>Staff Sign In</Text>
             <Text style={styles.loginSubtitle}>
               Enter the credentials assigned to your authorized account.
             </Text>
 
-            {/* Email */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Staff Email</Text>
               <TextInput
@@ -218,7 +242,6 @@ export default function SecureRoleScreen() {
               />
             </View>
 
-            {/* Password */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Password</Text>
               <TextInput
@@ -240,21 +263,18 @@ export default function SecureRoleScreen() {
               />
             </View>
 
-            {/* Error Message */}
-            {errorMessage !== "" && (
+            {errorMessage !== "" ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
-            )}
+            ) : null}
 
-            {/* Success Message */}
-            {successMessage !== "" && (
+            {successMessage !== "" ? (
               <View style={styles.successBox}>
                 <Text style={styles.successText}>{successMessage}</Text>
               </View>
-            )}
+            ) : null}
 
-            {/* Submit Button */}
             <Pressable
               onPress={handleStaffLogin}
               disabled={loading}
@@ -269,9 +289,8 @@ export default function SecureRoleScreen() {
             </Pressable>
           </View>
 
-          {/* Role Info Notice */}
           <View style={styles.infoCard}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
+            <AppIcon name="info" size={iconSizes.md} color={colors.navy[900]} />
             <View style={styles.infoContent}>
               <Text style={styles.infoTitle}>
                 Staff Accounts Are Provisioned by Administrators
@@ -284,29 +303,18 @@ export default function SecureRoleScreen() {
             </View>
           </View>
 
-          {/* Configured System Roles Card */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Authorized Staff Roles</Text>
-            <RoleItem
-              icon="⚙️"
-              title="System Administrator"
-              description="Manages staff accounts, roles, report categories, and security policies."
-            />
-            <View style={styles.divider} />
-            <RoleItem
-              icon="⚖️"
-              title="Case Investigator / Officer"
-              description="Reviews and investigates assigned human-rights cases and tracks status."
-            />
-            <View style={styles.divider} />
-            <RoleItem
-              icon="🔍"
-              title="Evidence Checker / Validator"
-              description="Reviews submitted evidence and records validation decisions."
-            />
+            {STAFF_ROLES.map((roleItem, index) => (
+              <React.Fragment key={roleItem.title}>
+                <RoleItem {...roleItem} />
+                {index < STAFF_ROLES.length - 1 ? (
+                  <View style={styles.divider} />
+                ) : null}
+              </React.Fragment>
+            ))}
           </View>
 
-          {/* Regular Login Link */}
           <Pressable
             onPress={() => router.replace("/login")}
             accessibilityRole="button"
@@ -320,19 +328,11 @@ export default function SecureRoleScreen() {
   );
 }
 
-function RoleItem({
-  icon,
-  title,
-  description,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-}) {
+function RoleItem({ icon, title, description }: StaffRoleItem) {
   return (
     <View style={styles.roleRow}>
       <View style={styles.roleIcon}>
-        <Text>{icon}</Text>
+        <AppIcon name={icon} size={iconSizes.md} color={colors.navy[800]} />
       </View>
       <View style={styles.roleContent}>
         <Text style={styles.roleTitle}>{title}</Text>
@@ -365,10 +365,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: {
-    fontSize: 32,
-    color: colors.navy[700],
-  },
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
@@ -390,9 +386,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 18,
     backgroundColor: colors.royal[50],
-  },
-  icon: {
-    fontSize: 27,
   },
   title: {
     marginTop: 12,
@@ -497,9 +490,6 @@ const styles = StyleSheet.create({
     borderColor: colors.navy[100],
     marginBottom: 14,
     gap: 10,
-  },
-  infoIcon: {
-    fontSize: 18,
   },
   infoContent: {
     flex: 1,

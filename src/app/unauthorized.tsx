@@ -9,7 +9,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { formatUnauthorizedReason, getDashboardRouteForRole, getRoleConfig, useAuth } from "../auth";
+
+import {
+  formatUnauthorizedReason,
+  getDashboardRouteForRole,
+  getRoleConfig,
+  useAuth,
+} from "../auth";
+import { AppIcon } from "../components/AppIcon";
 import { colors } from "../theme";
 import { shadows } from "../theme/shadows";
 
@@ -44,7 +51,6 @@ export default function UnauthorizedAccessScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header Branding */}
         <View style={styles.header}>
           <Image
             source={require("../../assets/images/justicenow-logo-mark.png")}
@@ -57,7 +63,6 @@ export default function UnauthorizedAccessScreen() {
           </Text>
         </View>
 
-        {/* Card */}
         <View style={styles.card}>
           <View
             style={[
@@ -65,21 +70,27 @@ export default function UnauthorizedAccessScreen() {
               isInactive ? styles.iconInactive : styles.iconUnauthorized,
             ]}
           >
-            <Text style={styles.icon}>{isInactive ? "⚠️" : "🔒"}</Text>
+            <AppIcon
+              name={isInactive ? "warning" : "lock"}
+              size={30}
+              color={isInactive ? colors.warning : colors.error}
+            />
           </View>
 
           <Text style={styles.title}>{reasonDetails.title}</Text>
-
           <Text style={styles.message}>{reasonDetails.message}</Text>
 
-          {/* User Session Info */}
-          {role && (
+          {role ? (
             <View style={styles.roleInfoCard}>
               <Text style={styles.roleInfoLabel}>Current Signed In Profile:</Text>
               <View style={styles.roleBadgeRow}>
-                <Text style={styles.roleBadgeIcon}>
-                  {currentRoleConfig?.icon || "👤"}
-                </Text>
+                <View style={styles.roleBadgeIcon}>
+                  <AppIcon
+                    name={currentRoleConfig?.icon || "user"}
+                    size={22}
+                    color={colors.navy[800]}
+                  />
+                </View>
                 <View>
                   <Text style={styles.roleBadgeName}>
                     {user?.full_name || currentRoleConfig?.name || role}
@@ -90,9 +101,8 @@ export default function UnauthorizedAccessScreen() {
                 </View>
               </View>
             </View>
-          )}
+          ) : null}
 
-          {/* Action Buttons */}
           <View style={styles.actionContainer}>
             {targetRoute && !isInactive ? (
               <Pressable
@@ -131,19 +141,19 @@ export default function UnauthorizedAccessScreen() {
               onPress={() => router.push("/secure-role")}
               accessibilityRole="button"
             >
-              <Text style={styles.staffLinkText}>
-                Switch Staff Role / Admin Access
-              </Text>
+              <Text style={styles.staffLinkText}>Switch Staff Role / Admin Access</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Security Help Notice */}
         <View style={styles.securityNotice}>
-          <Text style={styles.securityNoticeText}>
-            🛡️ Need access? If you believe this is in error, contact the system administrator at{" "}
-            <Text style={styles.contactEmail}>admin@justicenow.org</Text>.
-          </Text>
+          <View style={styles.securityNoticeRow}>
+            <AppIcon name="shield" size={16} color={colors.textSoft} />
+            <Text style={styles.securityNoticeText}>
+              Need access? If you believe this is in error, contact the system administrator at{" "}
+              <Text style={styles.contactEmail}>admin@justicenow.org</Text>.
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -208,9 +218,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FCD34D",
   },
-  icon: {
-    fontSize: 30,
-  },
   title: {
     fontSize: 20,
     fontWeight: "700",
@@ -247,8 +254,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   roleBadgeIcon: {
-    fontSize: 22,
+    width: 22,
     marginRight: 10,
+    alignItems: "center",
   },
   roleBadgeName: {
     fontSize: 13.5,
@@ -309,11 +317,16 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     paddingHorizontal: 8,
   },
+  securityNoticeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
   securityNoticeText: {
+    flex: 1,
     fontSize: 11.5,
     lineHeight: 17,
     color: colors.textSoft,
-    textAlign: "center",
   },
   contactEmail: {
     color: colors.royal[700],

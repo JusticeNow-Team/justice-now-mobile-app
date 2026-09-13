@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { AppIcon, AppIconName } from "../AppIcon";
 import { colors } from "../../theme";
 
 type NoticeTone = "privacy" | "info" | "caution" | "error" | "success" | "safety";
@@ -13,55 +14,55 @@ interface NoticeProps {
 
 const toneStyles: Record<
   NoticeTone,
-  { box: object; icon: string; text: object }
+  { box: object; icon: AppIconName; color: string }
 > = {
   privacy: {
     box: {
       borderColor: colors.teal[100],
       backgroundColor: colors.teal[50],
     },
-    icon: "🔒",
-    text: { color: colors.teal[800] },
+    icon: "lock",
+    color: colors.teal[800],
   },
   info: {
     box: {
       borderColor: colors.royal[100],
       backgroundColor: colors.royal[50],
     },
-    icon: "ℹ",
-    text: { color: colors.info },
+    icon: "info",
+    color: colors.info,
   },
   caution: {
     box: {
       borderColor: colors.gold[100],
       backgroundColor: colors.gold[50],
     },
-    icon: "⚠",
-    text: { color: colors.warning },
+    icon: "warning",
+    color: colors.warning,
   },
   error: {
     box: {
       borderColor: "#F4C7C3",
       backgroundColor: "#FFF2F1",
     },
-    icon: "⚠",
-    text: { color: colors.errorStrong },
+    icon: "warning",
+    color: colors.errorStrong,
   },
   success: {
     box: {
       borderColor: "#B7E4D4",
       backgroundColor: "#EAF8F2",
     },
-    icon: "✓",
-    text: { color: colors.success },
+    icon: "check-circle",
+    color: colors.success,
   },
   safety: {
     box: {
       borderColor: colors.navy[100],
       backgroundColor: colors.navy[50],
     },
-    icon: "🛡",
-    text: { color: colors.navy[700] },
+    icon: "shield",
+    color: colors.navy[700],
   },
 };
 
@@ -74,12 +75,12 @@ export default function Notice({
 
   return (
     <View style={[styles.box, selected.box]}>
-      <Text style={styles.icon}>{selected.icon}</Text>
+      <AppIcon name={selected.icon} size={14} color={selected.color} />
       <View style={styles.content}>
         {title ? (
-          <Text style={[styles.title, selected.text]}>{title}</Text>
+          <Text style={[styles.title, { color: selected.color }]}>{title}</Text>
         ) : null}
-        <Text style={[styles.body, selected.text]}>{children}</Text>
+        <Text style={[styles.body, { color: selected.color }]}>{children}</Text>
       </View>
     </View>
   );
@@ -94,10 +95,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  icon: {
-    marginTop: 1,
-    fontSize: 14,
   },
   content: {
     flex: 1,

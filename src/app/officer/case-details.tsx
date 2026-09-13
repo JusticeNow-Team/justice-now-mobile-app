@@ -14,8 +14,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 type CaseStatus =
   | "submitted"
@@ -514,14 +515,14 @@ export default function CaseDetailsScreen() {
             accessibilityLabel="Go back"
             style={styles.backButton}
           >
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Case Details</Text>
         </View>
 
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <AppIcon name="warning" size={iconSizes.xl} color={colors.warning} />
 
           <Text style={styles.errorTitle}>Unable to open case</Text>
 
@@ -550,7 +551,7 @@ export default function CaseDetailsScreen() {
           accessibilityLabel="Go back"
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹</Text>
+            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
         </Pressable>
 
         <View style={styles.headerContent}>
@@ -651,7 +652,7 @@ export default function CaseDetailsScreen() {
               ]}
             >
               <View style={styles.evidenceIconBox}>
-                <Text style={styles.evidenceIcon}>✉️</Text>
+                <AppIcon name="mail" size={iconSizes.md} color={colors.royal[700]} />
               </View>
 
               <View style={styles.evidenceContent}>
@@ -665,7 +666,7 @@ export default function CaseDetailsScreen() {
                 </Text>
               </View>
 
-              <Text style={styles.evidenceArrow}>›</Text>
+              <AppIcon name="chevron-right" size={iconSizes.md} color={colors.royal[700]} />
             </Pressable>
           </>
         )}
@@ -674,7 +675,7 @@ export default function CaseDetailsScreen() {
 
         {informationRequests.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>✉️</Text>
+              <AppIcon name="mail" size={iconSizes.xl} color={colors.royal[700]} />
 
             <Text style={styles.emptyTitle}>No information requests</Text>
 
@@ -840,7 +841,7 @@ export default function CaseDetailsScreen() {
           ]}
         >
           <View style={styles.evidenceIconBox}>
-            <Text style={styles.evidenceIcon}>🔎</Text>
+            <AppIcon name="search" size={iconSizes.md} color={colors.royal[700]} />
           </View>
 
           <View style={styles.evidenceContent}>
@@ -852,7 +853,7 @@ export default function CaseDetailsScreen() {
             </Text>
           </View>
 
-          <Text style={styles.evidenceArrow}>›</Text>
+          <AppIcon name="chevron-right" size={iconSizes.md} color={colors.royal[700]} />
         </Pressable>
 
         <Text style={styles.sectionTitle}>Investigation status</Text>
@@ -943,7 +944,7 @@ export default function CaseDetailsScreen() {
 
         {notes.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>📝</Text>
+              <AppIcon name="notebook-pen" size={iconSizes.xl} color={colors.royal[700]} />
 
             <Text style={styles.emptyTitle}>No investigation notes</Text>
 
@@ -982,7 +983,7 @@ export default function CaseDetailsScreen() {
 
                   <View style={styles.historyContent}>
                     <Text style={styles.historyTitle}>
-                      {formatStatus(item.old_status)} →{" "}
+                      {formatStatus(item.old_status)} â†’{" "}
                       {formatStatus(item.new_status)}
                     </Text>
 
@@ -1001,7 +1002,12 @@ export default function CaseDetailsScreen() {
         </View>
 
         <View style={styles.securityNotice}>
-          <Text style={styles.securityIcon}>🔒</Text>
+          <AppIcon
+            name="lock"
+            size={iconSizes.md}
+            color={colors.teal[800]}
+            style={styles.securityIcon}
+          />
 
           <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>
@@ -1132,10 +1138,6 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: "center",
     justifyContent: "center",
-  },
-  backText: {
-    fontSize: 32,
-    color: colors.navy[700],
   },
   headerContent: {
     flex: 1,
@@ -1281,9 +1283,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     backgroundColor: colors.surface,
-  },
-  evidenceIcon: {
-    fontSize: 19,
   },
   evidenceContent: {
     flex: 1,
@@ -1559,9 +1558,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surface,
   },
-  emptyIcon: {
-    fontSize: 24,
-  },
   emptyTitle: {
     marginTop: 8,
     fontSize: 13,
@@ -1642,9 +1638,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 30,
   },
-  errorIcon: {
-    fontSize: 30,
-  },
   errorTitle: {
     marginTop: 10,
     fontSize: 16,
@@ -1672,3 +1665,5 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
 });
+
+

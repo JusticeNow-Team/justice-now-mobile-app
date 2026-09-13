@@ -1,15 +1,18 @@
 import { Stack } from "expo-router";
-import React from "react";
-import { RoleGuard } from "../../auth";
+import { View } from "react-native";
+
+import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
 
 export default function OfficerLayout() {
   return (
-    <RoleGuard allowedRoles={["case_officer"]}>
+    <View style={{ flex: 1 }}>
       <Stack
         screenOptions={{
           headerShown: false,
         }}
       />
-    </RoleGuard>
+
+      <RoleBottomNavigation role="case_officer" />
+    </View>
   );
 }

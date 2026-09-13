@@ -15,8 +15,9 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../theme";
+import { colors, iconSizes } from "../../theme";
 
 // ---------------------------------------------------------
 // Types
@@ -357,7 +358,7 @@ export default function OfficerNotificationsScreen() {
           accessibilityLabel="Go back"
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
         </Pressable>
 
         <View style={styles.headerContent}>
@@ -480,9 +481,11 @@ export default function OfficerNotificationsScreen() {
               ]}
             >
               <View style={styles.notificationIconBox}>
-                <Text style={styles.notificationIcon}>
-                  {getNotificationIcon(notification.notification_type)}
-                </Text>
+                <AppIcon
+                  name={getNotificationIcon(notification.notification_type)}
+                  size={iconSizes.md}
+                  color={colors.navy[700]}
+                />
               </View>
 
               <View style={styles.notificationContent}>
@@ -517,7 +520,7 @@ export default function OfficerNotificationsScreen() {
                 </View>
               </View>
 
-              <Text style={styles.arrow}>›</Text>
+              <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.royal[700]} />
             </Pressable>
           ))}
 
@@ -525,7 +528,7 @@ export default function OfficerNotificationsScreen() {
 
         {errorMessage === "" && filteredNotifications.length === 0 && (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🔔</Text>
+            <AppIcon name="bell" size={iconSizes.xl} color={colors.navy[700]} />
 
             <Text style={styles.emptyTitle}>No notifications</Text>
 
@@ -538,7 +541,7 @@ export default function OfficerNotificationsScreen() {
         {/* Security */}
 
         <View style={styles.securityCard}>
-          <Text style={styles.securityIcon}>🔒</Text>
+          <AppIcon name="lock" size={iconSizes.sm} color={colors.teal[800]} />
 
           <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>
@@ -587,26 +590,26 @@ function FilterChip({
 // Notification Icon
 // ---------------------------------------------------------
 
-function getNotificationIcon(type: NotificationType) {
+function getNotificationIcon(type: NotificationType): AppIconName {
   switch (type) {
     case "case_assignment":
-      return "📁";
+      return "folder-open";
 
     case "new_evidence":
-      return "📎";
+      return "file-up";
 
     case "evidence_verified":
-      return "✅";
+      return "check-circle";
 
     case "evidence_rejected":
-      return "⚠️";
+      return "alert-triangle";
 
     case "security":
-      return "🔒";
+      return "lock";
 
     case "case_update":
     default:
-      return "📝";
+      return "notebook-pen";
   }
 }
 
@@ -699,13 +702,7 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  backText: {
-    fontSize: 32,
-
-    color: colors.navy[700],
-  },
+  },
 
   headerContent: {
     flex: 1,
@@ -906,11 +903,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
 
     backgroundColor: colors.surface,
-  },
-
-  notificationIcon: {
-    fontSize: 18,
-  },
+  },
 
   notificationContent: {
     flex: 1,
@@ -979,15 +972,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
 
     color: colors.textSoft,
-  },
-
-  arrow: {
-    marginLeft: 7,
-
-    fontSize: 24,
-
-    color: colors.royal[700],
-  },
+  },
 
   pressed: {
     opacity: 0.75,
@@ -1009,11 +994,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
 
     backgroundColor: colors.surface,
-  },
-
-  emptyIcon: {
-    fontSize: 28,
-  },
+  },
 
   emptyTitle: {
     marginTop: 9,
@@ -1053,11 +1034,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
 
     backgroundColor: colors.teal[50],
-  },
-
-  securityIcon: {
-    marginRight: 8,
-  },
+  },
 
   securityContent: {
     flex: 1,

@@ -1,3 +1,4 @@
+import { AppIconName } from "../components/AppIcon";
 import { RoleMetadata, SystemRole } from "./types";
 
 export const SYSTEM_ROLES = {
@@ -14,7 +15,7 @@ export const ROLE_CONFIGS: Record<SystemRole, RoleMetadata> = {
     label: "Public Reporter",
     description:
       "Submits human rights violation reports, uploads supporting evidence, and tracks personal case progress safely.",
-    icon: "📢",
+    icon: "bell" as AppIconName,
     badgeColor: {
       background: "#EEF3FA",
       text: "#1F4372",
@@ -38,7 +39,7 @@ export const ROLE_CONFIGS: Record<SystemRole, RoleMetadata> = {
     label: "Case Investigator / Officer",
     description:
       "Reviews, investigates, requests additional information, assigns evidence, and manages status for assigned cases.",
-    icon: "⚖️",
+    icon: "balance" as AppIconName,
     badgeColor: {
       background: "#EFF4FF",
       text: "#1E46AC",
@@ -65,7 +66,7 @@ export const ROLE_CONFIGS: Record<SystemRole, RoleMetadata> = {
     label: "Evidence Checker / Validator",
     description:
       "Examines submitted evidence files, verifies chain of custody, records forensic validation decisions, and adds verification notes.",
-    icon: "🔍",
+    icon: "search" as AppIconName,
     badgeColor: {
       background: "#EAF7F8",
       text: "#155C63",
@@ -89,7 +90,7 @@ export const ROLE_CONFIGS: Record<SystemRole, RoleMetadata> = {
     label: "System Administrator",
     description:
       "Configures system roles, manages user accounts and permissions, oversees audit logs, and maintains security controls.",
-    icon: "⚙️",
+    icon: "settings" as AppIconName,
     badgeColor: {
       background: "#FBF7EC",
       text: "#AF8722",
@@ -114,9 +115,6 @@ export const ROLE_CONFIGS: Record<SystemRole, RoleMetadata> = {
   },
 };
 
-/**
- * Normalizes legacy role names (e.g. 'evidence_validator') to the canonical SystemRole.
- */
 export function normalizeRole(role: string | null | undefined): SystemRole | null {
   if (!role) return null;
   const clean = role.trim().toLowerCase();
@@ -129,32 +127,20 @@ export function normalizeRole(role: string | null | undefined): SystemRole | nul
   return null;
 }
 
-/**
- * Checks if the given string is a recognized system role.
- */
 export function isValidRole(role: string | null | undefined): role is SystemRole {
   return normalizeRole(role) !== null;
 }
 
-/**
- * Returns the metadata configuration for a given role.
- */
 export function getRoleConfig(role: string | null | undefined): RoleMetadata | null {
   const normalized = normalizeRole(role);
   if (!normalized) return null;
   return ROLE_CONFIGS[normalized] || null;
 }
 
-/**
- * Returns all configured system roles as a list.
- */
 export function getAllRoles(): RoleMetadata[] {
   return Object.values(ROLE_CONFIGS);
 }
 
-/**
- * Returns only the staff roles (case_officer, evidence_checker, system_admin).
- */
 export function getStaffRoles(): RoleMetadata[] {
   return Object.values(ROLE_CONFIGS).filter((r) => r.isStaff);
 }

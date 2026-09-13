@@ -201,7 +201,7 @@ export default function LoginScreen() {
       <PrimaryButton
         title="Continue as anonymous reporter"
         variant="outline"
-        icon="◯"
+        icon="circle"
         onPress={() =>
           setInfoMessage(
             "Anonymous reporting will be connected when we implement the case reporting flow."

@@ -469,7 +469,7 @@ export default function InformationRequestScreen() {
             <PrimaryButton
               title="Upload supporting evidence"
               variant="outline"
-              icon="⬆"
+              icon="upload"
               onPress={() =>
                 router.push({
                   pathname: "/reporter/cases/upload",

@@ -28,14 +28,13 @@ import { generateSecureSignedUrl } from "../../../checker/evidenceStorageService
 import {
   getPublicStatusForReporter,
   getCaseOfficerStatusView,
-  validateStatusTransition,
 } from "../../../checker/statusTransitionService";
 import {
   EvidenceRecord,
-  EvidenceStatus,
   EvidenceValidationStatus,
   MetadataValidationResult,
 } from "../../../checker/types";
+import { AppIcon } from "../../../components/AppIcon";
 import { EvidenceSafePreview } from "../../../components/EvidenceSafePreview";
 import { EvidenceStatusTimeline } from "../../../components/EvidenceStatusTimeline";
 import { colors } from "../../../theme";
@@ -71,12 +70,12 @@ export default function EvidenceAuditDetailScreen() {
   }, [id]);
 
   useEffect(() => {
-    let isMounted = true;
-    if (isMounted) {
+    const timer = setTimeout(() => {
       void loadRecord();
-    }
+    }, 0);
+
     return () => {
-      isMounted = false;
+      clearTimeout(timer);
     };
   }, [loadRecord]);
 
@@ -89,7 +88,7 @@ export default function EvidenceAuditDetailScreen() {
     if (!record) return;
     if (!isAuthorized) {
       Alert.alert(
-        "🔒 Access Denied",
+        "Access Denied",
         "Signed token generation is restricted to authorized Evidence Checkers."
       );
       return;
@@ -113,12 +112,12 @@ export default function EvidenceAuditDetailScreen() {
       if (res.success && res.signedUrl) {
         setSignedUrlToken(res.signedUrl);
         Alert.alert(
-          "🔒 Secure Signed Token Generated",
+          "Secure Signed Token Generated",
           `Access Granted for Role: ${userRole}\n\nSigned Token URL:\n${res.signedUrl}\n\nExpires At: ${res.expiresAt}`
         );
       } else {
         setSignedUrlToken("");
-        Alert.alert("🔒 Access Denied", res.error || "Unauthorized request.");
+        Alert.alert("Access Denied", res.error || "Unauthorized request.");
       }
     } catch (err: any) {
       setGeneratingSignedUrl(false);
@@ -130,7 +129,7 @@ export default function EvidenceAuditDetailScreen() {
     if (!record) return;
     if (!isAuthorized) {
       Alert.alert(
-        "🔒 Access Denied",
+        "Access Denied",
         "Updating evidence status requires active Evidence Checker authorization."
       );
       return;
@@ -159,7 +158,7 @@ export default function EvidenceAuditDetailScreen() {
   const openDecisionModal = (type: EvidenceValidationStatus) => {
     if (!isAuthorized) {
       Alert.alert(
-        "🔒 Access Denied",
+        "Access Denied",
         "Validation decisions require active Evidence Checker authorization."
       );
       return;
@@ -231,7 +230,7 @@ export default function EvidenceAuditDetailScreen() {
   if (!record || !validation) {
     return (
       <SafeAreaView style={styles.centerContainer}>
-        <Text style={styles.errorIcon}>⚠️</Text>
+        <AppIcon name="warning" size={48} color={colors.warning} />
         <Text style={styles.errorTitle}>Evidence Record Not Found</Text>
         <Text style={styles.errorSub}>Requested ID: {id}</Text>
         <Pressable style={styles.backButtonBtn} onPress={handleBack}>
@@ -255,7 +254,7 @@ export default function EvidenceAuditDetailScreen() {
           accessibilityRole="button"
           accessibilityLabel="Back to queue"
         >
-          <Text style={styles.backBtnText}>‹ Back</Text>
+          <Text style={styles.backBtnText}>Back</Text>
         </Pressable>
         <View style={styles.headerInner}>
           <Pressable
@@ -264,13 +263,13 @@ export default function EvidenceAuditDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back to Dashboard"
           >
-            <Text style={styles.backBtnText}>‹</Text>
+            <AppIcon name="chevron-left" size={18} color={colors.navy[800]} />
           </Pressable>
 
           <View style={styles.headerTitleBox}>
             <Text style={styles.headerTitle}>{record.id}</Text>
             <Text style={styles.headerSub}>
-              {record.caseInfo?.caseReference || record.caseId} · evidence review
+              {record.caseInfo?.caseReference || record.caseId} Â· evidence review
             </Text>
           </View>
 
@@ -284,7 +283,12 @@ export default function EvidenceAuditDetailScreen() {
           <View style={styles.authBarCard}>
             <View style={styles.authBarTop}>
               <View style={styles.authBadge}>
-                <Text style={styles.authBadgeIcon}>{isAuthorized ? "🛡️" : "🔒"}</Text>
+                <AppIcon
+                  name={isAuthorized ? "shield" : "lock"}
+                  size={14}
+                  color={colors.navy[800]}
+                  style={styles.authBadgeIcon}
+                />
                 <Text style={styles.authBadgeText}>
                   {isAuthorized ? "Role: Evidence Checker Squad #1" : "Unauthorized Mode"}
                 </Text>
@@ -318,7 +322,7 @@ export default function EvidenceAuditDetailScreen() {
                     activeViewRole === "checker" && styles.roleTabTextActive,
                   ]}
                 >
-                  🛡️ Checker View
+                  Checker View
                 </Text>
               </Pressable>
 
@@ -335,7 +339,7 @@ export default function EvidenceAuditDetailScreen() {
                     activeViewRole === "case_officer" && styles.roleTabTextActive,
                   ]}
                 >
-                  👮 Case Officer
+                  Case Officer
                 </Text>
               </Pressable>
 
@@ -352,7 +356,7 @@ export default function EvidenceAuditDetailScreen() {
                     activeViewRole === "reporter" && styles.roleTabTextActive,
                   ]}
                 >
-                  👤 Reporter
+                  Reporter
                 </Text>
               </Pressable>
             </View>
@@ -363,7 +367,7 @@ export default function EvidenceAuditDetailScreen() {
           {/* ------------------------------------------------------------- */}
           {activeViewRole === "reporter" && (
             <View style={styles.reporterViewCard}>
-              <Text style={styles.reporterViewTitle}>👤 Reporter Status Portal</Text>
+              <Text style={styles.reporterViewTitle}>Reporter Status Portal</Text>
               <Text style={styles.reporterViewSub}>
                 Sanitized public progress view for your evidence submission (Internal metadata & storage paths are protected):
               </Text>
@@ -395,7 +399,7 @@ export default function EvidenceAuditDetailScreen() {
                     {pubInfo.actionRequiredForReporter && (
                       <View style={styles.reporterActionCallout}>
                         <Text style={styles.reporterActionCalloutTitle}>
-                          ⚠️ Action Required from Submitter
+                          Action Required from Submitter
                         </Text>
                         <Text style={styles.reporterActionCalloutSub}>
                           The assigned evidence checker requested additional clarification regarding your submission. Please check your contact email for response instructions.
@@ -413,7 +417,7 @@ export default function EvidenceAuditDetailScreen() {
           {/* ------------------------------------------------------------- */}
           {activeViewRole === "case_officer" && (
             <View style={styles.officerCard}>
-              <Text style={styles.officerTitle}>👮 Case Officer Technical Overview</Text>
+              <Text style={styles.officerTitle}>Case Officer Technical Overview</Text>
               <Text style={styles.officerSub}>
                 Investigator view with chain-of-custody timestamps & security audit parameters:
               </Text>
@@ -436,8 +440,8 @@ export default function EvidenceAuditDetailScreen() {
                         ]}
                       >
                         {officerView.isChainOfCustodyActive
-                          ? "✓ Verified & Active for Court Filing"
-                          : "⚠️ Examination In Progress"}
+                          ? "Verified & Active for Court Filing"
+                          : "Examination In Progress"}
                       </Text>
                     </View>
 
@@ -481,14 +485,14 @@ export default function EvidenceAuditDetailScreen() {
             <View style={styles.magicFileHeaderTop}>
               <View style={styles.magicIconBox}>
                 <Text style={styles.magicIconText}>
-                  {record.fileName.endsWith(".pdf") ? "📄" : "🖼️"}
+                  {record.fileName.endsWith(".pdf") ? "PDF" : "IMG"}
                 </Text>
               </View>
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.magicFileName}>{record.fileName}</Text>
                 <Text style={styles.magicFileSub}>
-                  {formatBytes(record.fileSizeBytes)} · uploaded{" "}
+                  {formatBytes(record.fileSizeBytes)} Â· uploaded{" "}
                   {new Date(record.uploadDate).toLocaleDateString(undefined, {
                     day: "numeric",
                     month: "short",
@@ -522,7 +526,7 @@ export default function EvidenceAuditDetailScreen() {
               </View>
 
               <View style={styles.magicCriticalPill}>
-                <Text style={styles.magicCriticalPillText}>🔴 Critical priority</Text>
+                <Text style={styles.magicCriticalPillText}>Critical priority</Text>
               </View>
             </View>
           </View>
@@ -570,7 +574,7 @@ export default function EvidenceAuditDetailScreen() {
                   month: "short",
                   year: "numeric",
                 })}{" "}
-                · {new Date(record.uploadDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                Â· {new Date(record.uploadDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </Text>
             </View>
 
@@ -631,7 +635,7 @@ export default function EvidenceAuditDetailScreen() {
         >
           <View style={styles.healthHeader}>
             <Text style={styles.healthIcon}>
-              {validation.isValid ? "✅" : "❌"}
+              {validation.isValid ? "Valid" : "Invalid"}
             </Text>
 
             <View style={styles.healthMain}>
@@ -693,10 +697,10 @@ export default function EvidenceAuditDetailScreen() {
           )}
         </View>
 
-        {/* 🔒 Secure Evidence Storage & Access Control Audit */}
+        {/* Secure Evidence Storage & Access Control Audit */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>
-            🔒 Secure Reference Storage Audit
+            Secure Reference Storage Audit
           </Text>
           <Text style={styles.sectionSubtitle}>
             Protection of evidence files outside public access:
@@ -776,7 +780,7 @@ export default function EvidenceAuditDetailScreen() {
               <ActivityIndicator color={colors.surface} />
             ) : (
               <Text style={styles.signedUrlBtnText}>
-                🔑 Generate 15-Min Signed Access URL Token
+                Generate 15-Min Signed Access URL Token
               </Text>
             )}
           </Pressable>
@@ -789,10 +793,10 @@ export default function EvidenceAuditDetailScreen() {
           )}
         </View>
 
-        {/* 📋 Acceptance Criteria Audit Checklist */}
+        {/* Acceptance Criteria Audit Checklist */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>
-            📋 Acceptance Criteria Audit Checklist
+            Acceptance Criteria Audit Checklist
           </Text>
 
           <View style={styles.checklistGrid}>
@@ -886,7 +890,7 @@ export default function EvidenceAuditDetailScreen() {
 
         {/* Detailed Metadata Breakdown */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>ℹ️ Record Metadata Details</Text>
+          <Text style={styles.sectionTitle}>Record Metadata Details</Text>
 
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Unique Identifier (ID):</Text>
@@ -930,21 +934,21 @@ export default function EvidenceAuditDetailScreen() {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Public Path Status:</Text>
             <Text style={[styles.metaValue, { color: "#047857" }]}>
-              🔒 Outside Public Access (Private Bucket)
+              Outside Public Access (Private Bucket)
             </Text>
           </View>
 
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Collision Prevention:</Text>
             <Text style={[styles.metaValue, { color: "#047857" }]}>
-              ✓ Collision-Proof Unique Slug
+              Collision-Proof Unique Slug
             </Text>
           </View>
 
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Access Control Policy:</Text>
             <Text style={[styles.metaValue, { color: "#047857" }]}>
-              🔑 Restricted via 15-Min Signed Token
+              Restricted via 15-Min Signed Token
             </Text>
           </View>
 
@@ -981,7 +985,7 @@ export default function EvidenceAuditDetailScreen() {
 
         {/* Evidence Checker Action Controls */}
         <View style={styles.actionCard}>
-          <Text style={styles.actionCardTitle}>⚡ Evidence Checker Decision</Text>
+          <Text style={styles.actionCardTitle}>Evidence Checker Decision</Text>
           <Text style={styles.actionCardSub}>
             Record your validation assessment for downstream investigators:
           </Text>
@@ -994,7 +998,7 @@ export default function EvidenceAuditDetailScreen() {
                 accessibilityRole="button"
               >
                 <Text style={styles.validateBtnText}>
-                  🔎 Begin Examination (Mark Under Review)
+                  Begin Examination (Mark Under Review)
                 </Text>
               </Pressable>
             )}
@@ -1005,7 +1009,7 @@ export default function EvidenceAuditDetailScreen() {
               accessibilityRole="button"
             >
               <Text style={styles.validateBtnText}>
-                ✓ Validate & Accept Metadata
+                Validate & Accept Metadata
               </Text>
             </Pressable>
 
@@ -1015,7 +1019,7 @@ export default function EvidenceAuditDetailScreen() {
               accessibilityRole="button"
             >
               <Text style={styles.rejectBtnText}>
-                ❌ Reject Evidence (Invalid / Unsupported)
+                Reject Evidence (Invalid / Unsupported)
               </Text>
             </Pressable>
 
@@ -1025,7 +1029,7 @@ export default function EvidenceAuditDetailScreen() {
               accessibilityRole="button"
             >
               <Text style={styles.infoBtnText}>
-                ❓ Request Additional Metadata Info
+                Request Additional Metadata Info
               </Text>
             </Pressable>
           </View>
@@ -1125,12 +1129,12 @@ function ChecklistItem({
   passed: boolean;
   isWarning?: boolean;
 }) {
-  let icon = passed ? "✓" : "❌";
+  let icon = passed ? "pass" : "fail";
   let bg = passed ? "#ECFDF5" : "#FEF2F2";
   let fg = passed ? "#047857" : "#B91C1C";
 
   if (!passed && isWarning) {
-    icon = "⚠️";
+    icon = "warning";
     bg = "#FEF3C7";
     fg = "#92400E";
   }
@@ -1140,36 +1144,10 @@ function ChecklistItem({
       <View style={styles.checkItemHeader}>
         <Text style={[styles.checkIcon, { color: fg }]}>{icon}</Text>
         <Text style={[styles.checkTitle, { color: fg }]}>
-          #{number} · {title}
+          #{number} Â· {title}
         </Text>
       </View>
       <Text style={styles.checkDetail}>{detail}</Text>
-    </View>
-  );
-}
-
-function StatusBadge({ status }: { status: EvidenceValidationStatus }) {
-  let bg = "#FEF3C7";
-  let fg = "#92400E";
-  let label = "Pending (#8)";
-
-  if (status === "validated") {
-    bg = "#D1FAE5";
-    fg = "#065F46";
-    label = "Validated";
-  } else if (status === "rejected") {
-    bg = "#FEE2E2";
-    fg = "#991B1B";
-    label = "Rejected";
-  } else if (status === "info_requested") {
-    bg = "#E0E7FF";
-    fg = "#3730A3";
-    label = "Info Requested";
-  }
-
-  return (
-    <View style={[styles.headerBadge, { backgroundColor: bg }]}>
-      <Text style={[styles.headerBadgeText, { color: fg }]}>{label}</Text>
     </View>
   );
 }
@@ -2106,3 +2084,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
+

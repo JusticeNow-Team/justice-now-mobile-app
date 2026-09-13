@@ -1,0 +1,1 @@
+export { AlertDetailScreen as default } from "../../../admin/AdminScreens";

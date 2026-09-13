@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
-import React from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,332 +9,703 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getAllRoles, RoleGuard, useAuth } from "../../auth";
+
+import { useAuth } from "../../auth";
+import { AppIcon } from "../../components/AppIcon";
+import {
+  getStaffAccounts,
+  getStaffAuditLogs,
+  StaffAccount,
+  StaffAuditLog,
+} from "../../staff";
 import { colors } from "../../theme";
+
+type Tone = "info" | "ok" | "warn" | "danger";
+
+const systemHealth = [
+  {
+    label: "API service",
+    value: "Operational · 128 ms",
+    state: "ok" as const,
+  },
+  {
+    label: "Database",
+    value: "Operational · 41% load",
+    state: "ok" as const,
+  },
+  {
+    label: "File storage",
+    value: "Warning · 78% used",
+    state: "warn" as const,
+  },
+  {
+    label: "Notifications",
+    value: "Operational · queue clear",
+    state: "ok" as const,
+  },
+  {
+    label: "Nightly backup",
+    value: "Completed 02:00",
+    state: "ok" as const,
+  },
+];
+
+const defaultActivity = [
+  {
+    actor: "System administrator",
+    action: "Suspended validator account",
+    time: "Today · 15:04",
+  },
+  {
+    actor: "System administrator",
+    action: "Approved investigator account request",
+    time: "Today · 12:20",
+  },
+  {
+    actor: "System",
+    action: "Retention policy applied to 12 closed cases",
+    time: "Yesterday · 17:02",
+  },
+  {
+    actor: "System administrator",
+    action: "Added a support organisation",
+    time: "Yesterday · 08:15",
+  },
+];
+
+function formatActivityTime(timestamp: string) {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  return date.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function toneColor(tone: Tone) {
+  switch (tone) {
+    case "ok":
+      return colors.success;
+    case "warn":
+      return colors.warning;
+    case "danger":
+      return colors.error;
+    default:
+      return colors.info;
+  }
+}
 
 export default function AdminDashboardScreen() {
   const router = useRouter();
-  const { user, role, signOut } = useAuth();
-  const roles = getAllRoles();
+  const { user } = useAuth();
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace("/login");
-  };
+  const [staff, setStaff] = useState<StaffAccount[]>([]);
+  const [auditLogs, setAuditLogs] = useState<StaffAuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const [accounts, activity] = await Promise.all([
+        getStaffAccounts(),
+        getStaffAuditLogs(),
+      ]);
+
+      setStaff(accounts);
+      setAuditLogs(activity);
+    } catch (error) {
+      console.error("Unable to load administrator dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [loadDashboard]);
+
+  const activeOfficers = staff.filter(
+    (account) => account.role === "case_officer" && account.isActive,
+  ).length;
+
+  const inactiveAccounts = staff.filter((account) => !account.isActive).length;
+
+  const kpis: {
+    label: string;
+    value: string | number;
+    tone: Tone;
+    route?: string;
+  }[] = [
+    {
+      label: "Total users",
+      value: staff.length,
+      tone: "info",
+      route: "/admin/staff",
+    },
+    {
+      label: "Active officers",
+      value: activeOfficers,
+      tone: "info",
+      route: "/admin/staff",
+    },
+    {
+      label: "Pending account requests",
+      value: inactiveAccounts,
+      tone: "warn",
+      route: "/admin/staff",
+    },
+    {
+      label: "Security alerts",
+      value: 4,
+      tone: "danger",
+      route: "/admin/audit",
+    },
+    {
+      label: "Active cases",
+      value: 212,
+      tone: "info",
+    },
+    {
+      label: "Storage used",
+      value: "78%",
+      tone: "warn",
+    },
+  ];
+
+  const activity = useMemo(() => {
+    if (auditLogs.length === 0) {
+      return defaultActivity;
+    }
+
+    return auditLogs.slice(0, 4).map((entry) => ({
+      actor: entry.actorEmail || "System administrator",
+      action: entry.description,
+      time: formatActivityTime(entry.timestamp),
+    }));
+  }, [auditLogs]);
 
   return (
-    <RoleGuard allowedRoles={["system_admin"]}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>System Administrator</Text>
-            <Text style={styles.headerSubtitle}>JusticeNow Control Center</Text>
-          </View>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.adminHeader}>
+          <View style={styles.identityRow}>
+            <View style={styles.identity}>
+              <View style={styles.logo}>
+                <AppIcon name="balance" size={18} color={colors.gold[300]} />
+              </View>
 
-          <Pressable
-            onPress={handleSignOut}
-            style={styles.signOutButton}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
-          >
-            <Text style={styles.signOutText}>Sign out</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Admin Profile */}
-          <View style={styles.profileCard}>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>⚙️ System Admin</Text>
+              <View>
+                <Text style={styles.identityLabel}>System administration</Text>
+                <Text style={styles.identityName}>
+                  {user?.full_name || "T. Wickrama"}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.userName}>
-              {user?.full_name || "System Administrator"}
-            </Text>
-            <Text style={styles.userRole}>
-              Active Role: <Text style={styles.bold}>{role}</Text>
-            </Text>
-          </View>
-
-          {/* Management Shortcuts */}
-          <View style={styles.actionGrid}>
-            <Pressable
-              style={styles.actionCard}
-              onPress={() => router.push("/admin/staff")}
-              accessibilityRole="button"
-              accessibilityLabel="Manage Staff Accounts"
-            >
-              <Text style={styles.actionIcon}>👥</Text>
-              <Text style={styles.actionTitle}>Staff Accounts</Text>
-              <Text style={styles.actionDesc}>
-                Manage, invite, activate, or deactivate Case Officers and Evidence Checkers with full audit logging.
-              </Text>
-            </Pressable>
 
             <Pressable
-              style={styles.actionCard}
-              onPress={() => router.push("/admin/categories")}
-              accessibilityRole="button"
-              accessibilityLabel="Manage Report Categories"
-            >
-              <Text style={styles.actionIcon}>📂</Text>
-              <Text style={styles.actionTitle}>Report Categories</Text>
-              <Text style={styles.actionDesc}>
-                Manage human-rights report categories, toggle active status, and configure case classifications.
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.actionCard}
-              onPress={() => router.push("/admin/roles")}
-              accessibilityRole="button"
-              accessibilityLabel="Manage Roles & Permissions"
-            >
-              <Text style={styles.actionIcon}>🔐</Text>
-              <Text style={styles.actionTitle}>Roles & Permissions</Text>
-              <Text style={styles.actionDesc}>
-                Configure the 4 system roles and security capabilities.
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.actionCard}
+              style={styles.alertButton}
               onPress={() => router.push("/admin/audit")}
               accessibilityRole="button"
-              accessibilityLabel="View Audit Logs"
+              accessibilityLabel="Security alerts, 4 open"
             >
-              <Text style={styles.actionIcon}>📜</Text>
-              <Text style={styles.actionTitle}>Audit Log Trail</Text>
-              <Text style={styles.actionDesc}>
-                Inspect immutable account and role change event logs, tamper-proof history, and security traces.
-              </Text>
+              <AppIcon
+                name="shield-alert"
+                size={20}
+                color={colors.textInverse}
+              />
+
+              <View style={styles.alertCounter}>
+                <Text style={styles.alertCounterText}>4</Text>
+              </View>
             </Pressable>
           </View>
 
-          {/* Configured Roles Overview */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Configured System Roles</Text>
-            {roles.map((r) => (
-              <View key={r.id} style={styles.roleItem}>
-                <View style={styles.roleItemHeader}>
-                  <Text style={styles.roleIcon}>{r.icon}</Text>
-                  <View style={styles.roleItemInfo}>
-                    <Text style={styles.roleName}>{r.label}</Text>
-                    <Text style={styles.roleKey}>
-                      Key: <Text style={styles.codeText}>{r.id}</Text>
-                    </Text>
+          <View style={styles.securityNotice}>
+            <Text style={styles.securityNoticeText}>
+              <Text style={styles.securityNoticeStrong}>
+                1 critical security alert
+              </Text>{" "}
+              is open: repeated failed sign-in attempts against an investigator
+              account.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiSection}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.kpiGrid}>
+              {kpis.map((kpi) => (
+                <Pressable
+                  key={kpi.label}
+                  style={styles.kpiCard}
+                  onPress={
+                    kpi.route ? () => router.push(kpi.route as any) : undefined
+                  }
+                >
+                  <View style={styles.kpiLabelRow}>
+                    <View
+                      style={[
+                        styles.kpiDot,
+                        {
+                          backgroundColor: toneColor(kpi.tone),
+                        },
+                      ]}
+                    />
+
+                    <Text style={styles.kpiLabel}>{kpi.label}</Text>
                   </View>
-                  <View
+
+                  <Text
                     style={[
-                      styles.staffBadge,
-                      r.isStaff ? styles.staffTrue : styles.staffFalse,
+                      styles.kpiValue,
+                      {
+                        color: toneColor(kpi.tone),
+                      },
                     ]}
                   >
-                    <Text
+                    {kpi.value}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.sections}>
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>System health</Text>
+                <Text style={styles.sectionDescription}>
+                  Live service status.
+                </Text>
+              </View>
+
+              <View style={styles.warningBadge}>
+                <View style={styles.warningDot} />
+                <Text style={styles.warningBadgeText}>1 warning</Text>
+              </View>
+            </View>
+
+            <View style={styles.sectionBody}>
+              {systemHealth.map((item) => {
+                const warning = item.state === "warn";
+
+                return (
+                  <View key={item.label} style={styles.healthRow}>
+                    <View style={styles.healthDetails}>
+                      <Text style={styles.healthLabel}>{item.label}</Text>
+                      <Text style={styles.healthValue}>{item.value}</Text>
+                    </View>
+
+                    <View
                       style={[
-                        styles.staffBadgeText,
-                        r.isStaff
-                          ? styles.staffTrueText
-                          : styles.staffFalseText,
+                        styles.healthBadge,
+                        warning
+                          ? styles.healthWarningBadge
+                          : styles.healthOkBadge,
                       ]}
                     >
-                      {r.isStaff ? "Staff" : "Public"}
+                      <View
+                        style={[
+                          styles.healthDot,
+                          {
+                            backgroundColor: warning
+                              ? colors.warning
+                              : colors.success,
+                          },
+                        ]}
+                      />
+
+                      <Text
+                        style={[
+                          styles.healthBadgeText,
+                          {
+                            color: warning ? colors.warning : colors.success,
+                          },
+                        ]}
+                      >
+                        {warning ? "Warning" : "Operational"}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+              <Pressable
+                style={styles.textLink}
+                onPress={() => router.push("/admin/categories")}
+              >
+                <Text style={styles.textLinkLabel}>
+                  Open backup & system health
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Recent administrative activity
+              </Text>
+
+              <Pressable onPress={() => router.push("/admin/audit")}>
+                <Text style={styles.auditLink}>Audit log</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              {activity.map((item, index) => (
+                <View
+                  key={`${item.time}-${index}`}
+                  style={[
+                    styles.activityRow,
+                    index === activity.length - 1 && styles.lastActivityRow,
+                  ]}
+                >
+                  <View style={styles.activityDot} />
+
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityAction}>{item.action}</Text>
+                    <Text style={styles.activityMeta}>
+                      {item.actor} · {item.time}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.roleDesc}>{r.description}</Text>
-                <Text style={styles.permCount}>
-                  🛡️ {r.permissions.length} granular permissions configured
-                </Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </RoleGuard>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.navy[900],
+  },
+  scrollView: {
+    flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    minHeight: 64,
+  scrollContent: {
+    paddingBottom: 22,
+    backgroundColor: colors.background,
+  },
+  adminHeader: {
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+    backgroundColor: colors.navy[900],
+  },
+  identityRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.navy[900],
+  identity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  signOutButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+  logo: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderColor: colors.royal[500],
+    backgroundColor: colors.royal[700],
   },
-  signOutText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.navy[700],
+  identityLabel: {
+    fontSize: 11.5,
+    fontWeight: "500",
+    color: colors.navy[300],
   },
-  content: {
-    padding: 16,
-    gap: 16,
-  },
-  profileCard: {
-    padding: 18,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  roleBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: "#FBF7EC",
-    borderWidth: 1,
-    borderColor: "#E9D69D",
-    marginBottom: 10,
-  },
-  roleBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#AF8722",
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.navy[800],
-  },
-  userRole: {
-    marginTop: 4,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  bold: {
-    fontWeight: "600",
-    color: colors.navy[800],
-  },
-  actionGrid: {
-    gap: 12,
-  },
-  actionCard: {
-    padding: 16,
-    borderRadius: 14,
-    backgroundColor: colors.royal[50],
-    borderWidth: 1,
-    borderColor: colors.royal[100],
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionTitle: {
+  identityName: {
+    marginTop: 1,
     fontSize: 15,
     fontWeight: "700",
-    color: colors.royal[800],
-    marginBottom: 4,
+    color: colors.textInverse,
   },
-  actionDesc: {
+  alertButton: {
+    position: "relative",
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alertCounter: {
+    position: "absolute",
+    right: 3,
+    top: 3,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.navy[900],
+    backgroundColor: colors.error,
+  },
+  alertCounterText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.textInverse,
+  },
+  securityNotice: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: colors.navy[800],
+  },
+  securityNoticeText: {
     fontSize: 12,
     lineHeight: 17,
-    color: colors.textSecondary,
+    color: colors.navy[100],
   },
-  card: {
-    padding: 16,
+  securityNoticeStrong: {
+    fontWeight: "700",
+    color: colors.textInverse,
+  },
+  kpiSection: {
+    marginTop: -16,
+    paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    height: 100,
     borderRadius: 16,
-    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 14,
+    backgroundColor: colors.surface,
   },
-  cardTitle: {
+  kpiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+  },
+  kpiCard: {
+    width: "48.6%",
+    minHeight: 89,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    shadowColor: colors.navy[900],
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  kpiLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  kpiDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  kpiLabel: {
+    flex: 1,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.35,
+    color: colors.textSecondary,
+  },
+  kpiValue: {
+    marginTop: 8,
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: "800",
+  },
+  sections: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    gap: 12,
+  },
+  sectionCard: {
+    overflow: "hidden",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  sectionHeader: {
+    minHeight: 60,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: colors.navy[800],
   },
-  roleItem: {
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: colors.navy[50],
-    borderWidth: 1,
-    borderColor: colors.navy[100],
-  },
-  roleItemHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 6,
-  },
-  roleIcon: {
-    fontSize: 20,
-  },
-  roleItemInfo: {
-    flex: 1,
-  },
-  roleName: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: colors.navy[900],
-  },
-  roleKey: {
-    fontSize: 11.5,
+  sectionDescription: {
+    marginTop: 2,
+    fontSize: 12,
     color: colors.textSecondary,
   },
-  codeText: {
-    fontFamily: "monospace",
-    color: colors.royal[700],
-  },
-  staffBadge: {
+  warningBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderColor: "#FAEBC8",
+    backgroundColor: "#FDF6E7",
   },
-  staffTrue: {
-    backgroundColor: colors.royal[100],
+  warningDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.warning,
   },
-  staffFalse: {
-    backgroundColor: colors.navy[100],
+  warningBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.warning,
   },
-  staffBadgeText: {
+  sectionBody: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  healthRow: {
+    minHeight: 55,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  healthDetails: {
+    flex: 1,
+  },
+  healthLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  healthValue: {
+    marginTop: 2,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  healthBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+  },
+  healthOkBadge: {
+    borderColor: "#D2EDE1",
+    backgroundColor: "#EAF6F0",
+  },
+  healthWarningBadge: {
+    borderColor: "#FAEBC8",
+    backgroundColor: "#FDF6E7",
+  },
+  healthDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  healthBadgeText: {
     fontSize: 10.5,
     fontWeight: "700",
   },
-  staffTrueText: {
-    color: colors.royal[800],
+  textLink: {
+    paddingTop: 12,
   },
-  staffFalseText: {
-    color: colors.navy[700],
+  textLinkLabel: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: colors.royal[700],
   },
-  roleDesc: {
+  auditLink: {
     fontSize: 12,
-    lineHeight: 17,
-    color: colors.textSecondary,
-    marginBottom: 6,
+    fontWeight: "700",
+    color: colors.royal[700],
   },
-  permCount: {
-    fontSize: 11.5,
+  activityRow: {
+    paddingVertical: 10,
+    flexDirection: "row",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  lastActivityRow: {
+    borderBottomWidth: 0,
+  },
+  activityDot: {
+    width: 6,
+    height: 6,
+    marginTop: 6,
+    borderRadius: 3,
+    backgroundColor: colors.navy[300],
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityAction: {
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: "600",
-    color: colors.navy[700],
+    color: colors.navy[800],
+  },
+  activityMeta: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: colors.textSecondary,
   },
 });

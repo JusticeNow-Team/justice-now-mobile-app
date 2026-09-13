@@ -1,16 +1,10 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "../../theme";
+import { AppIcon } from "../../components/AppIcon";
+import { colors, iconSizes } from "../../theme";
 
 const languages = [
   {
@@ -32,8 +26,7 @@ const languages = [
 
 export default function LanguageScreen() {
   const router = useRouter();
-  const [selectedLanguage, setSelectedLanguage] =
-    useState("en");
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
 
   return (
     <SafeAreaView style={styles.container}>
@@ -44,17 +37,17 @@ export default function LanguageScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon
+            name="chevron-left"
+            size={iconSizes.headerBack}
+            color={colors.navy[700]}
+          />
         </Pressable>
 
         <View style={styles.headerText}>
-          <Text style={styles.title}>
-            Choose your language
-          </Text>
+          <Text style={styles.title}>Choose your language</Text>
 
-          <Text style={styles.subtitle}>
-            භාෂාව තෝරන්න · மொழியைத் தேர்ந்தெடுக்கவும்
-          </Text>
+          <Text style={styles.subtitle}>භාෂාව තෝරන්න · மொழியைத் தேர்ந்தெடுக்கவும்</Text>
         </View>
       </View>
 
@@ -63,40 +56,33 @@ export default function LanguageScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.description}>
-          🌐 The whole app, including forms and notifications,
-          will use this language.
-        </Text>
+        <View style={styles.descriptionRow}>
+          <AppIcon name="globe" size={iconSizes.sm} color={colors.textSecondary} />
+          <Text style={styles.description}>
+            The whole app, including forms and notifications, will use this
+            language.
+          </Text>
+        </View>
 
         <View style={styles.languageList}>
           {languages.map((language) => {
-            const selected =
-              selectedLanguage === language.code;
+            const selected = selectedLanguage === language.code;
 
             return (
               <Pressable
                 key={language.code}
-                onPress={() =>
-                  setSelectedLanguage(language.code)
-                }
+                onPress={() => setSelectedLanguage(language.code)}
                 accessibilityRole="radio"
-                accessibilityState={{
-                  selected,
-                }}
+                accessibilityState={{ selected }}
                 style={[
                   styles.languageCard,
-                  selected &&
-                    styles.languageCardSelected,
+                  selected && styles.languageCardSelected,
                 ]}
               >
                 <View>
-                  <Text style={styles.languageNative}>
-                    {language.native}
-                  </Text>
+                  <Text style={styles.languageNative}>{language.native}</Text>
 
-                  <Text style={styles.languageLabel}>
-                    {language.label}
-                  </Text>
+                  <Text style={styles.languageLabel}>{language.label}</Text>
                 </View>
 
                 <View
@@ -105,9 +91,14 @@ export default function LanguageScreen() {
                     selected && styles.radioSelected,
                   ]}
                 >
-                  {selected && (
-                    <Text style={styles.check}>✓</Text>
-                  )}
+                  {selected ? (
+                    <AppIcon
+                      name="check"
+                      size={iconSizes.sm}
+                      color={colors.textInverse}
+                      strokeWidth={3}
+                    />
+                  ) : null}
                 </View>
               </Pressable>
             );
@@ -115,14 +106,11 @@ export default function LanguageScreen() {
         </View>
 
         <View style={styles.notice}>
-          <Text style={styles.noticeTitle}>
-            Interpreter support
-          </Text>
+          <Text style={styles.noticeTitle}>Interpreter support</Text>
 
           <Text style={styles.noticeText}>
-            If you are more comfortable in another language,
-            support organisations listed in the app can
-            provide an interpreter.
+            If you are more comfortable in another language, support
+            organisations listed in the app can provide an interpreter.
           </Text>
         </View>
       </ScrollView>
@@ -137,9 +125,7 @@ export default function LanguageScreen() {
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.continueText}>
-            Continue
-          </Text>
+          <Text style={styles.continueText}>Continue</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -170,12 +156,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  backText: {
-    fontSize: 34,
-    lineHeight: 36,
-    color: colors.navy[700],
-  },
-
   headerText: {
     flex: 1,
   },
@@ -200,8 +180,15 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-  description: {
+  descriptionRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
     marginBottom: 18,
+  },
+
+  description: {
+    flex: 1,
     fontSize: 13,
     lineHeight: 19,
     color: colors.textSecondary,
@@ -216,14 +203,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-
     paddingHorizontal: 16,
     paddingVertical: 14,
-
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
-
     backgroundColor: colors.surface,
   },
 
@@ -248,10 +232,8 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-
     borderWidth: 2,
     borderColor: colors.navy[200],
-
     alignItems: "center",
     justifyContent: "center",
   },
@@ -261,20 +243,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.royal[700],
   },
 
-  check: {
-    color: colors.textInverse,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
   notice: {
     marginTop: 20,
     padding: 14,
-
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.royal[100],
-
     backgroundColor: colors.royal[50],
   },
 
@@ -293,21 +267,16 @@ const styles = StyleSheet.create({
 
   footer: {
     padding: 16,
-
     borderTopWidth: 1,
     borderTopColor: colors.border,
-
     backgroundColor: colors.surface,
   },
 
   continueButton: {
     minHeight: 50,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderRadius: 12,
-
     backgroundColor: colors.royal[700],
   },
 

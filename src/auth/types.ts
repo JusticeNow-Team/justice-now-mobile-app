@@ -1,3 +1,5 @@
+import type { AppIconName } from "../components/AppIcon";
+
 export type SystemRole =
   | "reporter"
   | "case_officer"
@@ -40,7 +42,7 @@ export interface RoleMetadata {
   name: string;
   label: string;
   description: string;
-  icon: string;
+  icon: AppIconName;
   badgeColor: {
     background: string;
     text: string;

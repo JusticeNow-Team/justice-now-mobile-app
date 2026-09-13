@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../AppIcon";
 import { colors } from "../../theme";
 import PrimaryButton from "./PrimaryButton";
 
@@ -37,9 +38,11 @@ export default function ConfirmDialog({
         <View style={styles.panel} accessibilityRole="alert">
           <View style={styles.header}>
             <View style={[styles.iconWrap, danger && styles.iconWrapDanger]}>
-              <Text style={[styles.icon, danger && styles.iconDanger]}>
-                {danger ? "→" : "!"}
-              </Text>
+              <AppIcon
+                name={danger ? "alert-triangle" : "info"}
+                size={16}
+                color={danger ? colors.errorStrong : colors.royal[700]}
+              />
             </View>
             <View style={styles.headerText}>
               <Text style={styles.title}>{title}</Text>
@@ -51,7 +54,11 @@ export default function ConfirmDialog({
               accessibilityLabel="Close dialog"
               style={styles.close}
             >
-              <Text style={styles.closeText}>✕</Text>
+              <AppIcon
+                name="x"
+                size={16}
+                color={colors.textSecondary}
+              />
             </Pressable>
           </View>
 
@@ -107,13 +114,6 @@ const styles = StyleSheet.create({
   iconWrapDanger: {
     backgroundColor: "#FFF2F1",
   },
-  icon: {
-    fontSize: 16,
-    color: colors.royal[700],
-  },
-  iconDanger: {
-    color: colors.errorStrong,
-  },
   headerText: {
     flex: 1,
     minWidth: 0,
@@ -133,10 +133,6 @@ const styles = StyleSheet.create({
     marginTop: -4,
     marginRight: -4,
     padding: 6,
-  },
-  closeText: {
-    fontSize: 16,
-    color: colors.textSecondary,
   },
   actions: {
     marginTop: 16,

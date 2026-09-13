@@ -1,8 +1,10 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+
+import { AppIcon } from "../../components/AppIcon";
 import { colors } from "../../theme";
-import { useAuth } from "../useAuth";
 import { Permission } from "../types";
+import { useAuth } from "../useAuth";
 
 interface PermissionGuardProps {
   children: React.ReactNode;
@@ -45,7 +47,7 @@ export function PermissionGuard({
     return (
       <View style={styles.container}>
         <View style={styles.card}>
-          <Text style={styles.icon}>⚠️</Text>
+          <AppIcon name="alert-triangle" size={28} color={colors.error} />
           <Text style={styles.title}>Action Not Permitted</Text>
           <Text style={styles.message}>
             Your account does not have permission to execute this operation.
@@ -73,14 +75,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: "center",
   },
-  icon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
   title: {
     fontSize: 15,
     fontWeight: "700",
     color: colors.navy[800],
+    marginTop: 8,
     marginBottom: 4,
     textAlign: "center",
   },

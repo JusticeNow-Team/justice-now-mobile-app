@@ -1,7 +1,9 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+
 import { EvidenceStatus, StatusHistoryRecord } from "../checker/types";
-import { colors } from "../theme/colors";
+import { colors, iconSizes } from "../theme";
+import { AppIcon, AppIconName } from "./AppIcon";
 
 interface EvidenceStatusTimelineProps {
   currentStatus: EvidenceStatus;
@@ -9,37 +11,46 @@ interface EvidenceStatusTimelineProps {
   lastChangedAt?: string;
 }
 
+const STEPS: { key: EvidenceStatus; label: string; icon: AppIconName }[] = [
+  { key: "pending", label: "Pending Intake", icon: "clock" },
+  { key: "under_review", label: "Under Examination", icon: "search" },
+  { key: "validated", label: "Validated & Case-Linked", icon: "check" },
+];
+
 export function EvidenceStatusTimeline({
   currentStatus,
   statusHistory = [],
-  lastChangedAt,
 }: EvidenceStatusTimelineProps) {
-  // Define standard status sequence steps
-  const steps: { key: EvidenceStatus; label: string; icon: string }[] = [
-    { key: "pending", label: "Pending Intake", icon: "⏱️" },
-    { key: "under_review", label: "Under Examination", icon: "🔎" },
-    { key: "validated", label: "Validated & Case-Linked", icon: "✓" },
-  ];
-
   const isRejected = currentStatus === "rejected";
   const isInfoRequested = currentStatus === "info_requested";
   const isArchived = currentStatus === "archived";
 
   return (
     <View style={styles.container}>
-      {/* 1. VISUAL PROGRESS TRACKER */}
-      <Text style={styles.sectionHeaderTitle}>📍 Status Progression Tracker</Text>
+      <View style={styles.sectionHeader}>
+        <AppIcon name="activity" size={iconSizes.sm} color={colors.textPrimary} />
+        <Text style={styles.sectionHeaderTitle}>Status Progression Tracker</Text>
+      </View>
 
       <View style={styles.trackerRow}>
-        {steps.map((step, idx) => {
+        {STEPS.map((step, idx) => {
           let isCompleted = false;
-          let isActive = currentStatus === step.key;
+          const isActive = currentStatus === step.key;
 
           if (currentStatus === "validated") {
             isCompleted = true;
           } else if (currentStatus === "under_review" && step.key === "pending") {
             isCompleted = true;
           }
+
+          const iconName: AppIconName =
+            isRejected && isActive
+              ? "x"
+              : isInfoRequested && isActive
+                ? "circle-help"
+                : isCompleted
+                  ? "check"
+                  : step.icon;
 
           return (
             <React.Fragment key={step.key}>
@@ -53,15 +64,7 @@ export function EvidenceStatusTimeline({
                     isInfoRequested && isActive && styles.stepCircleInfo,
                   ]}
                 >
-                  <Text style={styles.stepIconText}>
-                    {isRejected && isActive
-                      ? "❌"
-                      : isInfoRequested && isActive
-                      ? "❓"
-                      : isCompleted
-                      ? "✓"
-                      : step.icon}
-                  </Text>
+                  <AppIcon name={iconName} size={iconSizes.sm} color={colors.textPrimary} />
                 </View>
                 <Text
                   style={[
@@ -72,58 +75,72 @@ export function EvidenceStatusTimeline({
                   {isRejected && isActive
                     ? "Rejected"
                     : isInfoRequested && isActive
-                    ? "Info Requested"
-                    : step.label}
+                      ? "Info Requested"
+                      : step.label}
                 </Text>
               </View>
 
-              {idx < steps.length - 1 && (
+              {idx < STEPS.length - 1 ? (
                 <View
                   style={[
                     styles.stepConnector,
                     isCompleted && styles.stepConnectorCompleted,
                   ]}
                 />
-              )}
+              ) : null}
             </React.Fragment>
           );
         })}
       </View>
 
-      {/* Special Status Callout Banners */}
-      {isRejected && (
+      {isRejected ? (
         <View style={styles.rejectedBanner}>
-          <Text style={styles.bannerIcon}>❌</Text>
+          <AppIcon
+            name="x"
+            size={iconSizes.sm}
+            color={colors.error}
+            style={styles.bannerIcon}
+          />
           <Text style={styles.bannerText}>
             Status: Rejected / Non-Compliant. Record flagged for checker audit.
           </Text>
         </View>
-      )}
+      ) : null}
 
-      {isInfoRequested && (
+      {isInfoRequested ? (
         <View style={styles.infoBanner}>
-          <Text style={styles.bannerIcon}>❓</Text>
+          <AppIcon
+            name="circle-help"
+            size={16}
+            color="#D97706"
+            style={styles.bannerIcon}
+          />
           <Text style={styles.bannerText}>
             Status: Action Required. Waiting for reporter/officer metadata response.
           </Text>
         </View>
-      )}
+      ) : null}
 
-      {isArchived && (
+      {isArchived ? (
         <View style={styles.archivedBanner}>
-          <Text style={styles.bannerIcon}>📦</Text>
+          <AppIcon
+            name="document"
+            size={iconSizes.sm}
+            color={colors.textSecondary}
+            style={styles.bannerIcon}
+          />
           <Text style={styles.bannerText}>
             Status: Case Archived. Terminal read-only state.
           </Text>
         </View>
-      )}
+      ) : null}
 
-      {/* 2. STATUS HISTORY AUDIT TRAIL LOG */}
       <View style={styles.historyHeaderRow}>
-        <Text style={styles.sectionHeaderTitle}>📜 Status Change History Trail</Text>
-        <Text style={styles.historyCountBadge}>
-          {statusHistory.length} event(s)
-        </Text>
+        <View style={styles.sectionHeader}>
+          <AppIcon name="history" size={iconSizes.sm} color={colors.textPrimary} />
+          <Text style={styles.sectionHeaderTitle}>Status Change History Trail</Text>
+        </View>
+        <Text style={styles.historyCountBadge}>{statusHistory.length} event(s)</Text>
       </View>
 
       {statusHistory.length === 0 ? (
@@ -149,7 +166,7 @@ export function EvidenceStatusTimeline({
                 <View style={styles.timelineCardHeader}>
                   <View style={styles.transitionBadgeRow}>
                     <Text style={styles.statusFromText}>{item.fromStatus}</Text>
-                    <Text style={styles.arrowIcon}>➔</Text>
+                    <AppIcon name="arrow-right" size={iconSizes.xs} color={colors.textSoft} />
                     <StatusPill status={item.toStatus} />
                   </View>
 
@@ -157,35 +174,49 @@ export function EvidenceStatusTimeline({
                 </View>
 
                 <View style={styles.timelineRoleRow}>
-                  <Text style={styles.roleBadgeText}>
-                    {item.changedByRole === "checker" && "🛡️ Evidence Checker"}
-                    {item.changedByRole === "case_officer" && "👮 Case Officer"}
-                    {item.changedByRole === "system" && "⚙️ System Intake"}
-                    {item.changedByRole === "reporter" && "👤 Reporter"}
-                  </Text>
-                  {item.changedByName && (
-                    <Text style={styles.actingUserText}>
-                      ({item.changedByName})
-                    </Text>
-                  )}
+                  <RoleLabel role={item.changedByRole} />
+                  {item.changedByName ? (
+                    <Text style={styles.actingUserText}>({item.changedByName})</Text>
+                  ) : null}
                 </View>
 
-                {item.notes && (
-                  <Text style={styles.timelineNotesText}>{item.notes}</Text>
-                )}
+                {item.notes ? <Text style={styles.timelineNotesText}>{item.notes}</Text> : null}
 
-                {item.rejectionReason && (
+                {item.rejectionReason ? (
                   <View style={styles.rejectionReasonBox}>
                     <Text style={styles.rejectionReasonText}>
                       Rejection Reason: {item.rejectionReason}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </View>
             );
           })}
         </View>
       )}
+    </View>
+  );
+}
+
+function RoleLabel({ role }: { role: StatusHistoryRecord["changedByRole"] }) {
+  let icon: AppIconName = "user";
+  let label = "Reporter";
+
+  if (role === "checker") {
+    icon = "shield";
+    label = "Evidence Checker";
+  } else if (role === "case_officer") {
+    icon = "balance";
+    label = "Case Officer";
+  } else if (role === "system") {
+    icon = "settings";
+    label = "System Intake";
+  }
+
+  return (
+    <View style={styles.roleBadgeRow}>
+      <AppIcon name={icon} size={iconSizes.xs} color={colors.textPrimary} />
+      <Text style={styles.roleBadgeText}>{label}</Text>
     </View>
   );
 }
@@ -233,28 +264,28 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     marginBottom: 14,
   },
-
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   sectionHeaderTitle: {
     fontSize: 14,
     fontWeight: "800",
     color: "#0F172A",
-    marginBottom: 12,
   },
-
-  // Tracker Progress Bar
   trackerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 12,
     marginBottom: 16,
     paddingHorizontal: 8,
   },
-
   stepBox: {
     alignItems: "center",
     zIndex: 2,
   },
-
   stepCircle: {
     width: 36,
     height: 36,
@@ -265,32 +296,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   stepCircleActive: {
     backgroundColor: "#EFF6FF",
     borderColor: "#2563EB",
   },
-
   stepCircleCompleted: {
     backgroundColor: "#D1FAE5",
     borderColor: "#059669",
   },
-
   stepCircleRejected: {
     backgroundColor: "#FEE2E2",
     borderColor: "#DC2626",
   },
-
   stepCircleInfo: {
     backgroundColor: "#FEF9C3",
     borderColor: "#D97706",
   },
-
-  stepIconText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
   stepLabel: {
     fontSize: 10.5,
     fontWeight: "600",
@@ -298,12 +319,10 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
   },
-
   stepLabelActive: {
     color: "#0F172A",
     fontWeight: "800",
   },
-
   stepConnector: {
     flex: 1,
     height: 2,
@@ -311,12 +330,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     marginTop: -16,
   },
-
   stepConnectorCompleted: {
     backgroundColor: "#059669",
   },
-
-  // Banners
   rejectedBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -327,7 +343,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "#DC2626",
   },
-
   infoBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -338,7 +353,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "#D97706",
   },
-
   archivedBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -349,20 +363,15 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "#475569",
   },
-
   bannerIcon: {
-    fontSize: 16,
     marginRight: 8,
   },
-
   bannerText: {
     fontSize: 12,
     color: "#0F172A",
     fontWeight: "600",
     flex: 1,
   },
-
-  // History List
   historyHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -370,7 +379,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 10,
   },
-
   historyCountBadge: {
     fontSize: 11,
     fontWeight: "700",
@@ -380,24 +388,20 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 10,
   },
-
   emptyHistoryBox: {
     backgroundColor: "#F8FAFC",
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
   },
-
   emptyHistoryText: {
     fontSize: 12,
     color: "#64748B",
     textAlign: "center",
   },
-
   timelineList: {
     gap: 10,
   },
-
   timelineCard: {
     backgroundColor: "#F8FAFC",
     borderRadius: 10,
@@ -405,71 +409,60 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
-
   timelineCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 6,
   },
-
   transitionBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-
   statusFromText: {
     fontSize: 11.5,
     fontWeight: "600",
     color: "#64748B",
   },
-
-  arrowIcon: {
-    fontSize: 12,
-    color: "#94A3B8",
-  },
-
   pill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
-
   pillText: {
     fontSize: 11,
     fontWeight: "800",
   },
-
   timelineDateText: {
     fontSize: 11,
     color: "#64748B",
   },
-
   timelineRoleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 4,
   },
-
+  roleBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   roleBadgeText: {
     fontSize: 11.5,
     fontWeight: "700",
     color: "#0F172A",
   },
-
   actingUserText: {
     fontSize: 11,
     color: "#64748B",
   },
-
   timelineNotesText: {
     fontSize: 12,
     color: "#334155",
     marginTop: 2,
   },
-
   rejectionReasonBox: {
     marginTop: 6,
     backgroundColor: "#FEF2F2",
@@ -478,7 +471,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: "#DC2626",
   },
-
   rejectionReasonText: {
     fontSize: 11.5,
     color: "#991B1B",

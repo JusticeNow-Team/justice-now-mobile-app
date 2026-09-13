@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../../components/AppIcon";
 import { AppTextInput, Notice } from "../../components/common";
 import { colors } from "../../theme";
 import { CATEGORY_ACCEPT, FILE_LIMIT_HINT } from "./constants";
@@ -27,7 +28,7 @@ function statusCopy(status?: EvidenceUploadStatus) {
   }
 
   if (status?.phase === "uploading") {
-    return `Uploading… ${status.progress}%`;
+    return `Uploading... ${status.progress}%`;
   }
 
   if (status?.phase === "uploaded") {
@@ -49,7 +50,7 @@ export default function EvidenceUploadPanel({
   return (
     <View>
       <View style={styles.box}>
-        <Text style={styles.icon}>⬆</Text>
+        <AppIcon name="upload" size={22} color={colors.royal[700]} />
         <Text style={styles.title}>Add a file</Text>
         <Text style={styles.copy}>{FILE_LIMIT_HINT}</Text>
         <View style={styles.grid}>
@@ -66,7 +67,7 @@ export default function EvidenceUploadPanel({
                 picking && styles.sourceDisabled,
               ]}
             >
-              <Text style={styles.sourceIcon}>{item.icon}</Text>
+              <AppIcon name={item.icon} size={16} color={colors.navy[700]} />
               <Text style={styles.sourceLabel}>{item.label}</Text>
             </Pressable>
           ))}
@@ -105,9 +106,11 @@ export default function EvidenceUploadPanel({
             <View key={file.localId} style={styles.card}>
               <View style={styles.cardTop}>
                 <View style={styles.kind}>
-                  <Text style={styles.kindText}>
-                    {CATEGORY_ACCEPT[file.category].icon}
-                  </Text>
+                  <AppIcon
+                    name={CATEGORY_ACCEPT[file.category].icon}
+                    size={16}
+                    color={colors.royal[700]}
+                  />
                 </View>
                 <View style={styles.cardBody}>
                   <View style={styles.cardHeader}>
@@ -120,7 +123,7 @@ export default function EvidenceUploadPanel({
                         accessibilityRole="button"
                         accessibilityLabel={`Remove ${file.fileName}`}
                       >
-                        <Text style={styles.remove}>✕</Text>
+                        <AppIcon name="x" size={16} color={colors.textSecondary} />
                       </Pressable>
                     ) : null}
                   </View>
@@ -176,10 +179,6 @@ const styles = StyleSheet.create({
     borderColor: colors.navy[200],
     backgroundColor: colors.surface,
   },
-  icon: {
-    fontSize: 22,
-    color: colors.royal[700],
-  },
   title: {
     marginTop: 8,
     fontSize: 13.5,
@@ -216,9 +215,6 @@ const styles = StyleSheet.create({
   },
   sourceDisabled: {
     opacity: 0.6,
-  },
-  sourceIcon: {
-    fontSize: 16,
   },
   sourceLabel: {
     fontSize: 11.5,
@@ -263,9 +259,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.royal[50],
   },
-  kindText: {
-    fontSize: 16,
-  },
   cardBody: {
     flex: 1,
     minWidth: 0,
@@ -280,10 +273,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: "600",
     color: colors.navy[800],
-  },
-  remove: {
-    fontSize: 16,
-    color: colors.textSecondary,
   },
   meta: {
     marginTop: 2,

@@ -1,16 +1,10 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "../theme";
+import { AppIcon } from "../components/AppIcon";
+import { colors, iconSizes } from "../theme";
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -46,9 +40,10 @@ export default function SplashScreen() {
             <View style={styles.loadingProgress} />
           </View>
 
-          <Text style={styles.loadingText}>
-            🔒 Establishing a secure connection…
-          </Text>
+          <View style={styles.loadingStatusRow}>
+            <AppIcon name="lock" size={iconSizes.xs} color={colors.navy[300]} />
+            <Text style={styles.loadingText}>Establishing a secure connection...</Text>
+          </View>
         </View>
       </View>
 
@@ -78,19 +73,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.navy[900],
   },
-
   content: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 32,
   },
-
   logo: {
     width: 92,
     height: 92,
   },
-
   brand: {
     marginTop: 24,
     fontSize: 30,
@@ -98,11 +90,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textInverse,
   },
-
   brandAccent: {
     color: colors.teal[300],
   },
-
   tagline: {
     marginTop: 12,
     fontSize: 13.5,
@@ -111,13 +101,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: colors.navy[200],
   },
-
   loadingContainer: {
     marginTop: 40,
     width: 180,
     alignItems: "center",
   },
-
   loadingTrack: {
     width: 160,
     height: 4,
@@ -125,34 +113,33 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.navy[800],
   },
-
   loadingProgress: {
     width: "66%",
     height: "100%",
     borderRadius: 999,
     backgroundColor: colors.teal[400],
   },
-
-  loadingText: {
+  loadingStatusRow: {
     marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  loadingText: {
     fontSize: 11.5,
     fontWeight: "500",
-    textAlign: "center",
     color: colors.navy[300],
   },
-
   footer: {
     paddingHorizontal: 32,
     paddingBottom: 24,
   },
-
   sdgText: {
     textAlign: "center",
     fontSize: 11,
     lineHeight: 16,
     color: colors.navy[400],
   },
-
   continueButton: {
     minHeight: 40,
     marginTop: 12,
@@ -162,11 +149,9 @@ const styles = StyleSheet.create({
     borderColor: colors.navy[700],
     borderRadius: 12,
   },
-
   continueButtonPressed: {
     backgroundColor: colors.navy[800],
   },
-
   continueText: {
     fontSize: 12,
     fontWeight: "600",

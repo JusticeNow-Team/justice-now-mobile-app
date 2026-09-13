@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppIcon } from "../AppIcon";
 import { colors } from "../../theme";
 
 interface AppHeaderProps {
@@ -27,7 +28,7 @@ export default function AppHeader({
           pressed && styles.backPressed,
         ]}
       >
-        <Text style={styles.backIcon}>‹</Text>
+        <AppIcon name="chevron-left" size={24} color={colors.navy[700]} />
       </Pressable>
 
       <View style={styles.headerText}>
@@ -65,12 +66,6 @@ const styles = StyleSheet.create({
   },
   backPressed: {
     backgroundColor: colors.navy[50],
-  },
-  backIcon: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: colors.navy[700],
-    marginTop: -2,
   },
   headerText: {
     flex: 1,

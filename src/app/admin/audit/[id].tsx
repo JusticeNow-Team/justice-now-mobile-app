@@ -1,0 +1,1 @@
+export { AuditDetailScreen as default } from "../../../admin/AdminScreens";
