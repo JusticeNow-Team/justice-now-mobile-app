@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Platform,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -13,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon, AppIconName } from "../../components/AppIcon";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -75,6 +77,7 @@ export default function AssignEvidenceScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [confirmingAssignment, setConfirmingAssignment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const loadWorkspace = useCallback(async (caseId: string) => {
@@ -110,15 +113,37 @@ export default function AssignEvidenceScreen() {
     }
 
     const nextEvidence = (evidenceResult.data ?? []) as EvidenceOption[];
+    const nextAssignments = (assignmentResult.data ?? []) as EvidenceAssignment[];
     setEvidence(nextEvidence);
-    setCheckers((checkerResult.data ?? []) as CheckerOption[]);
-    setAssignments((assignmentResult.data ?? []) as EvidenceAssignment[]);
+    setCheckers(
+      ((checkerResult.data ?? []) as {
+        id: string;
+        full_name: string;
+        active_assignment_count: number | string;
+      }[]).map((checker) => ({
+        ...checker,
+        active_assignment_count: Number(checker.active_assignment_count),
+      })),
+    );
+    setAssignments(nextAssignments);
 
     setSelectedEvidenceId((current) => {
       if (current && nextEvidence.some((item) => item.id === current)) {
         return current;
       }
-      return nextEvidence[0]?.id || "";
+      return (
+        nextEvidence.find(
+          (item) =>
+            item.validation_status === "pending" &&
+            !nextAssignments.some(
+              (assignment) =>
+                assignment.evidence_id === item.id &&
+                ["assigned", "under_review"].includes(assignment.status),
+            ),
+        )?.id ||
+        nextEvidence[0]?.id ||
+        ""
+      );
     });
   }, []);
 
@@ -225,7 +250,7 @@ export default function AssignEvidenceScreen() {
       assignments.find(
         (item) =>
           item.evidence_id === selectedEvidenceId &&
-          item.status !== "cancelled",
+          ["assigned", "under_review"].includes(item.status),
       ) || null,
     [assignments, selectedEvidenceId],
   );
@@ -250,12 +275,37 @@ export default function AssignEvidenceScreen() {
     }
   };
 
-  const assignEvidence = async () => {
+  const showMessage = (title: string, message: string) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}\n\n${message}`);
+      return;
+    }
+
+    Alert.alert(title, message);
+  };
+
+  const requestAssignment = () => {
     if (!selectedEvidenceId || !selectedCheckerId) {
-      Alert.alert(
+      showMessage(
         "Selection required",
         "Select one evidence item and one Evidence Validator.",
       );
+      return;
+    }
+
+    if (selectedEvidence?.validation_status !== "pending" || currentAssignment) {
+      showMessage(
+        "Evidence unavailable",
+        "Only pending evidence without an active assignment can be assigned.",
+      );
+      return;
+    }
+
+    setConfirmingAssignment(true);
+  };
+
+  const assignEvidence = async () => {
+    if (!selectedEvidenceId || !selectedCheckerId) {
       return;
     }
 
@@ -267,18 +317,19 @@ export default function AssignEvidenceScreen() {
       });
 
       if (error) {
-        Alert.alert("Assignment failed", error.message);
+        showMessage("Assignment failed", error.message);
         return;
       }
 
       await loadWorkspace(selectedCaseId);
       setSelectedCheckerId("");
-      Alert.alert(
+      setConfirmingAssignment(false);
+      showMessage(
         "Evidence assigned",
         "The Evidence Validator can now see this item in the validation queue.",
       );
     } catch (error) {
-      Alert.alert(
+      showMessage(
         "Assignment failed",
         error instanceof Error ? error.message : "Please try again.",
       );
@@ -437,12 +488,15 @@ export default function AssignEvidenceScreen() {
             const assigned = assignments.find(
               (assignment) =>
                 assignment.evidence_id === item.id &&
-                assignment.status !== "cancelled",
+                ["assigned", "under_review"].includes(assignment.status),
             );
+            const selectable =
+              item.validation_status === "pending" || Boolean(assigned);
 
             return (
               <Pressable
                 key={item.id}
+                disabled={!selectable}
                 onPress={() => {
                   setSelectedEvidenceId(item.id);
                   setSelectedCheckerId("");
@@ -450,6 +504,7 @@ export default function AssignEvidenceScreen() {
                 style={[
                   styles.evidenceCard,
                   active && styles.evidenceCardActive,
+                  !selectable && styles.unavailableCard,
                 ]}
               >
                 <View style={styles.fileIcon}>
@@ -470,8 +525,12 @@ export default function AssignEvidenceScreen() {
                       {assigned.checker_name} ·{" "}
                       {assigned.status.replace(/_/g, " ")}
                     </Text>
-                  ) : (
+                  ) : item.validation_status === "pending" ? (
                     <Text style={styles.unassignedText}>Not assigned</Text>
+                  ) : (
+                    <Text style={styles.unavailableText}>
+                      {item.validation_status.replace(/_/g, " ")} · unavailable
+                    </Text>
                   )}
                 </View>
                 <AppIcon
@@ -492,7 +551,19 @@ export default function AssignEvidenceScreen() {
               detail={`${checkers.length} available`}
             />
 
-            {currentAssignment ? (
+            {selectedEvidence.validation_status !== "pending" ? (
+              <View style={styles.alreadyAssignedCard}>
+                <AppIcon name="info" size={20} color={colors.royal[700]} />
+                <View style={styles.flexOne}>
+                  <Text style={styles.alreadyAssignedTitle}>
+                    Evidence is not pending
+                  </Text>
+                  <Text style={styles.alreadyAssignedText}>
+                    Only pending evidence can be assigned for validation.
+                  </Text>
+                </View>
+              </View>
+            ) : currentAssignment ? (
               <View style={styles.alreadyAssignedCard}>
                 <AppIcon name="info" size={20} color={colors.royal[700]} />
                 <View style={styles.flexOne}>
@@ -547,9 +618,11 @@ export default function AssignEvidenceScreen() {
               })
             )}
 
-            {!currentAssignment && checkers.length > 0 ? (
+            {selectedEvidence.validation_status === "pending" &&
+            !currentAssignment &&
+            checkers.length > 0 ? (
               <Pressable
-                onPress={() => void assignEvidence()}
+                onPress={requestAssignment}
                 disabled={!selectedCheckerId || assigning}
                 style={[
                   styles.assignButton,
@@ -590,6 +663,23 @@ export default function AssignEvidenceScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmingAssignment}
+        title="Assign evidence?"
+        body={`${selectedEvidence?.title ?? "This evidence"} will be assigned to ${
+          checkers.find((checker) => checker.id === selectedCheckerId)?.full_name ??
+          "the selected Evidence Validator"
+        }. The action will be recorded in the case timeline.`}
+        confirmLabel="Assign evidence"
+        loading={assigning}
+        onClose={() => {
+          if (!assigning) {
+            setConfirmingAssignment(false);
+          }
+        }}
+        onConfirm={() => void assignEvidence()}
+      />
     </SafeAreaView>
   );
 }
@@ -806,6 +896,7 @@ const styles = StyleSheet.create({
     borderColor: colors.royal[600],
     backgroundColor: colors.royal[50],
   },
+  unavailableCard: { opacity: 0.55 },
   fileIcon: {
     width: 40,
     height: 40,
@@ -828,6 +919,13 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: 10.5,
     fontWeight: "700",
+  },
+  unavailableText: {
+    marginTop: 5,
+    color: colors.textSecondary,
+    fontSize: 10.5,
+    fontWeight: "700",
+    textTransform: "capitalize",
   },
   checkerCard: {
     marginBottom: 9,

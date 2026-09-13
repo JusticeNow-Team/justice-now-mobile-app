@@ -208,6 +208,12 @@ export async function getMyVerificationHistory() {
   );
 
   if (error) {
+    // Verification decisions are delivered in a later Sprint 3 story. Keep the
+    // JN-340 assignment queue usable until that RPC is deployed.
+    if (error.code === "PGRST202" || error.code === "42883") {
+      return [];
+    }
+
     throw error;
   }
 

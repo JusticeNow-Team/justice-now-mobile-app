@@ -47,7 +47,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --no-warnings scripts/run-auth-tests.mjs"
+    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs",
+    "test:evidence-assignment": "node --no-warnings scripts/run-evidence-assignment-tests.mjs"
   },
   "private": true
 }

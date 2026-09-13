@@ -374,10 +374,18 @@ export default function OfficerDashboardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.brandName}>JusticeNow</Text>
+        <View style={styles.brandRow}>
+          <View style={styles.logoMark}>
+            <Text style={styles.logoText}>JN</Text>
+          </View>
 
-          <Text style={styles.workspaceLabel}>Case Officer Workspace</Text>
+          <View>
+            <Text style={styles.workspaceLabel}>
+              Case investigator dashboard
+            </Text>
+
+            <Text style={styles.brandName}>{officerName}</Text>
+          </View>
         </View>
 
         <Pressable
@@ -389,6 +397,8 @@ export default function OfficerDashboardScreen() {
             pressed && styles.pressed,
           ]}
         >
+          <AppIcon name="log-out" size={15} color={colors.textInverse} />
+
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
       </View>
@@ -407,11 +417,13 @@ export default function OfficerDashboardScreen() {
         <View style={styles.welcomeCard}>
           <Text style={styles.welcomeLabel}>CASE OFFICER</Text>
 
-          <Text style={styles.welcomeTitle}>Welcome, {officerName}</Text>
+          <Text style={styles.welcomeTitle}>Priority workload</Text>
 
           <Text style={styles.welcomeText}>
-            Review assigned cases, examine evidence and record investigation
-            progress securely.
+            {stats.urgent} urgent case{stats.urgent === 1 ? " is" : "s are"}{" "}
+            active and {stats.evidenceToReview} evidence item
+            {stats.evidenceToReview === 1 ? "" : "s"} need officer attention.
+            Critical cases are shown first in your queue.
           </Text>
         </View>
 
@@ -520,9 +532,9 @@ export default function OfficerDashboardScreen() {
 
         <ActionCard
           icon="bell"
-          title="Notifications"
+          title="Secure Communication"
           description="Review case assignments, evidence activity and officer alerts."
-          onPress={() => router.push("/officer/notifications")}
+          onPress={() => router.push("/officer/messages")}
         />
 
         <View style={styles.activityHeader}>
@@ -741,39 +753,62 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   header: {
-    minHeight: 68,
+    minHeight: 86,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: colors.navy[900],
+  },
+  brandRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  logoMark: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: colors.royal[600],
+  },
+  logoText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: colors.textInverse,
   },
   brandName: {
-    fontSize: 19,
+    fontSize: 15,
     fontWeight: "800",
-    color: colors.navy[800],
+    color: colors.textInverse,
   },
   workspaceLabel: {
-    marginTop: 2,
-    fontSize: 10.5,
-    color: colors.textSecondary,
+    marginBottom: 2,
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.navy[300],
   },
   signOutButton: {
     minHeight: 38,
+    flexDirection: "row",
+    gap: 6,
     paddingHorizontal: 13,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 12,
+    backgroundColor: colors.navy[800],
   },
   signOutText: {
     fontSize: 11.5,
-    fontWeight: "600",
-    color: colors.navy[700],
+    fontWeight: "700",
+    color: colors.textInverse,
   },
   pressed: {
     opacity: 0.75,
@@ -783,7 +818,8 @@ const styles = StyleSheet.create({
     paddingBottom: 42,
   },
   welcomeCard: {
-    padding: 20,
+    marginTop: -28,
+    padding: 14,
     borderRadius: 18,
     backgroundColor: colors.navy[800],
   },
