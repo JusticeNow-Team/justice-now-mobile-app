@@ -213,13 +213,19 @@ export default function AssignedCasesScreen() {
           accessibilityLabel="Go back"
           style={styles.backButton}
         >
-          <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
+          <AppIcon
+            name="chevron-left"
+            size={iconSizes.headerBack}
+            color={colors.textInverse}
+          />
         </Pressable>
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Assigned Cases</Text>
+          <Text style={styles.headerTitle}>Case queue</Text>
 
-          <Text style={styles.headerSubtitle}>Case Officer Workspace</Text>
+          <Text style={styles.headerSubtitle}>
+            {filteredCases.length} cases match your filters
+          </Text>
         </View>
       </View>
 
@@ -238,11 +244,12 @@ export default function AssignedCasesScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>YOUR CASELOAD</Text>
 
-          <Text style={styles.infoTitle}>Assigned investigations</Text>
+          <Text style={styles.infoTitle}>Assigned to me</Text>
 
           <Text style={styles.infoText}>
             {cases.length} {cases.length === 1 ? "case is" : "cases are"}{" "}
-            currently assigned to your officer account.
+            currently assigned to your officer account. High priority and
+            recently updated cases should be reviewed first.
           </Text>
         </View>
 
@@ -271,7 +278,7 @@ export default function AssignedCasesScreen() {
           contentContainerStyle={styles.filters}
         >
           <FilterChip
-            label="All"
+            label="All cases"
             active={activeFilter === "all"}
             onPress={() => setActiveFilter("all")}
           />
@@ -295,7 +302,7 @@ export default function AssignedCasesScreen() {
           />
 
           <FilterChip
-            label="Priority"
+            label="High priority"
             active={activeFilter === "priority"}
             onPress={() => setActiveFilter("priority")}
           />
@@ -526,13 +533,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   header: {
-    minHeight: 66,
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.navy[900],
   },
   backButton: {
     width: 42,
@@ -544,20 +549,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.navy[800],
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.textInverse,
   },
   headerSubtitle: {
     marginTop: 2,
     fontSize: 11.5,
-    color: colors.textSecondary,
+    color: colors.navy[300],
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 34,
   },
   infoCard: {
+    marginTop: -10,
     padding: 18,
     borderRadius: 16,
     backgroundColor: colors.navy[800],

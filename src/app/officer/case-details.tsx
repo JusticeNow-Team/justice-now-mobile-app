@@ -537,10 +537,14 @@ export default function CaseDetailsScreen() {
             accessibilityLabel="Go back"
             style={styles.backButton}
           >
-            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
+            <AppIcon
+              name="chevron-left"
+              size={iconSizes.headerBack}
+              color={colors.textInverse}
+            />
           </Pressable>
 
-          <Text style={styles.headerTitle}>Case Details</Text>
+          <Text style={styles.headerTitle}>Case review</Text>
         </View>
 
         <View style={styles.errorContainer}>
@@ -573,11 +577,15 @@ export default function CaseDetailsScreen() {
           accessibilityLabel="Go back"
           style={styles.backButton}
         >
-            <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
+            <AppIcon
+              name="chevron-left"
+              size={iconSizes.headerBack}
+              color={colors.textInverse}
+            />
         </Pressable>
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Case Details</Text>
+          <Text style={styles.headerTitle}>Case review</Text>
 
           <Text style={styles.headerSubtitle}>{caseData.case_reference}</Text>
         </View>
@@ -1181,13 +1189,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   header: {
-    minHeight: 66,
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.navy[900],
   },
   backButton: {
     width: 42,
@@ -1199,14 +1205,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.navy[800],
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.textInverse,
   },
   headerSubtitle: {
     marginTop: 2,
     fontSize: 11.5,
-    color: colors.textSecondary,
+    color: colors.navy[300],
   },
   scrollContent: {
     padding: 16,
@@ -1727,4 +1733,3 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
 });
-

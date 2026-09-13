@@ -338,7 +338,7 @@ export default function OfficerNotificationsScreen() {
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.royal[700]} />
 
-        <Text style={styles.loadingText}>Loading notifications...</Text>
+        <Text style={styles.loadingText}>Loading secure communication...</Text>
       </SafeAreaView>
     );
   }
@@ -358,13 +358,19 @@ export default function OfficerNotificationsScreen() {
           accessibilityLabel="Go back"
           style={styles.backButton}
         >
-          <AppIcon name="chevron-left" size={iconSizes.headerBack} color={colors.navy[700]} />
+          <AppIcon
+            name="chevron-left"
+            size={iconSizes.headerBack}
+            color={colors.textInverse}
+          />
         </Pressable>
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={styles.headerTitle}>Secure communication</Text>
 
-          <Text style={styles.headerSubtitle}>Case Officer Workspace</Text>
+          <Text style={styles.headerSubtitle}>
+            Messages, requests and officer alerts
+          </Text>
         </View>
 
         {unreadCount > 0 && (
@@ -397,13 +403,13 @@ export default function OfficerNotificationsScreen() {
 
         <View style={styles.hero}>
           <View>
-            <Text style={styles.heroLabel}>OFFICER ALERTS</Text>
+            <Text style={styles.heroLabel}>SECURE INBOX</Text>
 
-            <Text style={styles.heroTitle}>Stay updated</Text>
+            <Text style={styles.heroTitle}>Case communication</Text>
 
             <Text style={styles.heroText}>
-              Case assignments, evidence activity and investigation-related
-              updates appear here.
+              Case assignments, reporter responses, evidence activity and
+              investigation-related updates appear here.
             </Text>
           </View>
 
@@ -450,7 +456,7 @@ export default function OfficerNotificationsScreen() {
 
         {errorMessage !== "" && (
           <View style={styles.errorCard}>
-            <Text style={styles.errorTitle}>Unable to load notifications</Text>
+            <Text style={styles.errorTitle}>Unable to load messages</Text>
 
             <Text style={styles.errorText}>{errorMessage}</Text>
 
@@ -530,10 +536,10 @@ export default function OfficerNotificationsScreen() {
           <View style={styles.emptyCard}>
             <AppIcon name="bell" size={iconSizes.xl} color={colors.navy[700]} />
 
-            <Text style={styles.emptyTitle}>No notifications</Text>
+            <Text style={styles.emptyTitle}>No messages</Text>
 
             <Text style={styles.emptyText}>
-              There are currently no notifications matching this filter.
+              There are currently no messages matching this filter.
             </Text>
           </View>
         )}
@@ -545,7 +551,7 @@ export default function OfficerNotificationsScreen() {
 
           <View style={styles.securityContent}>
             <Text style={styles.securityTitle}>
-              Private officer notifications
+              Private officer communication
             </Text>
 
             <Text style={styles.securityText}>
@@ -682,18 +688,13 @@ const styles = StyleSheet.create({
   // -----------------------------------------------------
 
   header: {
-    minHeight: 66,
+    minHeight: 72,
 
     flexDirection: "row",
     alignItems: "center",
 
     paddingHorizontal: 14,
-
-    borderBottomWidth: 1,
-
-    borderBottomColor: colors.border,
-
-    backgroundColor: colors.surface,
+    backgroundColor: colors.navy[900],
   },
 
   backButton: {
@@ -709,11 +710,11 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
 
-    fontWeight: "700",
+    fontWeight: "800",
 
-    color: colors.navy[800],
+    color: colors.textInverse,
   },
 
   headerSubtitle: {
@@ -721,7 +722,7 @@ const styles = StyleSheet.create({
 
     fontSize: 11,
 
-    color: colors.textSecondary,
+    color: colors.navy[300],
   },
 
   markAllText: {
@@ -731,7 +732,7 @@ const styles = StyleSheet.create({
 
     fontWeight: "700",
 
-    color: colors.royal[700],
+    color: colors.textInverse,
   },
 
   content: {
