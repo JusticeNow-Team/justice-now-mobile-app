@@ -138,6 +138,9 @@ export default function CaseDetailScreen() {
   );
 
   const description = splitDescription(detail?.description ?? null);
+  const openInformationRequest = informationRequests.find(
+    (request) => request.status === "sent"
+  );
 
   const tabs: {
     id: DetailTab;
@@ -226,6 +229,21 @@ export default function CaseDetailScreen() {
 
               <ReporterStatusBadge status={detail.status} />
             </View>
+
+            {openInformationRequest ? (
+              <View style={styles.heroAction}>
+                <PrimaryButton
+                  title="Respond to information request"
+                  icon="?"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/reporter/cases/information-request",
+                      params: { requestId: openInformationRequest.id },
+                    })
+                  }
+                />
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.tabRow}>
@@ -582,6 +600,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  heroAction: {
+    marginTop: 12,
   },
   tabRow: {
     marginTop: 14,
