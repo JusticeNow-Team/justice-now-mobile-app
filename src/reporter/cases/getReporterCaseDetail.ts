@@ -62,6 +62,13 @@ export interface ReporterInformationRequest {
   response: ReporterInformationResponse | null;
 }
 
+export interface ReporterWithdrawalRequest {
+  id: string;
+  reason: string;
+  status: string;
+  requestedAt: string;
+}
+
 export type GetReporterCaseDetailResult =
   | {
       ok: true;
@@ -70,6 +77,7 @@ export type GetReporterCaseDetailResult =
       evidence: ReporterEvidenceRecord[];
       history: ReporterStatusEvent[];
       informationRequests: ReporterInformationRequest[];
+      withdrawalRequest: ReporterWithdrawalRequest | null;
     }
   | {
       ok: false;
@@ -336,6 +344,26 @@ export async function getReporterCaseDetail(
     };
   });
 
+  let withdrawalRequest: ReporterWithdrawalRequest | null = null;
+
+  const { data: withdrawalRow } = await supabase
+    .from("case_withdrawal_requests")
+    .select("id, reason, status, requested_at")
+    .eq("case_id", caseId)
+    .eq("reporter_id", user.id)
+    .order("requested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (withdrawalRow) {
+    withdrawalRequest = {
+      id: withdrawalRow.id,
+      reason: withdrawalRow.reason,
+      status: withdrawalRow.status,
+      requestedAt: withdrawalRow.requested_at,
+    };
+  }
+
   return {
     ok: true,
     detail,
@@ -343,5 +371,6 @@ export async function getReporterCaseDetail(
     evidence,
     history,
     informationRequests,
+    withdrawalRequest,
   };
 }
