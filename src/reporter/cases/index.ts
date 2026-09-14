@@ -4,3 +4,7 @@ export { default as InformationRequestScreen } from "./InformationRequestScreen"
 export { getReporterCases } from "./getReporterCases";
 export { getReporterCaseDetail } from "./getReporterCaseDetail";
 export { submitInformationResponse } from "./submitInformationResponse";
+export {
+  canRequestWithdrawal,
+  requestCaseWithdrawal,
+} from "./requestCaseWithdrawal";

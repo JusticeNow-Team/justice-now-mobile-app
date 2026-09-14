@@ -41,6 +41,11 @@ const labels: Record<
     color: colors.warning,
     background: "#FBF7EC",
   },
+  withdrawal_requested: {
+    label: "Withdrawal requested",
+    color: colors.errorStrong,
+    background: "#FFF2F1",
+  },
   resolved: {
     label: "Resolved",
     color: colors.success,
@@ -58,7 +63,7 @@ export default function ReporterStatusBadge({
 }: {
   status: ReporterCaseStatus;
 }) {
-  const config = labels[status];
+  const config = labels[status] ?? labels.submitted;
 
   return (
     <View

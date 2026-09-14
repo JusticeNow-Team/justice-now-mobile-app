@@ -5,6 +5,7 @@ export type ReporterCaseStatus =
   | "investigating"
   | "awaiting_information"
   | "awaiting_evidence"
+  | "withdrawal_requested"
   | "resolved"
   | "closed";
 
@@ -35,6 +36,7 @@ export const ACTIVE_STATUSES: ReporterCaseStatus[] = [
 export const WAITING_STATUSES: ReporterCaseStatus[] = [
   "awaiting_information",
   "awaiting_evidence",
+  "withdrawal_requested",
 ];
 
 export const RESOLVED_STATUSES: ReporterCaseStatus[] = [
@@ -73,6 +75,10 @@ export const STATUS_FILTERS: {
   {
     value: "awaiting_evidence",
     label: "Awaiting evidence",
+  },
+  {
+    value: "withdrawal_requested",
+    label: "Withdrawal requested",
   },
   {
     value: "resolved",
