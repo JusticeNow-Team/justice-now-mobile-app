@@ -47,8 +47,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs",
-    "test:evidence-assignment": "node --no-warnings scripts/run-evidence-assignment-tests.mjs"
+    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs",
+    "test:evidence-assignment": "node --no-warnings scripts/run-evidence-assignment-tests.mjs",
+    "test:withdrawal-review": "node --no-warnings scripts/run-withdrawal-review-tests.mjs"
   },
   "private": true
 }

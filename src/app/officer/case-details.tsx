@@ -25,6 +25,7 @@ type CaseStatus =
   | "investigating"
   | "awaiting_information"
   | "awaiting_evidence"
+  | "withdrawal_requested"
   | "resolved"
   | "closed";
 
@@ -92,6 +93,20 @@ type InformationRequestRecord = {
   sent_at: string | null;
   responded_at: string | null;
   response: InformationResponse | null;
+};
+
+type WithdrawalRequestRecord = {
+  withdrawal_id: string;
+  case_id: string;
+  case_reference: string;
+  case_title: string;
+  reporter_id: string;
+  request_reason: string;
+  status: "requested" | "pending" | "approved" | "rejected";
+  requested_at: string;
+  reviewed_at: string | null;
+  decision_reason: string | null;
+  reviewer_name: string | null;
 };
 
 type CaseDetailsTab = "overview" | "requests" | "evidence" | "notes" | "activity";
@@ -186,11 +201,16 @@ export default function CaseDetailsScreen() {
   const [informationRequests, setInformationRequests] = useState<
     InformationRequestRecord[]
   >([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<
+    WithdrawalRequestRecord[]
+  >([]);
+  const [withdrawalReason, setWithdrawalReason] = useState("");
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [reviewingWithdrawal, setReviewingWithdrawal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeTab, setActiveTab] = useState<CaseDetailsTab>("overview");
 
@@ -384,6 +404,20 @@ export default function CaseDetailsScreen() {
 
           setInformationRequests(records);
         }
+
+        const { data: withdrawalData, error: withdrawalError } =
+          await supabase.rpc("get_officer_case_withdrawal_requests", {
+            p_case_id: caseId,
+          });
+
+        if (withdrawalError) {
+          console.error("WITHDRAWAL REQUEST ERROR:", withdrawalError);
+          setWithdrawalRequests([]);
+        } else {
+          setWithdrawalRequests(
+            (withdrawalData ?? []) as WithdrawalRequestRecord[],
+          );
+        }
       } catch (error) {
         console.error("LOAD CASE WORKSPACE ERROR:", error);
 
@@ -552,6 +586,103 @@ export default function CaseDetailsScreen() {
     ]);
   };
 
+  const reviewWithdrawalRequest = async (
+    requestId: string,
+    decision: "approved" | "rejected",
+  ) => {
+    const cleanReason = withdrawalReason.trim();
+
+    if (cleanReason.length < 10) {
+      const message =
+        "Add a clear decision reason before approving or rejecting this withdrawal request.";
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Decision reason required", message);
+      }
+
+      return;
+    }
+
+    const actionLabel = decision === "approved" ? "approve" : "reject";
+    const confirmation = `Are you sure you want to ${actionLabel} this withdrawal request?`;
+
+    const performReview = async () => {
+      try {
+        setReviewingWithdrawal(true);
+
+        const { error } = await supabase.rpc(
+          "review_case_withdrawal_request",
+          {
+            p_request_id: requestId,
+            p_decision: decision,
+            p_reason: cleanReason,
+          },
+        );
+
+        if (error) {
+          const message = `Unable to review withdrawal request: ${error.message}`;
+
+          if (Platform.OS === "web") {
+            window.alert(message);
+          } else {
+            Alert.alert("Review failed", message);
+          }
+
+          return;
+        }
+
+        setWithdrawalReason("");
+        await loadWorkspace(false);
+
+        const message =
+          decision === "approved"
+            ? "Withdrawal approved. The case has been closed and the Reporter was informed."
+            : "Withdrawal rejected. The case remains active and the Reporter was informed.";
+
+        if (Platform.OS === "web") {
+          window.alert(message);
+        } else {
+          Alert.alert("Withdrawal reviewed", message);
+        }
+      } catch (error) {
+        console.error("WITHDRAWAL REVIEW ERROR:", error);
+
+        const message =
+          "JusticeNow could not submit the withdrawal decision. Please try again.";
+
+        if (Platform.OS === "web") {
+          window.alert(message);
+        } else {
+          Alert.alert("Review failed", message);
+        }
+      } finally {
+        setReviewingWithdrawal(false);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm(confirmation)) {
+        void performReview();
+      }
+
+      return;
+    }
+
+    Alert.alert("Review withdrawal request", confirmation, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: decision === "approved" ? "Approve" : "Reject",
+        style: decision === "approved" ? "default" : "destructive",
+        onPress: () => void performReview(),
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -692,6 +823,111 @@ export default function CaseDetailsScreen() {
 
         {activeTab === "overview" ? (
           <>
+        {withdrawalRequests.some((item) =>
+          ["requested", "pending"].includes(item.status),
+        ) ? (
+          <>
+            <Text style={styles.sectionTitle}>Withdrawal review</Text>
+
+            {withdrawalRequests
+              .filter((item) => ["requested", "pending"].includes(item.status))
+              .map((item) => (
+                <View key={item.withdrawal_id} style={styles.withdrawalCard}>
+                  <View style={styles.withdrawalHeader}>
+                    <View style={styles.withdrawalIconBox}>
+                      <AppIcon
+                        name="shield-alert"
+                        size={iconSizes.md}
+                        color={colors.warning}
+                      />
+                    </View>
+
+                    <View style={styles.withdrawalHeaderText}>
+                      <Text style={styles.withdrawalStatus}>
+                        PENDING OFFICER DECISION
+                      </Text>
+
+                      <Text style={styles.withdrawalDate}>
+                        Requested {formatDateTime(item.requested_at)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.withdrawalTitle}>
+                    Reporter withdrawal request
+                  </Text>
+
+                  <Text style={styles.withdrawalReasonText}>
+                    {item.request_reason}
+                  </Text>
+
+                  <Text style={styles.noteLabel}>Decision reason</Text>
+
+                  <TextInput
+                    value={withdrawalReason}
+                    onChangeText={setWithdrawalReason}
+                    placeholder="Explain why the request is approved or rejected..."
+                    placeholderTextColor={colors.textSoft}
+                    multiline
+                    maxLength={1000}
+                    textAlignVertical="top"
+                    editable={!reviewingWithdrawal}
+                    style={styles.withdrawalDecisionInput}
+                  />
+
+                  <View style={styles.withdrawalActions}>
+                    <Pressable
+                      onPress={() =>
+                        void reviewWithdrawalRequest(
+                          item.withdrawal_id,
+                          "rejected",
+                        )
+                      }
+                      disabled={reviewingWithdrawal}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [
+                        styles.withdrawalSecondaryButton,
+                        pressed && styles.pressed,
+                        reviewingWithdrawal && styles.disabledButton,
+                      ]}
+                    >
+                      <Text style={styles.withdrawalSecondaryText}>
+                        Reject request
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        void reviewWithdrawalRequest(
+                          item.withdrawal_id,
+                          "approved",
+                        )
+                      }
+                      disabled={reviewingWithdrawal}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [
+                        styles.withdrawalPrimaryButton,
+                        pressed && styles.pressed,
+                        reviewingWithdrawal && styles.disabledButton,
+                      ]}
+                    >
+                      {reviewingWithdrawal ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.textInverse}
+                        />
+                      ) : (
+                        <Text style={styles.withdrawalPrimaryText}>
+                          Approve withdrawal
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+          </>
+        ) : null}
+
         <Text style={styles.sectionTitle}>Case information</Text>
 
         <View style={styles.sectionCard}>
@@ -989,6 +1225,77 @@ export default function CaseDetailsScreen() {
                 <View style={styles.awaitingResponseBox}>
                   <Text style={styles.awaitingResponseText}>
                     The Reporter has not submitted a response yet.
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+
+        <Text style={styles.sectionTitle}>Withdrawal request history</Text>
+
+        {withdrawalRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <AppIcon name="shield" size={iconSizes.xl} color={colors.royal[700]} />
+
+            <Text style={styles.emptyTitle}>No withdrawal requests</Text>
+
+            <Text style={styles.emptyText}>
+              Reporter withdrawal requests and officer decisions will appear
+              here.
+            </Text>
+          </View>
+        ) : (
+          withdrawalRequests.map((item) => (
+            <View key={item.withdrawal_id} style={styles.requestHistoryCard}>
+              <View style={styles.requestHistoryHeader}>
+                <Text
+                  style={[
+                    styles.requestHistoryStatus,
+                    item.status === "approved" &&
+                      styles.requestHistoryResponded,
+                    item.status === "rejected" &&
+                      styles.withdrawalRejectedStatus,
+                  ]}
+                >
+                  {formatWithdrawalStatus(item.status).toUpperCase()}
+                </Text>
+
+                <Text style={styles.requestHistoryDate}>
+                  {formatDateTime(item.requested_at)}
+                </Text>
+              </View>
+
+              <Text style={styles.requestHistoryTitle}>
+                Withdrawal request
+              </Text>
+
+              <Text style={styles.requestHistoryMessage}>
+                {item.request_reason}
+              </Text>
+
+              {item.decision_reason ? (
+                <View style={styles.reporterResponseBox}>
+                  <Text style={styles.reporterResponseHeading}>
+                    Officer decision
+                  </Text>
+
+                  <Text style={styles.reporterResponseDate}>
+                    {item.reviewed_at
+                      ? formatDateTime(item.reviewed_at)
+                      : "Decision date unavailable"}
+                    {item.reviewer_name ? ` by ${item.reviewer_name}` : ""}
+                  </Text>
+
+                  <Text style={styles.reporterResponseText}>
+                    {item.decision_reason}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.awaitingResponseBox}>
+                  <Text style={styles.awaitingResponseText}>
+                    This withdrawal request is waiting for an authorized Case
+                    Officer decision.
                   </Text>
                 </View>
               )}
@@ -1335,6 +1642,8 @@ function formatStatus(status: CaseStatus | null) {
       return "Awaiting evidence";
     case "awaiting_information":
       return "Awaiting information";
+    case "withdrawal_requested":
+      return "Withdrawal requested";
     case "investigating":
       return "Investigating";
     case "submitted":
@@ -1345,6 +1654,20 @@ function formatStatus(status: CaseStatus | null) {
       return "Resolved";
     case "closed":
       return "Closed";
+    default:
+      return status;
+  }
+}
+
+function formatWithdrawalStatus(status: WithdrawalRequestRecord["status"]) {
+  switch (status) {
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "pending":
+    case "requested":
+      return "Pending review";
     default:
       return status;
   }
@@ -1581,6 +1904,98 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: colors.textSecondary,
   },
+  withdrawalCard: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: colors.gold[100],
+    borderRadius: 14,
+    backgroundColor: colors.gold[50],
+  },
+  withdrawalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+  withdrawalIconBox: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  withdrawalHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  withdrawalStatus: {
+    fontSize: 9.5,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    color: colors.warning,
+  },
+  withdrawalDate: {
+    marginTop: 2,
+    fontSize: 10.5,
+    color: colors.textSecondary,
+  },
+  withdrawalTitle: {
+    marginTop: 13,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  withdrawalReasonText: {
+    marginTop: 5,
+    marginBottom: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.navy[700],
+  },
+  withdrawalDecisionInput: {
+    minHeight: 96,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.gold[100],
+    borderRadius: 11,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.navy[800],
+    backgroundColor: colors.surface,
+  },
+  withdrawalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  withdrawalSecondaryButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  withdrawalSecondaryText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.error,
+  },
+  withdrawalPrimaryButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: colors.royal[700],
+  },
+  withdrawalPrimaryText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.textInverse,
+  },
   evidenceButton: {
     minHeight: 82,
     flexDirection: "row",
@@ -1644,6 +2059,9 @@ const styles = StyleSheet.create({
   },
   requestHistoryResponded: {
     color: colors.success,
+  },
+  withdrawalRejectedStatus: {
+    color: colors.error,
   },
   requestHistoryDate: {
     fontSize: 9.5,

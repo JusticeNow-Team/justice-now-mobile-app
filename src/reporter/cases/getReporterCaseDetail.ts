@@ -67,6 +67,8 @@ export interface ReporterWithdrawalRequest {
   reason: string;
   status: string;
   requestedAt: string;
+  reviewedAt: string | null;
+  decisionReason: string | null;
 }
 
 export type GetReporterCaseDetailResult =
@@ -348,7 +350,7 @@ export async function getReporterCaseDetail(
 
   const { data: withdrawalRow } = await supabase
     .from("case_withdrawal_requests")
-    .select("id, reason, status, requested_at")
+    .select("id, reason, status, requested_at, reviewed_at, decision_reason")
     .eq("case_id", caseId)
     .eq("reporter_id", user.id)
     .order("requested_at", { ascending: false })
@@ -361,6 +363,8 @@ export async function getReporterCaseDetail(
       reason: withdrawalRow.reason,
       status: withdrawalRow.status,
       requestedAt: withdrawalRow.requested_at,
+      reviewedAt: withdrawalRow.reviewed_at,
+      decisionReason: withdrawalRow.decision_reason,
     };
   }
 
