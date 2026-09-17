@@ -9,6 +9,10 @@ const officerScreen = await readFile(
   new URL("../src/app/officer/assign-evidence.tsx", import.meta.url),
   "utf8",
 );
+const officerEvidenceScreen = await readFile(
+  new URL("../src/app/officer/evidence.tsx", import.meta.url),
+  "utf8",
+);
 const validatorApi = await readFile(
   new URL("../src/evidence-validator/api.ts", import.meta.url),
   "utf8",
@@ -43,6 +47,26 @@ const requirements = [
   ["assignment timeline entry", /'evidence_assigned'/],
   ["Validator queue RPC", /create function public\.get_my_evidence_assignments\(\)/],
   ["start-review RPC", /create function public\.start_my_evidence_review\(p_assignment_id uuid\)/],
+  [
+    "verification decision storage",
+    /create table if not exists public\.evidence_verification_decisions/,
+  ],
+  [
+    "checker decision RPC",
+    /create function public\.submit_evidence_verification_decision\(/,
+  ],
+  [
+    "officer result RPC",
+    /create function public\.get_officer_evidence_verification_results\(/,
+  ],
+  [
+    "verification result officer ownership",
+    /officer_assignment\.assigned_officer_id = v_officer_id[\s\S]*officer_assignment\.is_active = true[\s\S]*decision_record\.case_id/,
+  ],
+  [
+    "separate reporter-visible timeline entry",
+    /'evidence_update_available'[\s\S]*v_reporter_message[\s\S]*true/,
+  ],
 ];
 
 for (const [name, pattern] of requirements) {
@@ -63,6 +87,21 @@ assert.match(
   validatorApi,
   /error\.code === "PGRST202" \|\| error\.code === "42883"/,
   "The assignment queue must not depend on the later verification-history story.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /get_officer_evidence_verification_results/,
+  "The Officer evidence screen must load verification results through the authorized RPC.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /Reporter-visible message/,
+  "The Officer evidence screen must label reporter-visible verification text separately.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /Internal officer notes/,
+  "The Officer evidence screen must label internal verification notes separately.",
 );
 
 console.log("Evidence assignment contract tests passed.");

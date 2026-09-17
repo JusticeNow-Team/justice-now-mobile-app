@@ -45,6 +45,37 @@ create table if not exists public.case_timeline_events (
 create index if not exists case_timeline_events_case_created_idx
 on public.case_timeline_events (case_id, created_at desc);
 
+create table if not exists public.evidence_verification_decisions (
+  id uuid primary key default gen_random_uuid(),
+  assignment_id uuid not null references public.evidence_assignments(id) on delete cascade,
+  evidence_id uuid not null references public.case_evidence(id) on delete cascade,
+  case_id uuid not null references public.cases(id) on delete cascade,
+  evidence_checker_id uuid not null references public.profiles(id),
+  decision text not null
+    check (
+      decision in (
+        'approved',
+        'rejected',
+        'replacement_requested',
+        'escalated'
+      )
+    ),
+  reason text not null,
+  internal_notes text,
+  reporter_message text,
+  decided_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists evidence_verification_decisions_one_per_assignment
+on public.evidence_verification_decisions (assignment_id);
+
+create index if not exists evidence_verification_decisions_evidence_idx
+on public.evidence_verification_decisions (evidence_id, decided_at desc);
+
+create index if not exists evidence_verification_decisions_case_idx
+on public.evidence_verification_decisions (case_id, decided_at desc);
+
 -- Older JusticeNow environments already contain the timeline table without
 -- this visibility flag. Adding it is non-destructive and keeps those records.
 alter table public.case_timeline_events
@@ -52,9 +83,11 @@ add column if not exists reporter_visible boolean not null default false;
 
 alter table public.evidence_assignments enable row level security;
 alter table public.case_timeline_events enable row level security;
+alter table public.evidence_verification_decisions enable row level security;
 
 grant select on public.evidence_assignments to authenticated;
 grant select on public.case_timeline_events to authenticated;
+grant select on public.evidence_verification_decisions to authenticated;
 
 drop policy if exists "Assigned staff can view evidence assignments"
 on public.evidence_assignments;
@@ -111,6 +144,31 @@ using (
       where reporter_case.id = case_timeline_events.case_id
         and reporter_case.reporter_id = (select auth.uid())
     )
+  )
+);
+
+drop policy if exists "Authorized staff can view evidence verification decisions"
+on public.evidence_verification_decisions;
+
+create policy "Authorized staff can view evidence verification decisions"
+on public.evidence_verification_decisions
+for select
+to authenticated
+using (
+  evidence_checker_id = (select auth.uid())
+  or exists (
+    select 1
+    from public.case_assignments as officer_assignment
+    where officer_assignment.case_id = evidence_verification_decisions.case_id
+      and officer_assignment.assigned_officer_id = (select auth.uid())
+      and officer_assignment.is_active = true
+  )
+  or exists (
+    select 1
+    from public.profiles as viewer
+    where viewer.id = (select auth.uid())
+      and viewer.role::text = 'system_admin'
+      and viewer.is_active = true
   )
 );
 
@@ -621,6 +679,350 @@ begin
 end;
 $$;
 
+drop function if exists public.submit_evidence_verification_decision(uuid, text, text, text, text);
+
+create function public.submit_evidence_verification_decision(
+  p_assignment_id uuid,
+  p_decision text,
+  p_reason text,
+  p_internal_notes text default null,
+  p_reporter_message text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_checker_id uuid := auth.uid();
+  v_assignment public.evidence_assignments%rowtype;
+  v_case_reference text;
+  v_evidence_title text;
+  v_decision text := trim(coalesce(p_decision, ''));
+  v_reason text := trim(coalesce(p_reason, ''));
+  v_internal_notes text := nullif(trim(coalesce(p_internal_notes, '')), '');
+  v_reporter_message text := nullif(trim(coalesce(p_reporter_message, '')), '');
+  v_decision_id uuid;
+begin
+  if v_checker_id is null then
+    raise exception 'You must be signed in to submit an evidence decision.';
+  end if;
+
+  if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'Multi-factor authentication is required.';
+  end if;
+
+  if not exists (
+    select 1
+    from public.profiles as checker
+    where checker.id = v_checker_id
+      and checker.role::text = 'evidence_validator'
+      and checker.is_active = true
+  ) then
+    raise exception 'Only an active Evidence Validator can submit this decision.';
+  end if;
+
+  if v_decision not in (
+    'approved',
+    'rejected',
+    'replacement_requested',
+    'escalated'
+  ) then
+    raise exception 'Select a valid evidence decision.';
+  end if;
+
+  if length(v_reason) < 5 then
+    raise exception 'Add verification comments before submitting.';
+  end if;
+
+  select assignment.*
+  into v_assignment
+  from public.evidence_assignments as assignment
+  where assignment.id = p_assignment_id
+    and assignment.evidence_checker_id = v_checker_id
+    and assignment.status in ('assigned', 'under_review')
+  for update;
+
+  if v_assignment.id is null then
+    raise exception 'This active evidence assignment could not be found.';
+  end if;
+
+  select
+    case_record.case_reference,
+    evidence.title
+  into
+    v_case_reference,
+    v_evidence_title
+  from public.cases as case_record
+  join public.case_evidence as evidence
+    on evidence.id = v_assignment.evidence_id
+  where case_record.id = v_assignment.case_id;
+
+  insert into public.evidence_verification_decisions (
+    assignment_id,
+    evidence_id,
+    case_id,
+    evidence_checker_id,
+    decision,
+    reason,
+    internal_notes,
+    reporter_message
+  )
+  values (
+    v_assignment.id,
+    v_assignment.evidence_id,
+    v_assignment.case_id,
+    v_checker_id,
+    v_decision,
+    v_reason,
+    v_internal_notes,
+    v_reporter_message
+  )
+  returning id into v_decision_id;
+
+  update public.evidence_assignments
+  set
+    status = 'completed',
+    started_at = coalesce(started_at, now()),
+    completed_at = now(),
+    updated_at = now()
+  where id = v_assignment.id;
+
+  if v_decision = 'approved' then
+    update public.case_evidence
+    set validation_status = 'verified'
+    where id = v_assignment.evidence_id;
+  elsif v_decision in ('rejected', 'replacement_requested') then
+    update public.case_evidence
+    set validation_status = 'rejected'
+    where id = v_assignment.evidence_id;
+  else
+    update public.case_evidence
+    set validation_status = 'under_review'
+    where id = v_assignment.evidence_id;
+  end if;
+
+  insert into public.case_timeline_events (
+    case_id,
+    event_type,
+    evidence_id,
+    title,
+    description,
+    actor_id,
+    metadata,
+    reporter_visible
+  )
+  values (
+    v_assignment.case_id,
+    'evidence_verification_completed',
+    v_assignment.evidence_id,
+    'Evidence verification completed',
+    format(
+      'Verification completed for %s on case %s.',
+      coalesce(v_evidence_title, 'evidence'),
+      coalesce(v_case_reference, 'this case')
+    ),
+    v_checker_id,
+    jsonb_build_object(
+      'decision_id', v_decision_id,
+      'decision', v_decision,
+      'reason', v_reason,
+      'internal_notes', v_internal_notes
+    ),
+    false
+  );
+
+  if v_reporter_message is not null then
+    insert into public.case_timeline_events (
+      case_id,
+      event_type,
+      evidence_id,
+      title,
+      description,
+      actor_id,
+      metadata,
+      reporter_visible
+    )
+    values (
+      v_assignment.case_id,
+      'evidence_update_available',
+      v_assignment.evidence_id,
+      'Evidence update available',
+      v_reporter_message,
+      v_checker_id,
+      jsonb_build_object(
+        'decision_id', v_decision_id,
+        'decision', v_decision
+      ),
+      true
+    );
+  end if;
+
+  return v_decision_id;
+exception
+  when unique_violation then
+    raise exception 'A verification decision has already been submitted for this assignment.';
+end;
+$$;
+
+drop function if exists public.get_my_evidence_verification_history();
+
+create function public.get_my_evidence_verification_history()
+returns table (
+  decision_id uuid,
+  assignment_id uuid,
+  evidence_id uuid,
+  evidence_title text,
+  file_name text,
+  case_id uuid,
+  case_reference text,
+  decision text,
+  reason text,
+  internal_notes text,
+  reporter_message text,
+  decided_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_checker_id uuid := auth.uid();
+begin
+  if v_checker_id is null then
+    raise exception 'You must be signed in to view verification history.';
+  end if;
+
+  if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'Multi-factor authentication is required.';
+  end if;
+
+  if not exists (
+    select 1
+    from public.profiles as checker
+    where checker.id = v_checker_id
+      and checker.role::text = 'evidence_validator'
+      and checker.is_active = true
+  ) then
+    raise exception 'Only an active Evidence Validator can view this history.';
+  end if;
+
+  return query
+  select
+    decision_record.id,
+    decision_record.assignment_id,
+    decision_record.evidence_id,
+    evidence.title,
+    evidence.file_name,
+    case_record.id,
+    case_record.case_reference,
+    decision_record.decision,
+    decision_record.reason,
+    decision_record.internal_notes,
+    decision_record.reporter_message,
+    decision_record.decided_at
+  from public.evidence_verification_decisions as decision_record
+  join public.case_evidence as evidence
+    on evidence.id = decision_record.evidence_id
+  join public.cases as case_record
+    on case_record.id = decision_record.case_id
+  where decision_record.evidence_checker_id = v_checker_id
+  order by decision_record.decided_at desc;
+end;
+$$;
+
+drop function if exists public.get_officer_evidence_verification_results(uuid);
+
+create function public.get_officer_evidence_verification_results(
+  p_case_id uuid default null
+)
+returns table (
+  decision_id uuid,
+  assignment_id uuid,
+  evidence_id uuid,
+  evidence_title text,
+  file_name text,
+  case_id uuid,
+  case_reference text,
+  decision text,
+  reason text,
+  internal_notes text,
+  reporter_message text,
+  decided_at timestamptz,
+  checker_id uuid,
+  checker_name text,
+  completed_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_officer_id uuid := auth.uid();
+begin
+  if v_officer_id is null then
+    raise exception 'You must be signed in to view verification results.';
+  end if;
+
+  if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'Multi-factor authentication is required.';
+  end if;
+
+  if not exists (
+    select 1
+    from public.profiles as officer
+    where officer.id = v_officer_id
+      and officer.role::text = 'case_officer'
+      and officer.is_active = true
+  ) then
+    raise exception 'Only an active Case Officer can view verification results.';
+  end if;
+
+  if p_case_id is not null and not exists (
+    select 1
+    from public.case_assignments as officer_assignment
+    where officer_assignment.case_id = p_case_id
+      and officer_assignment.assigned_officer_id = v_officer_id
+      and officer_assignment.is_active = true
+  ) then
+    raise exception 'You are not the active Case Officer for this case.';
+  end if;
+
+  return query
+  select
+    decision_record.id,
+    decision_record.assignment_id,
+    decision_record.evidence_id,
+    evidence.title,
+    evidence.file_name,
+    case_record.id,
+    case_record.case_reference,
+    decision_record.decision,
+    decision_record.reason,
+    decision_record.internal_notes,
+    decision_record.reporter_message,
+    decision_record.decided_at,
+    checker.id,
+    checker.full_name,
+    assignment.completed_at
+  from public.evidence_verification_decisions as decision_record
+  join public.evidence_assignments as assignment
+    on assignment.id = decision_record.assignment_id
+  join public.case_evidence as evidence
+    on evidence.id = decision_record.evidence_id
+  join public.cases as case_record
+    on case_record.id = decision_record.case_id
+  join public.profiles as checker
+    on checker.id = decision_record.evidence_checker_id
+  join public.case_assignments as officer_assignment
+    on officer_assignment.case_id = decision_record.case_id
+   and officer_assignment.assigned_officer_id = v_officer_id
+   and officer_assignment.is_active = true
+  where p_case_id is null or decision_record.case_id = p_case_id
+  order by decision_record.decided_at desc;
+end;
+$$;
+
 revoke all on function public.get_available_evidence_checkers(uuid)
 from public, anon;
 revoke all on function public.get_officer_evidence_assignments(uuid)
@@ -632,6 +1034,12 @@ from public, anon;
 revoke all on function public.get_my_evidence_assignment_detail(uuid)
 from public, anon;
 revoke all on function public.start_my_evidence_review(uuid)
+from public, anon;
+revoke all on function public.submit_evidence_verification_decision(uuid, text, text, text, text)
+from public, anon;
+revoke all on function public.get_my_evidence_verification_history()
+from public, anon;
+revoke all on function public.get_officer_evidence_verification_results(uuid)
 from public, anon;
 
 grant execute on function public.get_available_evidence_checkers(uuid)
@@ -645,6 +1053,12 @@ to authenticated;
 grant execute on function public.get_my_evidence_assignment_detail(uuid)
 to authenticated;
 grant execute on function public.start_my_evidence_review(uuid)
+to authenticated;
+grant execute on function public.submit_evidence_verification_decision(uuid, text, text, text, text)
+to authenticated;
+grant execute on function public.get_my_evidence_verification_history()
+to authenticated;
+grant execute on function public.get_officer_evidence_verification_results(uuid)
 to authenticated;
 
 notify pgrst, 'reload schema';
