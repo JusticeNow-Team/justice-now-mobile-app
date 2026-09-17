@@ -361,7 +361,7 @@ export default function OfficerNotificationsScreen() {
           <AppIcon
             name="chevron-left"
             size={iconSizes.headerBack}
-            color={colors.textInverse}
+            color={colors.navy[700]}
           />
         </Pressable>
 
@@ -694,7 +694,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
 
     paddingHorizontal: 14,
-    backgroundColor: colors.navy[900],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
 
   backButton: {
@@ -712,9 +714,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
 
-    fontWeight: "800",
+    fontWeight: "600",
 
-    color: colors.textInverse,
+    color: colors.navy[800],
   },
 
   headerSubtitle: {
@@ -722,7 +724,7 @@ const styles = StyleSheet.create({
 
     fontSize: 11,
 
-    color: colors.navy[300],
+    color: colors.textSecondary,
   },
 
   markAllText: {
@@ -730,9 +732,9 @@ const styles = StyleSheet.create({
 
     fontSize: 10.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
-    color: colors.textInverse,
+    color: colors.royal[700],
   },
 
   content: {
@@ -762,7 +764,7 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontSize: 9.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     letterSpacing: 0.8,
 
@@ -774,7 +776,7 @@ const styles = StyleSheet.create({
 
     fontSize: 19,
 
-    fontWeight: "800",
+    fontWeight: "600",
 
     color: colors.textInverse,
   },
@@ -806,7 +808,7 @@ const styles = StyleSheet.create({
   unreadValue: {
     fontSize: 19,
 
-    fontWeight: "800",
+    fontWeight: "600",
 
     color: colors.textInverse,
   },
@@ -929,7 +931,7 @@ const styles = StyleSheet.create({
   },
 
   notificationTitleUnread: {
-    fontWeight: "800",
+    fontWeight: "600",
   },
 
   unreadDot: {
@@ -964,7 +966,7 @@ const styles = StyleSheet.create({
   caseReference: {
     fontSize: 9.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.royal[700],
   },
@@ -1002,7 +1004,7 @@ const styles = StyleSheet.create({
 
     fontSize: 13,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },
@@ -1044,7 +1046,7 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 11.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.teal[800],
   },
@@ -1078,7 +1080,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 12,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.error,
   },
@@ -1107,7 +1109,7 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 10.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.textInverse,
   },

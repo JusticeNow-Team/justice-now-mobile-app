@@ -623,31 +623,6 @@ export default function EvidenceReviewScreen() {
                 </Pressable>
               </View>
 
-              {item.validation_status === "pending" ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Assign ${item.title} to an Evidence Validator`}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/officer/assign-evidence",
-                      params: {
-                        caseId: item.case_id,
-                        evidenceId: item.id,
-                      },
-                    })
-                  }
-                  style={styles.assignmentButton}
-                >
-                  <AppIcon
-                    name="user-plus"
-                    size={16}
-                    color={colors.royal[700]}
-                  />
-                  <Text style={styles.assignmentButtonText}>
-                    Assign for independent validation
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
           );
         })}
@@ -930,7 +905,7 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },
@@ -959,7 +934,7 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontSize: 10,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     letterSpacing: 0.7,
 
@@ -971,7 +946,7 @@ const styles = StyleSheet.create({
 
     fontSize: 19,
 
-    fontWeight: "800",
+    fontWeight: "600",
 
     color: colors.textInverse,
   },
@@ -1093,7 +1068,7 @@ const styles = StyleSheet.create({
   resultsTitle: {
     fontSize: 15,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },
@@ -1141,7 +1116,7 @@ const styles = StyleSheet.create({
   caseReference: {
     fontSize: 9.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.royal[700],
   },
@@ -1151,7 +1126,7 @@ const styles = StyleSheet.create({
 
     fontSize: 13.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },
@@ -1218,7 +1193,7 @@ const styles = StyleSheet.create({
   validationText: {
     fontSize: 9,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[700],
   },
@@ -1246,7 +1221,7 @@ const styles = StyleSheet.create({
   reviewStateText: {
     fontSize: 10.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },
@@ -1287,7 +1262,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 11,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.royal[700],
   },
@@ -1307,7 +1282,7 @@ const styles = StyleSheet.create({
 
   assignmentButtonText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
 
@@ -1327,7 +1302,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 11,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.textInverse,
   },
@@ -1349,7 +1324,7 @@ const styles = StyleSheet.create({
   composerLabel: {
     fontSize: 9.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     letterSpacing: 0.6,
 
@@ -1361,7 +1336,7 @@ const styles = StyleSheet.create({
 
     fontSize: 15,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },
@@ -1500,7 +1475,7 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: 11.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.textInverse,
   },
@@ -1524,7 +1499,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 12.5,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.error,
   },
@@ -1556,7 +1531,7 @@ const styles = StyleSheet.create({
 
     fontSize: 13,
 
-    fontWeight: "700",
+    fontWeight: "600",
 
     color: colors.navy[800],
   },

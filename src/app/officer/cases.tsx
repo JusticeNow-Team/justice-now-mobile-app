@@ -216,7 +216,7 @@ export default function AssignedCasesScreen() {
           <AppIcon
             name="chevron-left"
             size={iconSizes.headerBack}
-            color={colors.textInverse}
+            color={colors.navy[700]}
           />
         </Pressable>
 
@@ -537,7 +537,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    backgroundColor: colors.navy[900],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   backButton: {
     width: 42,
@@ -550,34 +552,33 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "800",
-    color: colors.textInverse,
+    fontWeight: "600",
+    color: colors.navy[800],
   },
   headerSubtitle: {
     marginTop: 2,
     fontSize: 11.5,
-    color: colors.navy[300],
+    color: colors.textSecondary,
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 34,
   },
   infoCard: {
-    marginTop: -10,
     padding: 18,
     borderRadius: 16,
     backgroundColor: colors.navy[800],
   },
   infoLabel: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.7,
     color: "#AFC2D9",
   },
   infoTitle: {
     marginTop: 5,
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   infoText: {
@@ -638,7 +639,7 @@ const styles = StyleSheet.create({
   },
   resultsTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   resultsCount: {
@@ -663,14 +664,14 @@ const styles = StyleSheet.create({
   },
   caseReference: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.4,
     color: colors.royal[700],
   },
   caseTitle: {
     marginTop: 8,
     fontSize: 14.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   caseDescription: {
@@ -734,7 +735,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 9.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   priorityBadge: {
@@ -754,7 +755,7 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     fontSize: 9.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   priorityUrgentText: {
@@ -779,7 +780,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 13,
     fontSize: 14.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   emptyDescription: {
@@ -798,7 +799,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.error,
   },
   errorText: {
@@ -817,7 +818,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   securityNotice: {
@@ -834,7 +835,7 @@ const styles = StyleSheet.create({
   },
   securityTitle: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   securityText: {

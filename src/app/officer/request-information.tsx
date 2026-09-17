@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   headerSubtitle: {
@@ -721,14 +721,14 @@ const styles = StyleSheet.create({
   },
   caseReference: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.5,
     color: "#BBD0E8",
   },
   caseTitle: {
     marginTop: 7,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
     lineHeight: 22,
     color: colors.textInverse,
   },
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 8,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   sectionCard: {
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   },
   itemNumberText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   itemInput: {
@@ -843,7 +843,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   divider: {
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
   },
   securityTitle: {
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   securityText: {
@@ -932,7 +932,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 13.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   primaryButton: {
@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 13.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   disabled: {
@@ -960,7 +960,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     marginTop: 12,
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   errorText: {
@@ -981,7 +981,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
 });

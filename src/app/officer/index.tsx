@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -313,6 +313,31 @@ export default function OfficerDashboardScreen() {
     void loadDashboard(false);
   };
 
+  const priorityQueue = useMemo(() => {
+    const priorityWeight: Record<CasePriority, number> = {
+      urgent: 4,
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
+
+    return Object.values(caseMap)
+      .sort((left, right) => {
+        const priorityDifference =
+          priorityWeight[right.priority] - priorityWeight[left.priority];
+
+        if (priorityDifference !== 0) {
+          return priorityDifference;
+        }
+
+        return (
+          new Date(right.updated_at).getTime() -
+          new Date(left.updated_at).getTime()
+        );
+      })
+      .slice(0, 4);
+  }, [caseMap]);
+
   const completeSignOut = async () => {
     const { error } = await supabase.auth.signOut();
 
@@ -376,13 +401,11 @@ export default function OfficerDashboardScreen() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoMark}>
-            <Text style={styles.logoText}>JN</Text>
+            <AppIcon name="scale" size={18} color={colors.textInverse} />
           </View>
 
           <View>
-            <Text style={styles.workspaceLabel}>
-              Case investigator dashboard
-            </Text>
+            <Text style={styles.workspaceLabel}>Case Officer workspace</Text>
 
             <Text style={styles.brandName}>{officerName}</Text>
           </View>
@@ -415,15 +438,15 @@ export default function OfficerDashboardScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.welcomeCard}>
-          <Text style={styles.welcomeLabel}>CASE OFFICER</Text>
+          <Text style={styles.welcomeLabel}>Today’s focus</Text>
 
-          <Text style={styles.welcomeTitle}>Priority workload</Text>
+          <Text style={styles.welcomeTitle}>Review, assign and follow up</Text>
 
           <Text style={styles.welcomeText}>
             {stats.urgent} urgent case{stats.urgent === 1 ? " is" : "s are"}{" "}
             active and {stats.evidenceToReview} evidence item
             {stats.evidenceToReview === 1 ? "" : "s"} need officer attention.
-            Critical cases are shown first in your queue.
+            Work through the queue from highest risk to routine follow-up.
           </Text>
         </View>
 
@@ -441,20 +464,6 @@ export default function OfficerDashboardScreen() {
             </Pressable>
           </View>
         )}
-
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Case overview</Text>
-
-            <Text style={styles.sectionSubtitle}>
-              Live data from your assigned investigations
-            </Text>
-          </View>
-
-          <Pressable onPress={handleRefresh} accessibilityRole="button">
-            <Text style={styles.refreshText}>Refresh</Text>
-          </Pressable>
-        </View>
 
         <View style={styles.statsGrid}>
           <StatCard
@@ -500,42 +509,77 @@ export default function OfficerDashboardScreen() {
           />
         </View>
 
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Priority case queue</Text>
+
+          <Pressable
+            onPress={() => router.push("/officer/cases")}
+            accessibilityRole="button"
+          >
+            <Text style={styles.refreshText}>Open queue</Text>
+          </Pressable>
+        </View>
+
+        {priorityQueue.length === 0 ? (
+          <View style={styles.emptyActivity}>
+            <AppIcon name="folder-open" size={22} color={colors.navy[700]} />
+
+            <Text style={styles.emptyActivityTitle}>No active cases</Text>
+
+            <Text style={styles.emptyActivityText}>
+              Assigned cases will appear here once your queue is updated.
+            </Text>
+          </View>
+        ) : (
+          priorityQueue.map((caseItem) => (
+            <PriorityCaseCard
+              key={caseItem.id}
+              caseItem={caseItem}
+              onPress={() =>
+                router.push({
+                  pathname: "/officer/case-details",
+                  params: {
+                    id: caseItem.id,
+                  },
+                })
+              }
+            />
+          ))
+        )}
+
         <Text style={styles.actionsSectionTitle}>Quick actions</Text>
 
-        <ActionCard
-          icon="folder-open"
-          title="Assigned Cases"
-          description="Review cases currently assigned to your officer account."
-          onPress={() => router.push("/officer/cases")}
-          badge={stats.assigned}
-        />
+        <View style={styles.actionGrid}>
+          <ActionCard
+            icon="folder-open"
+            title="View new cases"
+            description="Open your assigned case queue."
+            onPress={() => router.push("/officer/cases")}
+            badge={stats.assigned}
+          />
 
-        <ActionCard
-          icon="search"
-          title="Evidence Review"
-          description="View case evidence and record investigation findings."
-          onPress={() => router.push("/officer/evidence")}
-          badge={stats.evidenceToReview}
-        />
+          <ActionCard
+            icon="user-plus"
+            title="My assigned cases"
+            description="Continue active investigations."
+            onPress={() => router.push("/officer/cases")}
+          />
 
-        <ActionCard
-          icon="notebook-pen"
-          title="Case Updates"
-          description="Review the latest investigation status changes."
-          onPress={() =>
-            Alert.alert(
-              "Recent Case Updates",
-              "Your latest case updates are displayed below on this dashboard.",
-            )
-          }
-        />
+          <ActionCard
+            icon="message-square"
+            title="Pending responses"
+            description="Check reporter communication."
+            onPress={() => router.push("/officer/messages")}
+          />
 
-        <ActionCard
-          icon="bell"
-          title="Secure Communication"
-          description="Review case assignments, evidence activity and officer alerts."
-          onPress={() => router.push("/officer/messages")}
-        />
+          <ActionCard
+            icon="list-checks"
+            title="Investigation tasks"
+            description="Track today’s officer tasks."
+            onPress={() => router.push("/officer/tasks")}
+            badge={stats.evidenceToReview}
+          />
+        </View>
 
         <View style={styles.activityHeader}>
           <View>
@@ -705,6 +749,69 @@ function ActionCard({
   );
 }
 
+function PriorityCaseCard({
+  caseItem,
+  onPress,
+}: {
+  caseItem: DashboardCase;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${caseItem.case_reference}`}
+      style={({ pressed }) => [
+        styles.priorityCaseCard,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.priorityCaseTop}>
+        <View style={styles.priorityCaseContent}>
+          <Text style={styles.priorityReference}>
+            {caseItem.case_reference}
+          </Text>
+
+          <Text numberOfLines={1} style={styles.priorityTitle}>
+            {caseItem.title}
+          </Text>
+
+          <Text style={styles.priorityMeta}>
+            Updated {formatDateTime(caseItem.updated_at)}
+          </Text>
+        </View>
+
+        <AppIcon name="chevron-right" size={18} color={colors.navy[300]} />
+      </View>
+
+      <View style={styles.priorityBadgeRow}>
+        <View
+          style={[
+            styles.priorityBadge,
+            caseItem.priority === "urgent" && styles.priorityUrgent,
+            caseItem.priority === "high" && styles.priorityHigh,
+          ]}
+        >
+          <Text
+            style={[
+              styles.priorityBadgeText,
+              caseItem.priority === "urgent" && styles.priorityUrgentText,
+            ]}
+          >
+            {caseItem.priority} priority
+          </Text>
+        </View>
+
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusBadgeText}>
+            {formatStatus(caseItem.status)}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function formatStatus(status: CaseStatus | null) {
   if (!status) {
     return "Unknown";
@@ -777,14 +884,9 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: colors.royal[600],
   },
-  logoText: {
-    fontSize: 11,
-    fontWeight: "900",
-    color: colors.textInverse,
-  },
   brandName: {
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   workspaceLabel: {
@@ -807,7 +909,7 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   pressed: {
@@ -825,14 +927,14 @@ const styles = StyleSheet.create({
   },
   welcomeLabel: {
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.8,
     color: "#AFC5DE",
   },
   welcomeTitle: {
     marginTop: 6,
     fontSize: 21,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   welcomeText: {
@@ -850,7 +952,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   sectionSubtitle: {
@@ -873,16 +975,16 @@ const styles = StyleSheet.create({
   statCard: {
     flexGrow: 1,
     flexBasis: "47%",
-    minHeight: 126,
-    padding: 14,
+    minHeight: 92,
+    padding: 13,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 15,
+    borderRadius: 18,
     backgroundColor: colors.surface,
   },
   statIconBox: {
-    width: 38,
-    height: 38,
+    width: 26,
+    height: 26,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 11,
@@ -900,9 +1002,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF0EF",
   },
   statValue: {
-    marginTop: 10,
-    fontSize: 23,
-    fontWeight: "800",
+    marginTop: 8,
+    fontSize: 24,
+    fontWeight: "600",
     color: colors.navy[800],
   },
   statLabel: {
@@ -914,30 +1016,37 @@ const styles = StyleSheet.create({
   actionsSectionTitle: {
     marginTop: 25,
     marginBottom: 10,
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.navy[800],
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    color: colors.textSecondary,
+  },
+  actionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
   actionCard: {
-    minHeight: 83,
-    marginBottom: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 13,
+    flexGrow: 1,
+    flexBasis: "47%",
+    minHeight: 92,
+    justifyContent: "space-between",
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 18,
     backgroundColor: colors.surface,
   },
   actionIconBox: {
-    width: 44,
-    height: 44,
-    marginRight: 12,
+    width: 34,
+    height: 34,
+    marginBottom: 9,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: colors.royal[50],
-  },
+    borderRadius: 11,
+    backgroundColor: "transparent",
+  },
   actionContent: {
     flex: 1,
   },
@@ -948,7 +1057,7 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   actionDescription: {
@@ -956,7 +1065,87 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 15,
     color: colors.textSecondary,
-  },
+  },
+  priorityCaseCard: {
+    marginBottom: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+  },
+  priorityCaseTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  priorityCaseContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  priorityReference: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.royal[700],
+  },
+  priorityTitle: {
+    marginTop: 3,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  priorityMeta: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: colors.textSecondary,
+  },
+  priorityBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 9,
+    backgroundColor: colors.navy[50],
+  },
+  priorityHigh: {
+    borderColor: colors.gold[100],
+    backgroundColor: colors.gold[50],
+  },
+  priorityUrgent: {
+    borderColor: "#F2C8C4",
+    backgroundColor: "#FFF0EF",
+  },
+  priorityBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    textTransform: "capitalize",
+    color: colors.navy[700],
+  },
+  priorityUrgentText: {
+    color: colors.error,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.royal[100],
+    borderRadius: 9,
+    backgroundColor: colors.royal[50],
+  },
+  statusBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    color: colors.royal[700],
+  },
   actionBadge: {
     minWidth: 20,
     height: 20,
@@ -968,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   actionBadgeText: {
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   activityHeader: {
@@ -1003,7 +1192,7 @@ const styles = StyleSheet.create({
   },
   activityReference: {
     fontSize: 9.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   activityTitle: {
@@ -1032,7 +1221,7 @@ const styles = StyleSheet.create({
   emptyActivityTitle: {
     marginTop: 7,
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   emptyActivityText: {
@@ -1056,7 +1245,7 @@ const styles = StyleSheet.create({
   },
   securityTitle: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   securityText: {
@@ -1075,7 +1264,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.error,
   },
   errorText: {
@@ -1094,7 +1283,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
 });

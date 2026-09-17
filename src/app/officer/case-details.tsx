@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppIcon } from "../../components/AppIcon";
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -94,6 +94,8 @@ type InformationRequestRecord = {
   response: InformationResponse | null;
 };
 
+type CaseDetailsTab = "overview" | "requests" | "evidence" | "notes" | "activity";
+
 const STATUS_OPTIONS: {
   value: CaseStatus;
   label: string;
@@ -109,6 +111,38 @@ const STATUS_OPTIONS: {
   {
     value: "resolved",
     label: "Resolved",
+  },
+];
+
+const CASE_DETAILS_TABS: {
+  value: CaseDetailsTab;
+  label: string;
+  icon: AppIconName;
+}[] = [
+  {
+    value: "overview",
+    label: "Overview",
+    icon: "document",
+  },
+  {
+    value: "requests",
+    label: "Requests",
+    icon: "message-square",
+  },
+  {
+    value: "evidence",
+    label: "Evidence",
+    icon: "file-search",
+  },
+  {
+    value: "notes",
+    label: "Notes",
+    icon: "notebook-pen",
+  },
+  {
+    value: "activity",
+    label: "Activity",
+    icon: "history",
   },
 ];
 
@@ -158,6 +192,7 @@ export default function CaseDetailsScreen() {
   const [savingNote, setSavingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<CaseDetailsTab>("overview");
 
   const verifySecureSession = useCallback(async () => {
     const { data, error } =
@@ -540,7 +575,7 @@ export default function CaseDetailsScreen() {
             <AppIcon
               name="chevron-left"
               size={iconSizes.headerBack}
-              color={colors.textInverse}
+              color={colors.navy[700]}
             />
           </Pressable>
 
@@ -580,7 +615,7 @@ export default function CaseDetailsScreen() {
             <AppIcon
               name="chevron-left"
               size={iconSizes.headerBack}
-              color={colors.textInverse}
+              color={colors.navy[700]}
             />
         </Pressable>
 
@@ -615,6 +650,48 @@ export default function CaseDetailsScreen() {
           <StatusBadge status={caseData.status} />
         </View>
 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabList}
+        >
+          {CASE_DETAILS_TABS.map((tab) => {
+            const active = activeTab === tab.value;
+
+            return (
+              <Pressable
+                key={tab.value}
+                onPress={() => setActiveTab(tab.value)}
+                accessibilityRole="tab"
+                accessibilityLabel={`${tab.label} tab`}
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.tabButton,
+                  active && styles.tabButtonActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <AppIcon
+                  name={tab.icon}
+                  size={15}
+                  color={active ? colors.textInverse : colors.navy[700]}
+                />
+
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    active && styles.tabButtonTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {activeTab === "overview" ? (
+          <>
         <Text style={styles.sectionTitle}>Case information</Text>
 
         <View style={styles.sectionCard}>
@@ -661,6 +738,69 @@ export default function CaseDetailsScreen() {
           </Text>
         </View>
 
+        <Text style={styles.sectionTitle}>Officer actions</Text>
+
+        <View style={styles.actionGrid}>
+          <ActionTile
+            icon="notebook-pen"
+            title="Workspace"
+            description="Checklist, notes, recorded activity and next action."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/workspace",
+                params: {
+                  caseId: caseData.id,
+                  reference: caseData.case_reference,
+                },
+              })
+            }
+          />
+
+          <ActionTile
+            icon="message-square"
+            title="Request information"
+            description="Ask the reporter for structured follow-up details."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/request-information",
+                params: {
+                  caseId: caseData.id,
+                },
+              })
+            }
+          />
+
+          <ActionTile
+            icon="refresh-cw"
+            title="Update status"
+            description="Move the case forward with a status summary."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/status",
+                params: {
+                  caseId: caseData.id,
+                  reference: caseData.case_reference,
+                },
+              })
+            }
+          />
+
+          <ActionTile
+            icon="arrow-up-right"
+            title="Resolution"
+            description="Prepare escalation, closure or resolution notes."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/resolution",
+                params: {
+                  caseId: caseData.id,
+                  reference: caseData.case_reference,
+                },
+              })
+            }
+          />
+        </View>
+
         {caseData.reporter_id && !caseData.is_anonymous && (
           <>
             <Text style={styles.sectionTitle}>Reporter communication</Text>
@@ -700,7 +840,11 @@ export default function CaseDetailsScreen() {
             </Pressable>
           </>
         )}
+          </>
+        ) : null}
 
+        {activeTab === "requests" ? (
+          <>
         <Text style={styles.sectionTitle}>Information request history</Text>
 
         {informationRequests.length === 0 ? (
@@ -835,7 +979,7 @@ export default function CaseDetailsScreen() {
                       accessibilityRole="button"
                       style={styles.responseEvidenceButton}
                     >
-                      <Text style={styles.r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8}>
+                      <Text style={styles.responseEvidenceButtonText}>
                         Review submitted evidence
                       </Text>
                     </Pressable>
@@ -851,7 +995,11 @@ export default function CaseDetailsScreen() {
             </View>
           ))
         )}
+          </>
+        ) : null}
 
+        {activeTab === "evidence" ? (
+          <>
         <Text style={styles.sectionTitle}>Case evidence</Text>
 
         <Pressable
@@ -932,7 +1080,11 @@ export default function CaseDetailsScreen() {
             />
           )}
         </View>
+          </>
+        ) : null}
 
+        {activeTab === "notes" ? (
+          <>
         <Text style={styles.sectionTitle}>Investigation notes</Text>
 
         <View style={styles.noteComposer}>
@@ -997,7 +1149,11 @@ export default function CaseDetailsScreen() {
             </View>
           ))
         )}
+          </>
+        ) : null}
 
+        {activeTab === "activity" ? (
+          <>
         <Text style={styles.sectionTitle}>Status history</Text>
 
         <View style={styles.sectionCard}>
@@ -1084,6 +1240,8 @@ export default function CaseDetailsScreen() {
             </Text>
           </View>
         </View>
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1130,6 +1288,38 @@ function PriorityBadge({ priority }: { priority: CasePriority }) {
         {priority.charAt(0).toUpperCase() + priority.slice(1)}
       </Text>
     </View>
+  );
+}
+
+function ActionTile({
+  icon,
+  title,
+  description,
+  onPress,
+}: {
+  icon: AppIconName;
+  title: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [styles.actionTile, pressed && styles.pressed]}
+    >
+      <View style={styles.actionTileIcon}>
+        <AppIcon name={icon} size={18} color={colors.royal[700]} />
+      </View>
+
+      <View style={styles.actionTileContent}>
+        <Text style={styles.actionTileTitle}>{title}</Text>
+        <Text style={styles.actionTileDescription}>{description}</Text>
+      </View>
+
+      <AppIcon name="chevron-right" size={18} color={colors.textSoft} />
+    </Pressable>
   );
 }
 
@@ -1193,7 +1383,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    backgroundColor: colors.navy[900],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   backButton: {
     width: 42,
@@ -1206,13 +1398,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "800",
-    color: colors.textInverse,
+    fontWeight: "600",
+    color: colors.navy[800],
   },
   headerSubtitle: {
     marginTop: 2,
     fontSize: 11.5,
-    color: colors.navy[300],
+    color: colors.textSecondary,
   },
   scrollContent: {
     padding: 16,
@@ -1223,6 +1415,34 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     backgroundColor: colors.navy[800],
   },
+  tabList: {
+    gap: 8,
+    paddingTop: 14,
+    paddingBottom: 2,
+  },
+  tabButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+  },
+  tabButtonActive: {
+    borderColor: colors.royal[700],
+    backgroundColor: colors.royal[700],
+  },
+  tabButtonText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.navy[700],
+  },
+  tabButtonTextActive: {
+    color: colors.textInverse,
+  },
   caseTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1230,7 +1450,7 @@ const styles = StyleSheet.create({
   },
   reference: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.5,
     color: "#BBD0E8",
   },
@@ -1238,7 +1458,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 12,
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "600",
     lineHeight: 26,
     color: colors.textInverse,
   },
@@ -1260,7 +1480,7 @@ const styles = StyleSheet.create({
   },
   currentStatusText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   priorityBadge: {
@@ -1277,7 +1497,7 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   priorityUrgentText: {
@@ -1287,7 +1507,7 @@ const styles = StyleSheet.create({
     marginTop: 23,
     marginBottom: 9,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   sectionCard: {
@@ -1324,6 +1544,43 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.navy[700],
   },
+  actionGrid: {
+    gap: 9,
+  },
+  actionTile: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+  },
+  actionTileIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.royal[50],
+  },
+  actionTileContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionTileTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  actionTileDescription: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
   evidenceButton: {
     minHeight: 82,
     flexDirection: "row",
@@ -1351,7 +1608,7 @@ const styles = StyleSheet.create({
   },
   evidenceButtonTitle: {
     fontSize: 13.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   evidenceButtonText: {
@@ -1381,7 +1638,7 @@ const styles = StyleSheet.create({
   },
   requestHistoryStatus: {
     fontSize: 9.5,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0.5,
     color: colors.warning,
   },
@@ -1395,7 +1652,7 @@ const styles = StyleSheet.create({
   requestHistoryTitle: {
     marginTop: 9,
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   requestHistoryMessage: {
@@ -1413,7 +1670,7 @@ const styles = StyleSheet.create({
   requestedItemsLabel: {
     marginBottom: 6,
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   requestedItemText: {
@@ -1443,7 +1700,7 @@ const styles = StyleSheet.create({
   },
   reporterResponseHeading: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   reporterResponseDate: {
@@ -1457,7 +1714,7 @@ const styles = StyleSheet.create({
   },
   reporterAnswerQuestion: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     lineHeight: 15,
     color: colors.navy[700],
   },
@@ -1481,9 +1738,9 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: colors.royal[700],
   },
-  r9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8: {
+  responseEvidenceButtonText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   awaitingResponseBox: {
@@ -1542,7 +1799,7 @@ const styles = StyleSheet.create({
   noteLabel: {
     marginBottom: 8,
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   noteInput: {
@@ -1577,11 +1834,14 @@ const styles = StyleSheet.create({
   },
   saveNoteText: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
   disabledButton: {
     opacity: 0.55,
+  },
+  pressed: {
+    opacity: 0.82,
   },
   noteCard: {
     marginTop: 9,
@@ -1599,7 +1859,7 @@ const styles = StyleSheet.create({
   },
   noteOfficer: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   noteDate: {
@@ -1623,7 +1883,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 8,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   emptyText: {
@@ -1691,7 +1951,7 @@ const styles = StyleSheet.create({
   },
   securityTitle: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.teal[800],
   },
   securityText: {
@@ -1709,7 +1969,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     marginTop: 10,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   errorText: {
@@ -1729,7 +1989,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
 });
