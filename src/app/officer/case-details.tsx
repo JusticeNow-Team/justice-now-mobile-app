@@ -1002,6 +1002,7 @@ export default function CaseDetailsScreen() {
           <>
         <Text style={styles.sectionTitle}>Case evidence</Text>
 
+        <View style={styles.actionGrid}>
         <Pressable
           onPress={() =>
             router.push({
@@ -1033,6 +1034,49 @@ export default function CaseDetailsScreen() {
 
           <AppIcon name="chevron-right" size={iconSizes.md} color={colors.royal[700]} />
         </Pressable>
+
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/officer/assign-evidence",
+              params: {
+                caseId: caseData.id,
+              },
+            })
+          }
+          accessibilityRole="button"
+          accessibilityLabel="Assign case evidence to an Evidence Checker"
+          style={({ pressed }) => [
+            styles.evidenceButton,
+            pressed && styles.evidenceButtonPressed,
+          ]}
+        >
+          <View style={styles.evidenceIconBox}>
+            <AppIcon
+              name="user-plus"
+              size={iconSizes.md}
+              color={colors.royal[700]}
+            />
+          </View>
+
+          <View style={styles.evidenceContent}>
+            <Text style={styles.evidenceButtonTitle}>
+              Assign Evidence to Checker
+            </Text>
+
+            <Text style={styles.evidenceButtonText}>
+              Send pending submitted files to an Evidence Checker for
+              independent validation.
+            </Text>
+          </View>
+
+          <AppIcon
+            name="chevron-right"
+            size={iconSizes.md}
+            color={colors.royal[700]}
+          />
+        </Pressable>
+        </View>
 
         <Text style={styles.sectionTitle}>Investigation status</Text>
 

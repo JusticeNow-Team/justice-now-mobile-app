@@ -272,6 +272,30 @@ export default function OfficerTasksScreen() {
 
     const nextTasks: OfficerTask[] = [];
 
+    if (pendingEvidence.length > 0) {
+      const first = pendingEvidence[0];
+
+      nextTasks.push({
+        id: "assign-evidence",
+        title: "Assign evidence to checker",
+        description: `${pendingEvidence.length} pending evidence item${
+          pendingEvidence.length === 1 ? "" : "s"
+        } need an Evidence Checker assignment.`,
+        meta: `Next item: ${first.title}`,
+        icon: "user-plus",
+        tone: "royal",
+        actionLabel: "Assign now",
+        onPress: () =>
+          router.push({
+            pathname: "/officer/assign-evidence",
+            params: {
+              caseId: first.case_id,
+              evidenceId: first.id,
+            },
+          }),
+      });
+    }
+
     if (reviewEvidence.length > 0) {
       nextTasks.push({
         id: "review-evidence",
