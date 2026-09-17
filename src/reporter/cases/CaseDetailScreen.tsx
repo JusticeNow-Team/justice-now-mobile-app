@@ -70,6 +70,20 @@ function formatEvidenceStatus(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function formatWithdrawalRequestStatus(value: string) {
+  switch (value) {
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "pending":
+    case "requested":
+      return "Withdrawal requested";
+    default:
+      return value.replace(/_/g, " ");
+  }
+}
+
 export default function CaseDetailScreen() {
   const router = useRouter();
 
@@ -288,7 +302,7 @@ export default function CaseDetailScreen() {
               <View style={styles.heroAction}>
                 <PrimaryButton
                   title="Respond to information request"
-                  icon="?"
+                  icon="message-square"
                   onPress={() =>
                     router.push({
                       pathname: "/reporter/cases/information-request",
@@ -301,10 +315,25 @@ export default function CaseDetailScreen() {
 
             {showWithdrawalRequested ? (
               <View style={styles.heroNotice}>
-                <Notice tone="caution" title="Withdrawal requested">
-                  {withdrawalRequest
-                    ? `Requested ${formatCaseDateTime(withdrawalRequest.requestedAt)}. Staff have been notified and will review your request.`
-                    : "Staff have been notified and will review your withdrawal request."}
+                <Notice
+                  tone={
+                    withdrawalRequest?.status === "approved"
+                      ? "privacy"
+                      : "caution"
+                  }
+                  title={
+                    withdrawalRequest?.status === "approved"
+                      ? "Withdrawal approved"
+                      : withdrawalRequest?.status === "rejected"
+                        ? "Withdrawal rejected"
+                        : "Withdrawal requested"
+                  }
+                >
+                  {withdrawalRequest?.decisionReason
+                    ? withdrawalRequest.decisionReason
+                    : withdrawalRequest
+                      ? `Requested ${formatCaseDateTime(withdrawalRequest.requestedAt)}. Staff have been notified and will review your request.`
+                      : "Staff have been notified and will review your withdrawal request."}
                 </Notice>
               </View>
             ) : null}
@@ -337,20 +366,38 @@ export default function CaseDetailScreen() {
                 <SectionCard title="Withdrawal request">
                   <DataRow
                     label="Status"
-                    value="Withdrawal requested"
+                    value={formatWithdrawalRequestStatus(
+                      withdrawalRequest.status,
+                    )}
                   />
                   <DataRow
                     label="Requested on"
                     value={formatCaseDateTime(withdrawalRequest.requestedAt)}
                   />
+                  {withdrawalRequest.reviewedAt ? (
+                    <DataRow
+                      label="Decision date"
+                      value={formatCaseDateTime(withdrawalRequest.reviewedAt)}
+                    />
+                  ) : null}
                   <DataRow
-                    label="Reason"
+                    label="Request reason"
                     value={withdrawalRequest.reason}
-                    last
+                    last={!withdrawalRequest.decisionReason}
                   />
+                  {withdrawalRequest.decisionReason ? (
+                    <DataRow
+                      label="Decision reason"
+                      value={withdrawalRequest.decisionReason}
+                      last
+                    />
+                  ) : null}
                   <Text style={styles.officerNote}>
-                    Your assigned investigator or an administrator has been
-                    flagged to review this request.
+                    {withdrawalRequest.status === "approved"
+                      ? "Your case has been closed after an authorized withdrawal decision."
+                      : withdrawalRequest.status === "rejected"
+                        ? "Your case remains active after an authorized withdrawal decision."
+                        : "Your assigned investigator or an administrator has been flagged to review this request."}
                   </Text>
                 </SectionCard>
               ) : null}
