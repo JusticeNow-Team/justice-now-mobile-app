@@ -299,9 +299,9 @@ export default function OfficerTasksScreen() {
     if (reviewEvidence.length > 0) {
       nextTasks.push({
         id: "review-evidence",
-        title: "Review case evidence",
+        title: "View case evidence",
         description:
-          "Open submitted files and record investigation findings from the case workspace.",
+          "Open submitted files and assign pending evidence to an Evidence Checker when validation is needed.",
         meta: `${reviewEvidence.length} evidence item${
           reviewEvidence.length === 1 ? "" : "s"
         } · ${pendingEvidence.length} pending`,

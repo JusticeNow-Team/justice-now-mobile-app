@@ -25,19 +25,10 @@ type EvidenceType = "document" | "image" | "audio" | "video" | "text";
 
 type ValidationStatus = "pending" | "under_review" | "verified" | "rejected";
 
-type OfficerReviewState = "reviewed" | "follow_up_required";
-
 type CaseBrief = {
   id: string;
   case_reference: string;
   title: string;
-};
-
-type OfficerReview = {
-  id: string;
-  review_state: OfficerReviewState;
-  finding_text: string;
-  reviewed_at: string;
 };
 
 type EvidenceItem = {
@@ -66,11 +57,9 @@ type EvidenceItem = {
   created_at: string;
 
   cases: CaseBrief | null;
-
-  officer_evidence_reviews: OfficerReview[];
 };
 
-type ReviewFilter = "all" | "unreviewed" | "reviewed" | "follow_up";
+type ReviewFilter = "all" | ValidationStatus;
 
 export default function EvidenceReviewScreen() {
   const router = useRouter();
@@ -92,15 +81,6 @@ export default function EvidenceReviewScreen() {
   const [search, setSearch] = useState("");
 
   const [filter, setFilter] = useState<ReviewFilter>("all");
-
-  const [selected, setSelected] = useState<EvidenceItem | null>(null);
-
-  const [reviewState, setReviewState] =
-    useState<OfficerReviewState>("reviewed");
-
-  const [finding, setFinding] = useState("");
-
-  const [saving, setSaving] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -161,13 +141,6 @@ export default function EvidenceReviewScreen() {
                   id,
                   case_reference,
                   title
-                ),
-
-                officer_evidence_reviews (
-                  id,
-                  review_state,
-                  finding_text,
-                  reviewed_at
                 )
               `,
           )
@@ -237,8 +210,6 @@ export default function EvidenceReviewScreen() {
     const query = search.trim().toLowerCase();
 
     return evidence.filter((item) => {
-      const review = item.officer_evidence_reviews?.[0];
-
       const matchesSearch =
         query === "" ||
         item.title.toLowerCase().includes(query) ||
@@ -250,14 +221,11 @@ export default function EvidenceReviewScreen() {
       }
 
       switch (filter) {
-        case "unreviewed":
-          return !review;
-
-        case "reviewed":
-          return review?.review_state === "reviewed";
-
-        case "follow_up":
-          return review?.review_state === "follow_up_required";
+        case "pending":
+        case "under_review":
+        case "verified":
+        case "rejected":
+          return item.validation_status === filter;
 
         case "all":
         default:
@@ -265,87 +233,6 @@ export default function EvidenceReviewScreen() {
       }
     });
   }, [evidence, search, filter]);
-
-  // -------------------------------------------------------
-  // Start Review
-  // -------------------------------------------------------
-
-  const startReview = (item: EvidenceItem) => {
-    const existing = item.officer_evidence_reviews?.[0];
-
-    setSelected(item);
-
-    if (existing) {
-      setReviewState(existing.review_state);
-
-      setFinding(existing.finding_text);
-    } else {
-      setReviewState("reviewed");
-
-      setFinding("");
-    }
-  };
-
-  // -------------------------------------------------------
-  // Save Review
-  // -------------------------------------------------------
-
-  const saveReview = async () => {
-    if (!selected) {
-      return;
-    }
-
-    const cleanFinding = finding.trim();
-
-    if (cleanFinding.length < 3) {
-      Alert.alert(
-        "Finding required",
-        "Enter your investigation finding before saving.",
-      );
-
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const { error } = await supabase.rpc("save_officer_evidence_review", {
-        p_evidence_id: selected.id,
-
-        p_review_state: reviewState,
-
-        p_finding_text: cleanFinding,
-      });
-
-      console.log("SAVE EVIDENCE REVIEW ERROR:", error);
-
-      if (error) {
-        Alert.alert("Unable to save review", error.message);
-
-        return;
-      }
-
-      setSelected(null);
-
-      setFinding("");
-
-      await loadEvidence(false);
-
-      Alert.alert(
-        "Evidence review saved",
-        "Your investigation finding has been recorded.",
-      );
-    } catch (error) {
-      console.error("Save evidence review error:", error);
-
-      Alert.alert(
-        "Unable to save review",
-        "JusticeNow could not save your evidence review.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
 
   // -------------------------------------------------------
   // Open Evidence File
@@ -416,7 +303,7 @@ export default function EvidenceReviewScreen() {
         </Pressable>
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Evidence Review</Text>
+          <Text style={styles.headerTitle}>Case evidence</Text>
 
           <Text style={styles.headerSubtitle}>Case Officer Workspace</Text>
         </View>
@@ -435,11 +322,11 @@ export default function EvidenceReviewScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>INVESTIGATION EVIDENCE</Text>
 
-          <Text style={styles.heroTitle}>Review case evidence</Text>
+          <Text style={styles.heroTitle}>View case evidence</Text>
 
           <Text style={styles.heroText}>
-            Review evidence connected to your assigned cases and record
-            investigation findings.
+            View submitted evidence connected to your assigned cases and send
+            pending files to an Evidence Checker for validation.
           </Text>
         </View>
 
@@ -449,8 +336,8 @@ export default function EvidenceReviewScreen() {
           <AppIcon name="info" size={16} color={colors.royal[700]} />
 
           <Text style={styles.infoText}>
-            Case Officers record investigation findings. Evidence verification
-            decisions are handled separately by authorized Evidence Validators.
+            Case Officers can view and assign evidence. Verification decisions
+            are handled only by authorized Evidence Checkers.
           </Text>
         </View>
 
@@ -488,21 +375,27 @@ export default function EvidenceReviewScreen() {
           />
 
           <FilterChip
-            title="Not reviewed"
-            active={filter === "unreviewed"}
-            onPress={() => setFilter("unreviewed")}
+            title="Pending"
+            active={filter === "pending"}
+            onPress={() => setFilter("pending")}
           />
 
           <FilterChip
-            title="Reviewed"
-            active={filter === "reviewed"}
-            onPress={() => setFilter("reviewed")}
+            title="Under review"
+            active={filter === "under_review"}
+            onPress={() => setFilter("under_review")}
           />
 
           <FilterChip
-            title="Follow-up"
-            active={filter === "follow_up"}
-            onPress={() => setFilter("follow_up")}
+            title="Verified"
+            active={filter === "verified"}
+            onPress={() => setFilter("verified")}
+          />
+
+          <FilterChip
+            title="Rejected"
+            active={filter === "rejected"}
+            onPress={() => setFilter("rejected")}
           />
         </ScrollView>
 
@@ -529,10 +422,7 @@ export default function EvidenceReviewScreen() {
           </View>
         )}
 
-        {filteredEvidence.map((item) => {
-          const review = item.officer_evidence_reviews?.[0];
-
-          return (
+        {filteredEvidence.map((item) => (
             <View key={item.id} style={styles.evidenceCard}>
               {/* Top */}
 
@@ -582,27 +472,6 @@ export default function EvidenceReviewScreen() {
                 </View>
               </View>
 
-              {/* Existing Review */}
-
-              {review && (
-                <View
-                  style={
-                    review.review_state === "follow_up_required"
-                      ? styles.followUpBox
-                      : styles.reviewedBox
-                  }
-                >
-                  <Text style={styles.reviewStateText}>
-                    {review.review_state === "follow_up_required"
-                      ? "Follow-up required" : "Reviewed"}
-                  </Text>
-
-                  <Text style={styles.reviewFinding}>
-                    {review.finding_text}
-                  </Text>
-                </View>
-              )}
-
               {/* Actions */}
 
               <View style={styles.actions}>
@@ -611,15 +480,6 @@ export default function EvidenceReviewScreen() {
                   style={styles.secondaryButton}
                 >
                   <Text style={styles.secondaryButtonText}>View file</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => startReview(item)}
-                  style={styles.primaryButton}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {review ? "Update finding" : "Review evidence"}
-                  </Text>
                 </Pressable>
               </View>
 
@@ -649,10 +509,8 @@ export default function EvidenceReviewScreen() {
                   </Text>
                 </Pressable>
               ) : null}
-
             </View>
-          );
-        })}
+        ))}
 
         {/* Empty */}
 
@@ -665,100 +523,6 @@ export default function EvidenceReviewScreen() {
             <Text style={styles.emptyText}>
               No evidence matches your current search or filter.
             </Text>
-          </View>
-        )}
-
-        {/* Review Composer */}
-
-        {selected && (
-          <View style={styles.reviewComposer}>
-            <Text style={styles.composerLabel}>CASE OFFICER FINDING</Text>
-
-            <Text style={styles.composerTitle}>{selected.title}</Text>
-
-            <Text style={styles.composerHelp}>
-              Record how this evidence affects your investigation. Do not make
-              an evidence validation decision here.
-            </Text>
-
-            {/* Review State */}
-
-            <View style={styles.stateRow}>
-              <Pressable
-                onPress={() => setReviewState("reviewed")}
-                style={[
-                  styles.stateButton,
-
-                  reviewState === "reviewed" && styles.stateButtonActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.stateButtonText,
-
-                    reviewState === "reviewed" && styles.stateButtonTextActive,
-                  ]}
-                >
-                  Reviewed
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setReviewState("follow_up_required")}
-                style={[
-                  styles.stateButton,
-
-                  reviewState === "follow_up_required" &&
-                    styles.stateButtonWarning,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.stateButtonText,
-
-                    reviewState === "follow_up_required" &&
-                      styles.stateButtonTextActive,
-                  ]}
-                >
-                  Follow-up required
-                </Text>
-              </Pressable>
-            </View>
-
-            <TextInput
-              value={finding}
-              onChangeText={setFinding}
-              placeholder="Record your investigation finding..."
-              placeholderTextColor={colors.textSoft}
-              multiline
-              maxLength={5000}
-              textAlignVertical="top"
-              style={styles.findingInput}
-            />
-
-            <Text style={styles.characterCount}>{finding.length}/5000</Text>
-
-            <View style={styles.composerActions}>
-              <Pressable
-                onPress={() => setSelected(null)}
-                disabled={saving}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={saveReview}
-                disabled={saving}
-                style={[styles.saveButton, saving && styles.disabled]}
-              >
-                {saving ? (
-                  <ActivityIndicator color={colors.textInverse} />
-                ) : (
-                  <Text style={styles.saveText}>Save finding</Text>
-                )}
-              </Pressable>
-            </View>
           </View>
         )}
 
