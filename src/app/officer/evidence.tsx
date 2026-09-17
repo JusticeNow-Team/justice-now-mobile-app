@@ -25,6 +25,12 @@ type EvidenceType = "document" | "image" | "audio" | "video" | "text";
 
 type ValidationStatus = "pending" | "under_review" | "verified" | "rejected";
 
+type EvidenceDecision =
+  | "approved"
+  | "rejected"
+  | "replacement_requested"
+  | "escalated";
+
 type CaseBrief = {
   id: string;
   case_reference: string;
@@ -59,6 +65,24 @@ type EvidenceItem = {
   cases: CaseBrief | null;
 };
 
+type VerificationResultRow = {
+  decision_id: string;
+  assignment_id: string;
+  evidence_id: string;
+  evidence_title: string;
+  file_name: string | null;
+  case_id: string;
+  case_reference: string;
+  decision: EvidenceDecision;
+  reason: string;
+  internal_notes: string | null;
+  reporter_message: string | null;
+  decided_at: string;
+  checker_id: string;
+  checker_name: string;
+  completed_at: string | null;
+};
+
 type ReviewFilter = "all" | ValidationStatus;
 
 export default function EvidenceReviewScreen() {
@@ -73,6 +97,10 @@ export default function EvidenceReviewScreen() {
     : params.caseId;
 
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+
+  const [verificationResults, setVerificationResults] = useState<
+    VerificationResultRow[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -152,11 +180,17 @@ export default function EvidenceReviewScreen() {
           query = query.eq("case_id", caseId);
         }
 
-        const { data, error } = await query;
+        const [evidenceResponse, verificationResponse] = await Promise.all([
+          query,
+          supabase.rpc("get_officer_evidence_verification_results", {
+            p_case_id: caseId ?? null,
+          }),
+        ]);
 
-        console.log("EVIDENCE DATA:", data);
+        const { data, error } = evidenceResponse;
 
-        console.log("EVIDENCE ERROR:", error);
+        const { data: verificationData, error: verificationError } =
+          verificationResponse;
 
         if (error) {
           setErrorMessage(error.message);
@@ -164,7 +198,16 @@ export default function EvidenceReviewScreen() {
           return;
         }
 
+        if (verificationError) {
+          setErrorMessage(verificationError.message);
+
+          return;
+        }
+
         setEvidence((data ?? []) as unknown as EvidenceItem[]);
+        setVerificationResults(
+          (verificationData ?? []) as VerificationResultRow[],
+        );
       } catch (error) {
         console.error("Load evidence error:", error);
 
@@ -233,6 +276,18 @@ export default function EvidenceReviewScreen() {
       }
     });
   }, [evidence, search, filter]);
+
+  const resultByEvidenceId = useMemo(() => {
+    const resultMap = new Map<string, VerificationResultRow>();
+
+    verificationResults.forEach((result) => {
+      if (!resultMap.has(result.evidence_id)) {
+        resultMap.set(result.evidence_id, result);
+      }
+    });
+
+    return resultMap;
+  }, [verificationResults]);
 
   // -------------------------------------------------------
   // Open Evidence File
@@ -422,7 +477,10 @@ export default function EvidenceReviewScreen() {
           </View>
         )}
 
-        {filteredEvidence.map((item) => (
+        {filteredEvidence.map((item) => {
+          const verificationResult = resultByEvidenceId.get(item.id);
+
+          return (
             <View key={item.id} style={styles.evidenceCard}>
               {/* Top */}
 
@@ -472,6 +530,24 @@ export default function EvidenceReviewScreen() {
                 </View>
               </View>
 
+              {verificationResult ? (
+                <VerificationResultCard result={verificationResult} />
+              ) : item.validation_status === "under_review" ? (
+                <View style={styles.awaitingResultBox}>
+                  <AppIcon
+                    name="clock"
+                    size={15}
+                    color={colors.royal[700]}
+                  />
+
+                  <Text style={styles.awaitingResultText}>
+                    This evidence is with an Evidence Checker. Verification
+                    results will appear here after the checker submits a
+                    decision.
+                  </Text>
+                </View>
+              ) : null}
+
               {/* Actions */}
 
               <View style={styles.actions}>
@@ -510,7 +586,8 @@ export default function EvidenceReviewScreen() {
                 </Pressable>
               ) : null}
             </View>
-        ))}
+          );
+        })}
 
         {/* Empty */}
 
@@ -538,6 +615,97 @@ export default function EvidenceReviewScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function VerificationResultCard({
+  result,
+}: {
+  result: VerificationResultRow;
+}) {
+  return (
+    <View style={styles.verificationCard}>
+      <View style={styles.verificationHeader}>
+        <View>
+          <Text style={styles.verificationEyebrow}>VERIFICATION RESULT</Text>
+
+          <Text style={styles.verificationTitle}>
+            {formatDecision(result.decision)}
+          </Text>
+        </View>
+
+        <DecisionBadge decision={result.decision} />
+      </View>
+
+      <View style={styles.verificationMetaGrid}>
+        <View style={styles.verificationMetaItem}>
+          <Text style={styles.metaLabel}>Evidence Checker</Text>
+
+          <Text style={styles.metaValue}>{result.checker_name}</Text>
+        </View>
+
+        <View style={styles.verificationMetaItem}>
+          <Text style={styles.metaLabel}>Completed</Text>
+
+          <Text style={styles.metaValue}>
+            {formatDateTime(result.completed_at ?? result.decided_at)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.resultSection}>
+        <Text style={styles.resultSectionTitle}>
+          {result.decision === "rejected" ||
+          result.decision === "replacement_requested"
+            ? "Rejection reason"
+            : "Verification comments"}
+        </Text>
+
+        <Text style={styles.resultSectionText}>{result.reason}</Text>
+      </View>
+
+      {result.internal_notes ? (
+        <View style={styles.internalNotesBox}>
+          <View style={styles.resultSectionHeader}>
+            <AppIcon name="lock" size={14} color={colors.navy[700]} />
+
+            <Text style={styles.resultSectionTitle}>Internal officer notes</Text>
+          </View>
+
+          <Text style={styles.resultSectionText}>{result.internal_notes}</Text>
+        </View>
+      ) : null}
+
+      {result.reporter_message ? (
+        <View style={styles.reporterMessageBox}>
+          <View style={styles.resultSectionHeader}>
+            <AppIcon name="message-square" size={14} color={colors.teal[800]} />
+
+            <Text style={styles.resultSectionTitle}>
+              Reporter-visible message
+            </Text>
+          </View>
+
+          <Text style={styles.resultSectionText}>{result.reporter_message}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function DecisionBadge({ decision }: { decision: EvidenceDecision }) {
+  return (
+    <View
+      style={[
+        styles.decisionBadge,
+        decision === "approved" && styles.decisionApproved,
+        decision === "rejected" && styles.decisionRejected,
+        decision === "replacement_requested" && styles.decisionReplacement,
+        decision === "escalated" && styles.decisionEscalated,
+      ]}
+    >
+      <Text style={styles.decisionBadgeText}>{formatDecision(decision)}</Text>
+    </View>
   );
 }
 
@@ -637,8 +805,31 @@ function formatValidationStatus(status: ValidationStatus) {
   }
 }
 
+function formatDecision(decision: EvidenceDecision) {
+  switch (decision) {
+    case "approved":
+      return "Approved";
+
+    case "rejected":
+      return "Rejected";
+
+    case "replacement_requested":
+      return "Replacement requested";
+
+    case "escalated":
+      return "Escalated";
+
+    default:
+      return decision;
+  }
+}
+
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString();
+}
+
+function formatDateTime(date: string) {
+  return new Date(date).toLocaleString();
 }
 
 // ---------------------------------------------------------
@@ -987,6 +1178,186 @@ const styles = StyleSheet.create({
     fontWeight: "600",
 
     color: colors.navy[700],
+  },
+
+  verificationCard: {
+    marginTop: 13,
+
+    padding: 12,
+
+    borderWidth: 1,
+
+    borderColor: colors.teal[100],
+
+    borderRadius: 12,
+
+    backgroundColor: colors.teal[50],
+  },
+
+  verificationHeader: {
+    flexDirection: "row",
+
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+
+    gap: 10,
+  },
+
+  verificationEyebrow: {
+    fontSize: 9,
+
+    fontWeight: "600",
+
+    letterSpacing: 0.6,
+
+    color: colors.teal[800],
+  },
+
+  verificationTitle: {
+    marginTop: 3,
+
+    fontSize: 13,
+
+    fontWeight: "600",
+
+    color: colors.navy[800],
+  },
+
+  decisionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+
+    borderRadius: 8,
+
+    backgroundColor: colors.navy[50],
+  },
+
+  decisionApproved: {
+    backgroundColor: colors.teal[100],
+  },
+
+  decisionRejected: {
+    backgroundColor: "#FFF0EF",
+  },
+
+  decisionReplacement: {
+    backgroundColor: colors.gold[50],
+  },
+
+  decisionEscalated: {
+    backgroundColor: colors.royal[50],
+  },
+
+  decisionBadgeText: {
+    fontSize: 9,
+
+    fontWeight: "600",
+
+    color: colors.navy[700],
+  },
+
+  verificationMetaGrid: {
+    flexDirection: "row",
+
+    gap: 10,
+
+    marginTop: 12,
+  },
+
+  verificationMetaItem: {
+    flex: 1,
+  },
+
+  resultSection: {
+    marginTop: 12,
+
+    paddingTop: 11,
+
+    borderTopWidth: 1,
+
+    borderTopColor: colors.teal[100],
+  },
+
+  resultSectionHeader: {
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    gap: 6,
+  },
+
+  resultSectionTitle: {
+    fontSize: 10.5,
+
+    fontWeight: "600",
+
+    color: colors.navy[800],
+  },
+
+  resultSectionText: {
+    marginTop: 4,
+
+    fontSize: 11,
+
+    lineHeight: 16,
+
+    color: colors.textSecondary,
+  },
+
+  internalNotesBox: {
+    marginTop: 10,
+
+    padding: 10,
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 10,
+
+    backgroundColor: colors.surface,
+  },
+
+  reporterMessageBox: {
+    marginTop: 10,
+
+    padding: 10,
+
+    borderWidth: 1,
+
+    borderColor: colors.teal[100],
+
+    borderRadius: 10,
+
+    backgroundColor: colors.surface,
+  },
+
+  awaitingResultBox: {
+    flexDirection: "row",
+
+    gap: 8,
+
+    marginTop: 12,
+
+    padding: 11,
+
+    borderWidth: 1,
+
+    borderColor: colors.royal[100],
+
+    borderRadius: 10,
+
+    backgroundColor: colors.royal[50],
+  },
+
+  awaitingResultText: {
+    flex: 1,
+
+    fontSize: 10.5,
+
+    lineHeight: 16,
+
+    color: colors.textSecondary,
   },
 
   reviewedBox: {
