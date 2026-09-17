@@ -94,6 +94,8 @@ type InformationRequestRecord = {
   response: InformationResponse | null;
 };
 
+type CaseDetailsTab = "overview" | "requests" | "evidence" | "notes" | "activity";
+
 const STATUS_OPTIONS: {
   value: CaseStatus;
   label: string;
@@ -109,6 +111,38 @@ const STATUS_OPTIONS: {
   {
     value: "resolved",
     label: "Resolved",
+  },
+];
+
+const CASE_DETAILS_TABS: {
+  value: CaseDetailsTab;
+  label: string;
+  icon: AppIconName;
+}[] = [
+  {
+    value: "overview",
+    label: "Overview",
+    icon: "document",
+  },
+  {
+    value: "requests",
+    label: "Requests",
+    icon: "message-square",
+  },
+  {
+    value: "evidence",
+    label: "Evidence",
+    icon: "file-search",
+  },
+  {
+    value: "notes",
+    label: "Notes",
+    icon: "notebook-pen",
+  },
+  {
+    value: "activity",
+    label: "Activity",
+    icon: "history",
   },
 ];
 
@@ -158,6 +192,7 @@ export default function CaseDetailsScreen() {
   const [savingNote, setSavingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<CaseDetailsTab>("overview");
 
   const verifySecureSession = useCallback(async () => {
     const { data, error } =
@@ -615,6 +650,48 @@ export default function CaseDetailsScreen() {
           <StatusBadge status={caseData.status} />
         </View>
 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabList}
+        >
+          {CASE_DETAILS_TABS.map((tab) => {
+            const active = activeTab === tab.value;
+
+            return (
+              <Pressable
+                key={tab.value}
+                onPress={() => setActiveTab(tab.value)}
+                accessibilityRole="tab"
+                accessibilityLabel={`${tab.label} tab`}
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.tabButton,
+                  active && styles.tabButtonActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <AppIcon
+                  name={tab.icon}
+                  size={15}
+                  color={active ? colors.textInverse : colors.navy[700]}
+                />
+
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    active && styles.tabButtonTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {activeTab === "overview" ? (
+          <>
         <Text style={styles.sectionTitle}>Case information</Text>
 
         <View style={styles.sectionCard}>
@@ -763,7 +840,11 @@ export default function CaseDetailsScreen() {
             </Pressable>
           </>
         )}
+          </>
+        ) : null}
 
+        {activeTab === "requests" ? (
+          <>
         <Text style={styles.sectionTitle}>Information request history</Text>
 
         {informationRequests.length === 0 ? (
@@ -914,7 +995,11 @@ export default function CaseDetailsScreen() {
             </View>
           ))
         )}
+          </>
+        ) : null}
 
+        {activeTab === "evidence" ? (
+          <>
         <Text style={styles.sectionTitle}>Case evidence</Text>
 
         <Pressable
@@ -995,7 +1080,11 @@ export default function CaseDetailsScreen() {
             />
           )}
         </View>
+          </>
+        ) : null}
 
+        {activeTab === "notes" ? (
+          <>
         <Text style={styles.sectionTitle}>Investigation notes</Text>
 
         <View style={styles.noteComposer}>
@@ -1060,7 +1149,11 @@ export default function CaseDetailsScreen() {
             </View>
           ))
         )}
+          </>
+        ) : null}
 
+        {activeTab === "activity" ? (
+          <>
         <Text style={styles.sectionTitle}>Status history</Text>
 
         <View style={styles.sectionCard}>
@@ -1147,6 +1240,8 @@ export default function CaseDetailsScreen() {
             </Text>
           </View>
         </View>
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1319,6 +1414,34 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 17,
     backgroundColor: colors.navy[800],
+  },
+  tabList: {
+    gap: 8,
+    paddingTop: 14,
+    paddingBottom: 2,
+  },
+  tabButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+  },
+  tabButtonActive: {
+    borderColor: colors.royal[700],
+    backgroundColor: colors.royal[700],
+  },
+  tabButtonText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.navy[700],
+  },
+  tabButtonTextActive: {
+    color: colors.textInverse,
   },
   caseTopRow: {
     flexDirection: "row",
