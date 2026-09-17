@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     Alert,
     Linking,
+    Platform,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -30,6 +31,12 @@ type EvidenceDecision =
   | "rejected"
   | "replacement_requested"
   | "escalated";
+
+type CaseReviewAction =
+  | "move_forward"
+  | "request_information"
+  | "request_clarification"
+  | "reassign_evidence";
 
 type CaseBrief = {
   id: string;
@@ -81,6 +88,11 @@ type VerificationResultRow = {
   checker_id: string;
   checker_name: string;
   completed_at: string | null;
+  case_action_id: string | null;
+  case_action: CaseReviewAction | null;
+  case_action_status: string | null;
+  case_action_public_update: string | null;
+  case_action_created_at: string | null;
 };
 
 type ReviewFilter = "all" | ValidationStatus;
@@ -111,6 +123,8 @@ export default function EvidenceReviewScreen() {
   const [filter, setFilter] = useState<ReviewFilter>("all");
 
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [actingDecisionId, setActingDecisionId] = useState<string | null>(null);
 
   // -------------------------------------------------------
   // Load Evidence
@@ -334,6 +348,81 @@ export default function EvidenceReviewScreen() {
     }
   };
 
+  const takeCaseAction = async (
+    result: VerificationResultRow,
+    action: CaseReviewAction,
+  ) => {
+    const actionLabel = formatCaseAction(action);
+    const confirmMessage = getActionConfirmation(action);
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(confirmMessage);
+
+      if (!confirmed) {
+        return;
+      }
+    } else {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert("Confirm case action", confirmMessage, [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => resolve(false),
+          },
+          {
+            text: actionLabel,
+            onPress: () => resolve(true),
+          },
+        ]);
+      });
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    try {
+      setActingDecisionId(result.decision_id);
+
+      const { error } = await supabase.rpc(
+        "take_case_action_after_evidence_review",
+        {
+          p_decision_id: result.decision_id,
+          p_action: action,
+          p_public_update: getPublicUpdate(action),
+          p_internal_note: getInternalActionNote(result, action),
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      await loadEvidence(false);
+
+      const message = `${actionLabel} recorded. The case timeline and Reporter update were created.`;
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Action recorded", message);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "JusticeNow could not record this case action.";
+
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("Action failed", message);
+      }
+    } finally {
+      setActingDecisionId(null);
+    }
+  };
+
   // -------------------------------------------------------
   // Loading
   // -------------------------------------------------------
@@ -531,7 +620,13 @@ export default function EvidenceReviewScreen() {
               </View>
 
               {verificationResult ? (
-                <VerificationResultCard result={verificationResult} />
+                <VerificationResultCard
+                  result={verificationResult}
+                  acting={actingDecisionId === verificationResult.decision_id}
+                  onAction={(action) =>
+                    void takeCaseAction(verificationResult, action)
+                  }
+                />
               ) : item.validation_status === "under_review" ? (
                 <View style={styles.awaitingResultBox}>
                   <AppIcon
@@ -620,9 +715,15 @@ export default function EvidenceReviewScreen() {
 
 function VerificationResultCard({
   result,
+  acting,
+  onAction,
 }: {
   result: VerificationResultRow;
+  acting: boolean;
+  onAction: (action: CaseReviewAction) => void;
 }) {
+  const actions = getAvailableActions(result.decision);
+
   return (
     <View style={styles.verificationCard}>
       <View style={styles.verificationHeader}>
@@ -689,6 +790,91 @@ function VerificationResultCard({
           <Text style={styles.resultSectionText}>{result.reporter_message}</Text>
         </View>
       ) : null}
+
+      {result.case_action_id ? (
+        <View style={styles.actionRecordedBox}>
+          <View style={styles.resultSectionHeader}>
+            <AppIcon name="check-circle" size={14} color={colors.teal[800]} />
+
+            <Text style={styles.resultSectionTitle}>Case action recorded</Text>
+          </View>
+
+          <Text style={styles.resultSectionText}>
+            {result.case_action
+              ? formatCaseAction(result.case_action)
+              : "Action recorded"}{" "}
+            {result.case_action_status
+              ? `- case status is now ${formatStatusText(
+                  result.case_action_status,
+                )}.`
+              : "for this verification result."}
+          </Text>
+
+          {result.case_action_public_update ? (
+            <Text style={styles.resultSectionText}>
+              Reporter update: {result.case_action_public_update}
+            </Text>
+          ) : null}
+        </View>
+      ) : (
+        <View style={styles.nextActionBox}>
+          <Text style={styles.nextActionTitle}>Next case action</Text>
+
+          <Text style={styles.nextActionHelp}>
+            Choose one action based on the Evidence Checker result. Internal
+            notes stay protected; the Reporter receives only the public update.
+          </Text>
+
+          <View style={styles.nextActionButtons}>
+            {actions.map((action) => (
+              <Pressable
+                key={action}
+                onPress={() => onAction(action)}
+                disabled={acting}
+                accessibilityRole="button"
+                style={[
+                  styles.caseActionButton,
+                  action === "move_forward" && styles.caseActionPositive,
+                  acting && styles.disabled,
+                ]}
+              >
+                {acting ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={
+                      action === "move_forward"
+                        ? colors.textInverse
+                        : colors.royal[700]
+                    }
+                  />
+                ) : (
+                  <>
+                    <AppIcon
+                      name={getActionIcon(action)}
+                      size={14}
+                      color={
+                        action === "move_forward"
+                          ? colors.textInverse
+                          : colors.royal[700]
+                      }
+                    />
+
+                    <Text
+                      style={[
+                        styles.caseActionButtonText,
+                        action === "move_forward" &&
+                          styles.caseActionPositiveText,
+                      ]}
+                    >
+                      {formatCaseAction(action)}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -822,6 +1008,114 @@ function formatDecision(decision: EvidenceDecision) {
     default:
       return decision;
   }
+}
+
+function getAvailableActions(decision: EvidenceDecision): CaseReviewAction[] {
+  switch (decision) {
+    case "approved":
+      return ["move_forward"];
+
+    case "rejected":
+      return ["request_information"];
+
+    case "replacement_requested":
+      return ["request_information", "request_clarification"];
+
+    case "escalated":
+      return ["request_clarification", "reassign_evidence"];
+
+    default:
+      return [];
+  }
+}
+
+function getActionIcon(action: CaseReviewAction): AppIconName {
+  switch (action) {
+    case "move_forward":
+      return "arrow-right";
+
+    case "request_information":
+      return "message-square";
+
+    case "request_clarification":
+      return "circle-help";
+
+    case "reassign_evidence":
+      return "user-plus";
+
+    default:
+      return "circle";
+  }
+}
+
+function formatCaseAction(action: CaseReviewAction) {
+  switch (action) {
+    case "move_forward":
+      return "Move case forward";
+
+    case "request_information":
+      return "Request information";
+
+    case "request_clarification":
+      return "Request clarification";
+
+    case "reassign_evidence":
+      return "Reassign evidence";
+
+    default:
+      return action;
+  }
+}
+
+function getActionConfirmation(action: CaseReviewAction) {
+  switch (action) {
+    case "move_forward":
+      return "Move this case back into active investigation based on the verified evidence?";
+
+    case "request_information":
+      return "Send a secure additional-information request to the Reporter and mark the case as awaiting information?";
+
+    case "request_clarification":
+      return "Send a secure clarification request to the Reporter and mark the case as awaiting information?";
+
+    case "reassign_evidence":
+      return "Mark this evidence as pending again so it can be reassigned for another review?";
+
+    default:
+      return "Record this case action?";
+  }
+}
+
+function getPublicUpdate(action: CaseReviewAction) {
+  switch (action) {
+    case "move_forward":
+      return "Evidence review is complete and the case has moved back into active investigation.";
+
+    case "request_information":
+      return "The evidence review found that more information is needed. A secure request has been sent to you.";
+
+    case "request_clarification":
+      return "The evidence review is unclear. A secure clarification request has been sent before the next case decision.";
+
+    case "reassign_evidence":
+      return "The evidence needs another validation step before the case can move forward.";
+
+    default:
+      return "A case update was recorded after evidence review.";
+  }
+}
+
+function getInternalActionNote(
+  result: VerificationResultRow,
+  action: CaseReviewAction,
+) {
+  return `${formatCaseAction(action)} recorded after ${formatDecision(
+    result.decision,
+  ).toLowerCase()} verification for "${result.evidence_title}".`;
+}
+
+function formatStatusText(status: string) {
+  return status.replace(/_/g, " ");
 }
 
 function formatDate(date: string) {
@@ -1358,6 +1652,96 @@ const styles = StyleSheet.create({
     lineHeight: 16,
 
     color: colors.textSecondary,
+  },
+
+  actionRecordedBox: {
+    marginTop: 10,
+
+    padding: 10,
+
+    borderWidth: 1,
+
+    borderColor: colors.teal[100],
+
+    borderRadius: 10,
+
+    backgroundColor: colors.surface,
+  },
+
+  nextActionBox: {
+    marginTop: 12,
+
+    paddingTop: 11,
+
+    borderTopWidth: 1,
+
+    borderTopColor: colors.teal[100],
+  },
+
+  nextActionTitle: {
+    fontSize: 11.5,
+
+    fontWeight: "600",
+
+    color: colors.navy[800],
+  },
+
+  nextActionHelp: {
+    marginTop: 4,
+
+    fontSize: 10.5,
+
+    lineHeight: 16,
+
+    color: colors.textSecondary,
+  },
+
+  nextActionButtons: {
+    flexDirection: "row",
+
+    flexWrap: "wrap",
+
+    gap: 8,
+
+    marginTop: 10,
+  },
+
+  caseActionButton: {
+    minHeight: 38,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    gap: 7,
+
+    paddingHorizontal: 12,
+
+    borderWidth: 1,
+
+    borderColor: colors.royal[200],
+
+    borderRadius: 10,
+
+    backgroundColor: colors.surface,
+  },
+
+  caseActionPositive: {
+    borderColor: colors.royal[700],
+
+    backgroundColor: colors.royal[700],
+  },
+
+  caseActionButtonText: {
+    fontSize: 10.5,
+
+    fontWeight: "600",
+
+    color: colors.royal[700],
+  },
+
+  caseActionPositiveText: {
+    color: colors.textInverse,
   },
 
   reviewedBox: {

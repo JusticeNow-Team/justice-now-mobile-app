@@ -67,6 +67,42 @@ const requirements = [
     "separate reporter-visible timeline entry",
     /'evidence_update_available'[\s\S]*v_reporter_message[\s\S]*true/,
   ],
+  [
+    "case action storage after evidence review",
+    /create table if not exists public\.evidence_case_actions/,
+  ],
+  [
+    "one case action per verification result",
+    /create unique index[\s\S]*evidence_case_actions_one_per_decision[\s\S]*decision_id/i,
+  ],
+  [
+    "case action RPC",
+    /create function public\.take_case_action_after_evidence_review\(/,
+  ],
+  [
+    "case action officer ownership",
+    /officer_assignment\.case_id = v_decision\.case_id[\s\S]*officer_assignment\.assigned_officer_id = v_officer_id[\s\S]*officer_assignment\.is_active = true/,
+  ],
+  [
+    "approved evidence moves case forward",
+    /v_action = 'move_forward'[\s\S]*v_decision\.decision <> 'approved'[\s\S]*v_next_status := 'investigating'/,
+  ],
+  [
+    "rejected evidence triggers information request",
+    /v_action = 'request_information'[\s\S]*case_information_requests[\s\S]*v_next_status := 'awaiting_information'/,
+  ],
+  [
+    "unclear evidence can be reassigned",
+    /v_action in \('request_clarification', 'reassign_evidence'\)[\s\S]*v_decision\.decision not in \('escalated', 'replacement_requested'\)[\s\S]*validation_status = 'pending'/,
+  ],
+  [
+    "public update excludes internal timeline",
+    /'case_update_after_evidence_review'[\s\S]*v_public_update[\s\S]*true/,
+  ],
+  [
+    "internal case action timeline stays protected",
+    /'evidence_case_action_taken'[\s\S]*v_internal_note[\s\S]*false/,
+  ],
 ];
 
 for (const [name, pattern] of requirements) {
@@ -102,6 +138,26 @@ assert.match(
   officerEvidenceScreen,
   /Internal officer notes/,
   "The Officer evidence screen must label internal verification notes separately.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /take_case_action_after_evidence_review/,
+  "The Officer evidence screen must call the post-review case action RPC.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /Move case forward/,
+  "Verified evidence must offer a move-forward action.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /Request information/,
+  "Rejected evidence must offer an additional-information action.",
+);
+assert.match(
+  officerEvidenceScreen,
+  /Reassign evidence/,
+  "Unclear evidence must offer a reassignment action.",
 );
 
 console.log("Evidence assignment contract tests passed.");
