@@ -1,28 +1,30 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
-    AppHeader,
-    Notice,
-    PrimaryButton,
-    SectionCard,
+  AppHeader,
+  AppTextArea,
+  Field,
+  Notice,
+  PrimaryButton,
+  SectionCard,
 } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 import { logoutReporter } from "../login";
 import { formatCaseDate, formatCaseDateTime } from "./filterReporterCases";
+import { submitInformationResponse } from "./submitInformationResponse";
 
 type RequestCase = {
   id: string;
@@ -46,6 +48,7 @@ type InformationRequest = {
   id: string;
   case_id: string;
   reporter_id: string;
+  officer_id: string | null;
   title: string;
   message: string;
   requested_items: string[];
@@ -54,8 +57,13 @@ type InformationRequest = {
   status: "sent" | "responded";
   sent_at: string;
   cases: RequestCase | null;
+  officerName: string | null;
   case_information_responses: SavedResponse[];
 };
+
+function draftKey(requestId: string) {
+  return `jn-info-request-draft:${requestId}`;
+}
 
 function parseSavedAnswers(value: unknown): SavedAnswer[] {
   if (!Array.isArray(value)) {
@@ -67,16 +75,8 @@ function parseSavedAnswers(value: unknown): SavedAnswer[] {
       (item): item is SavedAnswer =>
         typeof item === "object" &&
         item !== null &&
-        typeof (
-          item as {
-            question?: unknown;
-          }
-        ).question === "string" &&
-        typeof (
-          item as {
-            answer?: unknown;
-          }
-        ).answer === "string",
+        typeof (item as { question?: unknown }).question === "string" &&
+        typeof (item as { answer?: unknown }).answer === "string"
     )
     .map((item) => ({
       question: item.question,
@@ -84,26 +84,48 @@ function parseSavedAnswers(value: unknown): SavedAnswer[] {
     }));
 }
 
+function responseFromSaved(saved: SavedResponse | null) {
+  if (!saved) {
+    return "";
+  }
+
+  if (saved.additional_message?.trim()) {
+    return saved.additional_message.trim();
+  }
+
+  const firstAnswer = saved.answers.find((item) => item.answer.trim());
+  return firstAnswer?.answer.trim() ?? "";
+}
+
 export default function InformationRequestScreen() {
   const router = useRouter();
-
   const params = useLocalSearchParams<{
     requestId?: string | string[];
   }>();
-
   const requestId = Array.isArray(params.requestId)
     ? params.requestId[0]
     : params.requestId;
 
   const [request, setRequest] = useState<InformationRequest | null>(null);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [additionalMessage, setAdditionalMessage] = useState("");
+  const [responseText, setResponseText] = useState("");
   const [savedResponse, setSavedResponse] = useState<SavedResponse | null>(
-    null,
+    null
   );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const goToCase = useCallback(() => {
+    if (request?.case_id) {
+      router.replace(`/reporter/cases/${request.case_id}` as Href);
+      return;
+    }
+
+    router.replace("/reporter/cases" as Href);
+  }, [request?.case_id, router]);
 
   const loadRequest = useCallback(async () => {
     if (!requestId) {
@@ -134,6 +156,7 @@ export default function InformationRequestScreen() {
             id,
             case_id,
             reporter_id,
+            officer_id,
             title,
             message,
             requested_items,
@@ -152,7 +175,7 @@ export default function InformationRequestScreen() {
               additional_message,
               submitted_at
             )
-          `,
+          `
         )
         .eq("id", requestId)
         .eq("reporter_id", user.id)
@@ -165,19 +188,17 @@ export default function InformationRequestScreen() {
 
       if (!data) {
         setErrorMessage(
-          "This information request is not available on your account.",
+          "This information request is not available on your account."
         );
         return;
       }
 
       const nestedCase = Array.isArray(data.cases) ? data.cases[0] : data.cases;
-
       const responseRows = Array.isArray(data.case_information_responses)
         ? data.case_information_responses
         : data.case_information_responses
           ? [data.case_information_responses]
           : [];
-
       const firstResponse = responseRows[0];
 
       const parsedResponse: SavedResponse | null = firstResponse
@@ -189,10 +210,23 @@ export default function InformationRequestScreen() {
           }
         : null;
 
+      let officerName: string | null = null;
+
+      if (data.officer_id) {
+        const { data: officerProfile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", data.officer_id)
+          .maybeSingle();
+
+        officerName = officerProfile?.full_name ?? null;
+      }
+
       const typedRequest: InformationRequest = {
         id: data.id,
         case_id: data.case_id,
         reporter_id: data.reporter_id,
+        officer_id: data.officer_id,
         title: data.title,
         message: data.message,
         requested_items: data.requested_items ?? [],
@@ -201,6 +235,7 @@ export default function InformationRequestScreen() {
         status: data.status === "responded" ? "responded" : "sent",
         sent_at: data.sent_at,
         cases: nestedCase ?? null,
+        officerName,
         case_information_responses: parsedResponse ? [parsedResponse] : [],
       };
 
@@ -208,27 +243,16 @@ export default function InformationRequestScreen() {
       setSavedResponse(parsedResponse);
 
       if (parsedResponse) {
-        setAnswers(
-          typedRequest.requested_items.map(
-            (question) =>
-              parsedResponse.answers.find(
-                (answer) => answer.question === question,
-              )?.answer ?? "",
-          ),
-        );
-
-        setAdditionalMessage(parsedResponse.additional_message ?? "");
+        setResponseText(responseFromSaved(parsedResponse));
       } else {
-        setAnswers(typedRequest.requested_items.map(() => ""));
-        setAdditionalMessage("");
+        const draft = await AsyncStorage.getItem(draftKey(requestId));
+        setResponseText(draft ?? "");
       }
     } catch (error) {
-      console.error("LOAD REPORTER INFORMATION REQUEST ERROR:", error);
-
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "JusticeNow could not load this information request.",
+          : "JusticeNow could not load this information request."
       );
     } finally {
       setLoading(false);
@@ -239,15 +263,24 @@ export default function InformationRequestScreen() {
     useCallback(() => {
       void loadRequest();
       return undefined;
-    }, [loadRequest]),
+    }, [loadRequest])
   );
 
-  const updateAnswer = (index: number, value: string) => {
-    setAnswers((current) =>
-      current.map((answer, answerIndex) =>
-        answerIndex === index ? value : answer,
-      ),
-    );
+  const saveDraft = async () => {
+    if (!requestId || savingDraft || savedResponse) {
+      return;
+    }
+
+    try {
+      setSavingDraft(true);
+      setFormError("");
+      await AsyncStorage.setItem(draftKey(requestId), responseText);
+      setDraftSaved(true);
+    } catch {
+      setFormError("JusticeNow could not save your draft on this device.");
+    } finally {
+      setSavingDraft(false);
+    }
   };
 
   const submitResponse = async () => {
@@ -255,81 +288,32 @@ export default function InformationRequestScreen() {
       return;
     }
 
-    const preparedAnswers = request.requested_items
-      .map((question, index) => ({
-        question,
-        answer: (answers[index] ?? "").trim(),
-      }))
-      .filter((item) => item.answer.length > 0);
-
-    const cleanAdditionalMessage = additionalMessage.trim();
-
-    if (preparedAnswers.length === 0 && cleanAdditionalMessage.length === 0) {
-      const message =
-        "Answer at least one question or add a message. Partial answers are accepted.";
-
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Response required", message);
-      }
-
-      return;
-    }
-
     try {
       setSubmitting(true);
+      setFormError("");
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const result = await submitInformationResponse({
+        requestId: request.id,
+        caseId: request.case_id,
+        requestedItems: request.requested_items,
+        responseText,
+      });
 
-      if (userError || !user) {
-        await logoutReporter().catch(() => undefined);
-        router.replace("/login");
+      if (!result.ok) {
+        if (result.reason === "unauthenticated") {
+          await logoutReporter().catch(() => undefined);
+          router.replace("/login");
+          return;
+        }
+
+        setFormError(result.message);
         return;
       }
 
-      const { error } = await supabase
-        .from("case_information_responses")
-        .insert({
-          request_id: request.id,
-          case_id: request.case_id,
-          reporter_id: user.id,
-          answers: preparedAnswers,
-          additional_message: cleanAdditionalMessage || null,
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      await loadRequest();
-
-      if (Platform.OS === "web") {
-        window.alert(
-          "Response submitted. Your response was sent securely to the Case Officer.",
-        );
-      } else {
-        Alert.alert(
-          "Response submitted",
-          "Your response was sent securely to the Case Officer.",
-        );
-      }
-    } catch (error) {
-      console.error("SUBMIT INFORMATION RESPONSE ERROR:", error);
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "JusticeNow could not submit your response.";
-
-      if (Platform.OS === "web") {
-        window.alert(`Unable to submit response: ${message}`);
-      } else {
-        Alert.alert("Unable to submit response", message);
-      }
+      await AsyncStorage.removeItem(draftKey(request.id)).catch(() => undefined);
+      goToCase();
+    } catch {
+      setFormError("JusticeNow could not submit your response. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -340,7 +324,6 @@ export default function InformationRequestScreen() {
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.royal[700]} />
-
           <Text style={styles.loadingText}>Loading secure request…</Text>
         </View>
       </SafeAreaView>
@@ -350,13 +333,14 @@ export default function InformationRequestScreen() {
   if (errorMessage || !request) {
     return (
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        <AppHeader title="Information request" onBack={() => router.back()} />
-
+        <AppHeader
+          title="Additional information required"
+          onBack={() => router.replace("/reporter/cases" as Href)}
+        />
         <View style={styles.errorContent}>
           <Notice tone="error" title="Unable to open request">
             {errorMessage || "This request is unavailable."}
           </Notice>
-
           <PrimaryButton
             title="Try again"
             onPress={() => void loadRequest()}
@@ -368,6 +352,12 @@ export default function InformationRequestScreen() {
   }
 
   const readOnly = Boolean(savedResponse) || request.status === "responded";
+  const officerLabel = request.officerName
+    ? `Message from ${request.officerName}`
+    : "Message from your assigned investigator";
+  const dueLabel = request.due_date
+    ? `Response requested by ${formatCaseDate(request.due_date)}`
+    : "A response has been requested";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -376,9 +366,9 @@ export default function InformationRequestScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <AppHeader
-          title="Information request"
+          title="Additional information required"
           subtitle={request.cases?.case_reference}
-          onBack={() => router.back()}
+          onBack={goToCase}
         />
 
         <ScrollView
@@ -386,121 +376,141 @@ export default function InformationRequestScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.hero}>
-            <Text style={styles.heroLabel}>CASE OFFICER REQUEST</Text>
-
-            <Text style={styles.heroTitle}>{request.title}</Text>
-
-            <Text style={styles.heroMeta}>
-              Sent {formatCaseDateTime(request.sent_at)}
+          <View style={styles.deadline}>
+            <Text style={styles.deadlineTitle}>🕒 {dueLabel}</Text>
+            <Text style={styles.deadlineCopy}>
+              If you need more time, tell your officer — the case will not be
+              closed while you are working on a reply.
             </Text>
           </View>
 
-          <SectionCard title="Message from your Case Officer">
-            <Text style={styles.message}>{request.message}</Text>
-          </SectionCard>
+          <View style={styles.stack}>
+            <SectionCard
+              title={officerLabel}
+              description="Assigned investigator"
+            >
+              <Text style={styles.message}>{request.message}</Text>
+            </SectionCard>
 
-          <SectionCard
-            title={readOnly ? "Your submitted response" : "Your response"}
-            description={
-              readOnly
-                ? savedResponse
-                  ? `Submitted ${formatCaseDateTime(
-                      savedResponse.submitted_at,
-                    )}`
-                  : "Response submitted"
-                : "Answer only what you are comfortable sharing. Partial answers are accepted."
-            }
-          >
-            {request.requested_items.map((question, index) => (
-              <View key={`${index}-${question}`} style={styles.answerGroup}>
-                <Text style={styles.question}>
-                  {index + 1}. {question}
+            <SectionCard title="Information requested">
+              {request.requested_items.length === 0 ? (
+                <Text style={styles.emptyItems}>
+                  Your investigator has not listed specific items. Use the
+                  response box below.
                 </Text>
+              ) : (
+                request.requested_items.map((item, index) => (
+                  <View key={`${index}-${item}`} style={styles.itemRow}>
+                    <View style={styles.itemBadge}>
+                      <Text style={styles.itemBadgeText}>{index + 1}</Text>
+                    </View>
+                    <Text style={styles.itemText}>{item}</Text>
+                  </View>
+                ))
+              )}
+            </SectionCard>
 
-                <TextInput
-                  value={answers[index] ?? ""}
-                  onChangeText={(value) => updateAnswer(index, value)}
-                  editable={!readOnly && !submitting}
-                  multiline
-                  maxLength={1500}
-                  textAlignVertical="top"
-                  placeholder="Type your answer…"
-                  placeholderTextColor={colors.textSoft}
-                  style={[styles.answerInput, readOnly && styles.readOnlyInput]}
-                />
-              </View>
-            ))}
-
-            <Text style={styles.question}>Additional message</Text>
-
-            <TextInput
-              value={additionalMessage}
-              onChangeText={setAdditionalMessage}
-              editable={!readOnly && !submitting}
-              multiline
-              maxLength={2000}
-              textAlignVertical="top"
-              placeholder="Add anything else the Case Officer should know…"
-              placeholderTextColor={colors.textSoft}
-              style={[styles.answerInput, readOnly && styles.readOnlyInput]}
-            />
-          </SectionCard>
-
-          <SectionCard title="Request details">
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Response due</Text>
-
-              <Text style={styles.detailValue}>
-                {formatCaseDate(request.due_date)}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Supporting evidence</Text>
-
-              <Text style={styles.detailValue}>
-                {request.requires_evidence ? "Requested" : "Not requested"}
-              </Text>
-            </View>
-          </SectionCard>
-
-          {request.requires_evidence ? (
-            <PrimaryButton
-              title="Upload supporting evidence"
-              variant="outline"
-              icon="upload"
-              onPress={() =>
-                router.push({
-                  pathname: "/reporter/cases/upload",
-                  params: {
-                    caseId: request.case_id,
-                  },
-                })
+            <SectionCard
+              title={readOnly ? "Your submitted response" : "Your response"}
+              description={
+                readOnly && savedResponse
+                  ? `Submitted ${formatCaseDateTime(savedResponse.submitted_at)}`
+                  : undefined
               }
-            />
+            >
+              <Field
+                label="Write your response"
+                hint="Answer in your own words, in any language you prefer."
+              >
+                <AppTextArea
+                  value={responseText}
+                  onChangeText={(value) => {
+                    setDraftSaved(false);
+                    setResponseText(value.slice(0, 2000));
+                  }}
+                  editable={!readOnly && !submitting}
+                  placeholder="Type here…"
+                  style={[styles.responseArea, readOnly && styles.readOnlyInput]}
+                />
+              </Field>
+              <Text style={styles.counter}>
+                {responseText.length} / 2000 characters
+              </Text>
+
+              <PrimaryButton
+                title="Attach a supporting file"
+                variant="outline"
+                icon="📎"
+                onPress={() =>
+                  router.push({
+                    pathname: "/reporter/cases/upload",
+                    params: { caseId: request.case_id },
+                  })
+                }
+              />
+            </SectionCard>
+          </View>
+
+          {formError ? (
+            <View style={styles.notice}>
+              <Notice tone="error" title="Unable to continue">
+                {formError}
+              </Notice>
+            </View>
+          ) : null}
+
+          {draftSaved && !readOnly ? (
+            <View style={styles.notice}>
+              <Notice tone="success" title="Draft saved">
+                Your draft is saved on this device until you submit.
+              </Notice>
+            </View>
           ) : null}
 
           {readOnly ? (
-            <Notice tone="success" title="Response submitted">
-              Your Case Officer has been notified. Your response is now part of
-              the protected case record.
-            </Notice>
+            <View style={styles.notice}>
+              <Notice tone="success" title="Response submitted">
+                Your response was sent securely to your assigned investigator.
+              </Notice>
+            </View>
           ) : (
-            <Notice tone="privacy" title="Secure case communication">
-              Your answers are visible only to authorized staff working on this
-              case. Submit once you are ready; responses cannot be edited later.
-            </Notice>
+            <View style={styles.notice}>
+              <Notice tone="privacy">
+                Your response is added to the case record and seen only by your
+                assigned investigator.
+              </Notice>
+            </View>
           )}
-
-          {!readOnly ? (
-            <PrimaryButton
-              title="Submit response securely"
-              loading={submitting}
-              onPress={() => void submitResponse()}
-            />
-          ) : null}
         </ScrollView>
+
+        {!readOnly ? (
+          <View style={styles.footer}>
+            <View style={styles.footerRow}>
+              <View style={styles.draftBtn}>
+                <PrimaryButton
+                  title="Save draft"
+                  variant="outline"
+                  loading={savingDraft}
+                  disabled={submitting}
+                  onPress={() => void saveDraft()}
+                />
+              </View>
+              <View style={styles.submitBtn}>
+                <PrimaryButton
+                  title="Submit response"
+                  icon="✈"
+                  loading={submitting}
+                  disabled={savingDraft}
+                  onPress={() => void submitResponse()}
+                />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.footer}>
+            <PrimaryButton title="Back to case" onPress={goToCase} />
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -531,79 +541,96 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   content: {
-    gap: 14,
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 28,
   },
-  hero: {
-    padding: 18,
-    borderRadius: 17,
-    backgroundColor: colors.navy[800],
+  deadline: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.gold[100],
+    backgroundColor: colors.gold[50],
   },
-  heroLabel: {
-    fontSize: 10,
+  deadlineTitle: {
+    fontSize: 13,
     fontWeight: "700",
-    letterSpacing: 0.7,
-    color: "#AFC5DE",
+    color: colors.warning,
   },
-  heroTitle: {
-    marginTop: 6,
-    fontSize: 19,
-    fontWeight: "800",
-    lineHeight: 25,
-    color: colors.textInverse,
+  deadlineCopy: {
+    marginTop: 4,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.warning,
   },
-  heroMeta: {
-    marginTop: 7,
-    fontSize: 11,
-    color: "#DCE5EF",
+  stack: {
+    marginTop: 14,
+    gap: 12,
   },
   message: {
     fontSize: 13,
     lineHeight: 20,
-    color: colors.navy[700],
-  },
-  answerGroup: {
-    marginBottom: 16,
-  },
-  question: {
-    marginBottom: 7,
-    fontSize: 12.5,
-    fontWeight: "600",
-    lineHeight: 18,
     color: colors.navy[800],
   },
-  answerInput: {
-    minHeight: 90,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-    borderRadius: 11,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: colors.navy[800],
-    backgroundColor: colors.surface,
-  },
-  readOnlyInput: {
-    borderColor: colors.border,
-    backgroundColor: colors.navy[50],
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-    paddingVertical: 7,
-  },
-  detailLabel: {
-    fontSize: 12,
+  emptyItems: {
+    fontSize: 13,
+    lineHeight: 19,
     color: colors.textSecondary,
   },
-  detailValue: {
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 8,
+  },
+  itemBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.royal[50],
+  },
+  itemBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.royal[700],
+  },
+  itemText: {
     flex: 1,
-    textAlign: "right",
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.navy[800],
+  },
+  responseArea: {
+    minHeight: 140,
+  },
+  readOnlyInput: {
+    backgroundColor: colors.navy[50],
+  },
+  counter: {
+    marginTop: 6,
+    marginBottom: 12,
+    fontSize: 11.5,
+    color: colors.textSecondary,
+  },
+  notice: {
+    marginTop: 14,
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  footerRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  draftBtn: {
+    flex: 0.42,
+  },
+  submitBtn: {
+    flex: 1,
   },
 });

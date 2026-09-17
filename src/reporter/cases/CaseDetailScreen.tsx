@@ -31,8 +31,14 @@ import {
   ReporterInformationRequest,
   ReporterOfficerPublic,
   ReporterStatusEvent,
+  ReporterWithdrawalRequest,
 } from "./getReporterCaseDetail";
+import {
+  canRequestWithdrawal,
+  requestCaseWithdrawal,
+} from "./requestCaseWithdrawal";
 import ReporterStatusBadge from "./ReporterStatusBadge";
+import WithdrawalRequestDialog from "./WithdrawalRequestDialog";
 
 type DetailTab = "overview" | "progress" | "requests" | "evidence" | "activity";
 
@@ -84,6 +90,11 @@ export default function CaseDetailScreen() {
   const [informationRequests, setInformationRequests] = useState<
     ReporterInformationRequest[]
   >([]);
+  const [withdrawalRequest, setWithdrawalRequest] =
+    useState<ReporterWithdrawalRequest | null>(null);
+  const [withdrawalOpen, setWithdrawalOpen] = useState(false);
+  const [withdrawalSaving, setWithdrawalSaving] = useState(false);
+  const [withdrawalError, setWithdrawalError] = useState("");
 
   const loadDetail = useCallback(
     async (showLoader = true) => {
@@ -119,6 +130,7 @@ export default function CaseDetailScreen() {
         setEvidence(result.evidence);
         setHistory(result.history);
         setInformationRequests(result.informationRequests);
+        setWithdrawalRequest(result.withdrawalRequest);
       } catch {
         setErrorMessage(
           "JusticeNow could not load this case. Please try again.",
@@ -137,7 +149,52 @@ export default function CaseDetailScreen() {
     }, [loadDetail]),
   );
 
+  const submitWithdrawal = async (reason: string) => {
+    if (!detail || withdrawalSaving) {
+      return;
+    }
+
+    try {
+      setWithdrawalSaving(true);
+      setWithdrawalError("");
+
+      const result = await requestCaseWithdrawal({
+        caseId: detail.id,
+        reason,
+      });
+
+      if (!result.ok) {
+        if (result.reason === "unauthenticated") {
+          await logoutReporter().catch(() => undefined);
+          router.replace("/login");
+          return;
+        }
+
+        setWithdrawalError(result.message);
+        return;
+      }
+
+      setWithdrawalOpen(false);
+      await loadDetail(false);
+    } catch {
+      setWithdrawalError(
+        "JusticeNow could not submit your withdrawal request. Please try again."
+      );
+    } finally {
+      setWithdrawalSaving(false);
+    }
+  };
+
   const description = splitDescription(detail?.description ?? null);
+  const openInformationRequest = informationRequests.find(
+    (request) => request.status === "sent"
+  );
+  const showWithdrawalAction =
+    detail &&
+    canRequestWithdrawal(detail.status) &&
+    !withdrawalRequest;
+  const showWithdrawalRequested =
+    detail?.status === "withdrawal_requested" || Boolean(withdrawalRequest);
 
   const tabs: {
     id: DetailTab;
@@ -226,6 +283,31 @@ export default function CaseDetailScreen() {
 
               <ReporterStatusBadge status={detail.status} />
             </View>
+
+            {openInformationRequest ? (
+              <View style={styles.heroAction}>
+                <PrimaryButton
+                  title="Respond to information request"
+                  icon="?"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/reporter/cases/information-request",
+                      params: { requestId: openInformationRequest.id },
+                    })
+                  }
+                />
+              </View>
+            ) : null}
+
+            {showWithdrawalRequested ? (
+              <View style={styles.heroNotice}>
+                <Notice tone="caution" title="Withdrawal requested">
+                  {withdrawalRequest
+                    ? `Requested ${formatCaseDateTime(withdrawalRequest.requestedAt)}. Staff have been notified and will review your request.`
+                    : "Staff have been notified and will review your withdrawal request."}
+                </Notice>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.tabRow}>
@@ -251,6 +333,28 @@ export default function CaseDetailScreen() {
 
           {tab === "overview" ? (
             <View style={styles.stack}>
+              {showWithdrawalRequested && withdrawalRequest ? (
+                <SectionCard title="Withdrawal request">
+                  <DataRow
+                    label="Status"
+                    value="Withdrawal requested"
+                  />
+                  <DataRow
+                    label="Requested on"
+                    value={formatCaseDateTime(withdrawalRequest.requestedAt)}
+                  />
+                  <DataRow
+                    label="Reason"
+                    value={withdrawalRequest.reason}
+                    last
+                  />
+                  <Text style={styles.officerNote}>
+                    Your assigned investigator or an administrator has been
+                    flagged to review this request.
+                  </Text>
+                </SectionCard>
+              ) : null}
+
               <SectionCard title="Incident details">
                 <DataRow label="Category" value={detail.category || "—"} />
 
@@ -311,6 +415,17 @@ export default function CaseDetailScreen() {
                   </Text>
                 )}
               </SectionCard>
+
+              {showWithdrawalAction ? (
+                <PrimaryButton
+                  title="Request withdrawal"
+                  variant="outline"
+                  onPress={() => {
+                    setWithdrawalError("");
+                    setWithdrawalOpen(true);
+                  }}
+                />
+              ) : null}
             </View>
           ) : null}
 
@@ -520,6 +635,20 @@ export default function CaseDetailScreen() {
           ) : null}
         </ScrollView>
       ) : null}
+
+      <WithdrawalRequestDialog
+        visible={withdrawalOpen}
+        caseReference={detail?.caseReference}
+        loading={withdrawalSaving}
+        error={withdrawalError}
+        onConfirm={(reason) => void submitWithdrawal(reason)}
+        onClose={() => {
+          if (!withdrawalSaving) {
+            setWithdrawalOpen(false);
+            setWithdrawalError("");
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -582,6 +711,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  heroAction: {
+    marginTop: 12,
+  },
+  heroNotice: {
+    marginTop: 12,
   },
   tabRow: {
     marginTop: 14,

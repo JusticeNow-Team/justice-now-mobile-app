@@ -19,6 +19,7 @@ const STATUSES: ReporterCaseStatus[] = [
   "investigating",
   "awaiting_information",
   "awaiting_evidence",
+  "withdrawal_requested",
   "resolved",
   "closed",
 ];
