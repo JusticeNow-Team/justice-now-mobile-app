@@ -64,6 +64,8 @@ export default function AssignEvidenceScreen() {
 
   const requestedCaseId = firstParam(params.caseId);
   const requestedEvidenceId = firstParam(params.evidenceId);
+  const lockedToRequestedCase = Boolean(requestedCaseId);
+  const lockedToRequestedEvidence = Boolean(requestedEvidenceId);
 
   const [cases, setCases] = useState<CaseOption[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState(requestedCaseId || "");
@@ -112,7 +114,10 @@ export default function AssignEvidenceScreen() {
       throw new Error(assignmentResult.error.message);
     }
 
-    const nextEvidence = (evidenceResult.data ?? []) as EvidenceOption[];
+    const allEvidence = (evidenceResult.data ?? []) as EvidenceOption[];
+    const nextEvidence = requestedEvidenceId
+      ? allEvidence.filter((item) => item.id === requestedEvidenceId)
+      : allEvidence;
     const nextAssignments = (assignmentResult.data ?? []) as EvidenceAssignment[];
     setEvidence(nextEvidence);
     setCheckers(
@@ -128,6 +133,11 @@ export default function AssignEvidenceScreen() {
     setAssignments(nextAssignments);
 
     setSelectedEvidenceId((current) => {
+      if (requestedEvidenceId) {
+        return nextEvidence.some((item) => item.id === requestedEvidenceId)
+          ? requestedEvidenceId
+          : "";
+      }
       if (current && nextEvidence.some((item) => item.id === current)) {
         return current;
       }
@@ -145,7 +155,7 @@ export default function AssignEvidenceScreen() {
         ""
       );
     });
-  }, []);
+  }, [requestedEvidenceId]);
 
   const loadPage = useCallback(
     async (showLoader = true) => {
@@ -198,13 +208,23 @@ export default function AssignEvidenceScreen() {
           throw new Error(caseError.message);
         }
 
-        const assignedCases = (caseAssignments ?? [])
+        const allAssignedCases = (caseAssignments ?? [])
           .map((row: any) => row.cases)
           .filter(Boolean) as CaseOption[];
+        const assignedCases = requestedCaseId
+          ? allAssignedCases.filter((caseItem) => caseItem.id === requestedCaseId)
+          : allAssignedCases;
+
+        if (requestedCaseId && assignedCases.length === 0) {
+          throw new Error(
+            "This case is not assigned to your Case Officer account.",
+          );
+        }
 
         setCases(assignedCases);
 
         const nextCaseId =
+          requestedCaseId ||
           (selectedCaseId &&
           assignedCases.some((caseItem) => caseItem.id === selectedCaseId)
             ? selectedCaseId
@@ -225,7 +245,7 @@ export default function AssignEvidenceScreen() {
         setRefreshing(false);
       }
     },
-    [loadWorkspace, router, selectedCaseId],
+    [loadWorkspace, requestedCaseId, router, selectedCaseId],
   );
 
   useEffect(() => {
@@ -256,6 +276,10 @@ export default function AssignEvidenceScreen() {
   );
 
   const selectCase = async (caseId: string) => {
+    if (lockedToRequestedCase) {
+      return;
+    }
+
     if (caseId === selectedCaseId) {
       return;
     }
@@ -288,7 +312,7 @@ export default function AssignEvidenceScreen() {
     if (!selectedEvidenceId || !selectedCheckerId) {
       showMessage(
         "Selection required",
-        "Select one evidence item and one Evidence Validator.",
+        "Select one evidence item and one Evidence Checker.",
       );
       return;
     }
@@ -326,7 +350,7 @@ export default function AssignEvidenceScreen() {
       setConfirmingAssignment(false);
       showMessage(
         "Evidence assigned",
-        "The Evidence Validator can now see this item in the validation queue.",
+        "The Evidence Checker can now see this item in the validation queue.",
       );
     } catch (error) {
       showMessage(
@@ -351,8 +375,8 @@ export default function AssignEvidenceScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.header}>
         <Pressable
-          accessibilityLabel="Back to officer dashboard"
-          onPress={() => router.replace("/officer")}
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
           style={styles.headerButton}
         >
           <AppIcon
@@ -365,7 +389,7 @@ export default function AssignEvidenceScreen() {
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Assign evidence</Text>
           <Text style={styles.headerSubtitle}>
-            Send submitted files to an Evidence Validator
+            Send selected files to an Evidence Checker
           </Text>
         </View>
 
@@ -399,7 +423,7 @@ export default function AssignEvidenceScreen() {
         <View style={styles.notice}>
           <AppIcon name="shield-check" size={20} color={colors.teal[700]} />
           <Text style={styles.noticeText}>
-            Assign only the evidence required for independent validation. The
+            Assign only the selected evidence required for independent validation. The
             action is recorded against your Case Officer account.
           </Text>
         </View>
@@ -413,8 +437,10 @@ export default function AssignEvidenceScreen() {
 
         <SectionHeading
           step="1"
-          title="Select an assigned case"
-          detail={`${cases.length} available`}
+          title={lockedToRequestedCase ? "Assigned case" : "Select an assigned case"}
+          detail={
+            lockedToRequestedCase ? "Locked from case flow" : `${cases.length} available`
+          }
         />
 
         {cases.length === 0 ? (
@@ -423,7 +449,7 @@ export default function AssignEvidenceScreen() {
             title="No assigned cases"
             body="A case must be assigned to your officer account before its evidence can be delegated."
           />
-        ) : (
+        ) : lockedToRequestedCase ? null : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -472,8 +498,12 @@ export default function AssignEvidenceScreen() {
 
         <SectionHeading
           step="2"
-          title="Select evidence"
-          detail={`${evidence.length} item${evidence.length === 1 ? "" : "s"}`}
+          title={lockedToRequestedEvidence ? "Evidence to assign" : "Select evidence"}
+          detail={
+            lockedToRequestedEvidence
+              ? "Locked from evidence flow"
+              : `${evidence.length} item${evidence.length === 1 ? "" : "s"}`
+          }
         />
 
         {selectedCase && evidence.length === 0 ? (
@@ -496,7 +526,7 @@ export default function AssignEvidenceScreen() {
             return (
               <Pressable
                 key={item.id}
-                disabled={!selectable}
+                disabled={!selectable || lockedToRequestedEvidence}
                 onPress={() => {
                   setSelectedEvidenceId(item.id);
                   setSelectedCheckerId("");
@@ -547,7 +577,7 @@ export default function AssignEvidenceScreen() {
           <>
             <SectionHeading
               step="3"
-              title="Select a validator"
+              title="Select an Evidence Checker"
               detail={`${checkers.length} available`}
             />
 
@@ -579,8 +609,8 @@ export default function AssignEvidenceScreen() {
             ) : checkers.length === 0 ? (
               <EmptyState
                 icon="users"
-                title="No validator available"
-                body="Ask the administrator to create and activate an Evidence Validator account."
+                title="No Evidence Checker available"
+                body="Ask the administrator to create and activate an Evidence Checker account."
               />
             ) : (
               checkers.map((checker) => {
@@ -639,7 +669,7 @@ export default function AssignEvidenceScreen() {
                       color={colors.textInverse}
                     />
                     <Text style={styles.assignButtonText}>
-                      Assign to validator
+                      Assign to checker
                     </Text>
                   </>
                 )}
@@ -669,7 +699,7 @@ export default function AssignEvidenceScreen() {
         title="Assign evidence?"
         body={`${selectedEvidence?.title ?? "This evidence"} will be assigned to ${
           checkers.find((checker) => checker.id === selectedCheckerId)?.full_name ??
-          "the selected Evidence Validator"
+          "the selected Evidence Checker"
         }. The action will be recorded in the case timeline.`}
         confirmLabel="Assign evidence"
         loading={assigning}

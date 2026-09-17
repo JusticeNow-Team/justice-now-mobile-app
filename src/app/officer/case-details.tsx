@@ -1012,7 +1012,7 @@ export default function CaseDetailsScreen() {
             })
           }
           accessibilityRole="button"
-          accessibilityLabel="Review case evidence"
+          accessibilityLabel="View case evidence"
           style={({ pressed }) => [
             styles.evidenceButton,
             pressed && styles.evidenceButtonPressed,
@@ -1023,11 +1023,11 @@ export default function CaseDetailsScreen() {
           </View>
 
           <View style={styles.evidenceContent}>
-            <Text style={styles.evidenceButtonTitle}>Review Evidence</Text>
+            <Text style={styles.evidenceButtonTitle}>View Evidence</Text>
 
             <Text style={styles.evidenceButtonText}>
-              View evidence submitted for this case and record your
-              investigation findings.
+              View evidence submitted for this case and assign pending files
+              to an Evidence Checker.
             </Text>
           </View>
 
