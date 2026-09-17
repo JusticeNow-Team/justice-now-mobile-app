@@ -623,31 +623,6 @@ export default function EvidenceReviewScreen() {
                 </Pressable>
               </View>
 
-              {item.validation_status === "pending" ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Assign ${item.title} to an Evidence Validator`}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/officer/assign-evidence",
-                      params: {
-                        caseId: item.case_id,
-                        evidenceId: item.id,
-                      },
-                    })
-                  }
-                  style={styles.assignmentButton}
-                >
-                  <AppIcon
-                    name="user-plus"
-                    size={16}
-                    color={colors.royal[700]}
-                  />
-                  <Text style={styles.assignmentButtonText}>
-                    Assign for independent validation
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
           );
         })}

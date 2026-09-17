@@ -151,7 +151,10 @@ const HIDDEN_PREFIXES: Record<NavigationRole, string[]> = {
   case_officer: [
     "/officer/case-details",
     "/officer/assign-evidence",
+    "/officer/workspace",
     "/officer/request-information",
+    "/officer/status",
+    "/officer/resolution",
   ],
 
   evidence_validator: ["/validator/evidence"],

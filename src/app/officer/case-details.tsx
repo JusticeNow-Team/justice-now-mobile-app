@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppIcon } from "../../components/AppIcon";
+import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -661,6 +661,69 @@ export default function CaseDetailsScreen() {
           </Text>
         </View>
 
+        <Text style={styles.sectionTitle}>Officer actions</Text>
+
+        <View style={styles.actionGrid}>
+          <ActionTile
+            icon="notebook-pen"
+            title="Workspace"
+            description="Checklist, notes, recorded activity and next action."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/workspace",
+                params: {
+                  caseId: caseData.id,
+                  reference: caseData.case_reference,
+                },
+              })
+            }
+          />
+
+          <ActionTile
+            icon="message-square"
+            title="Request information"
+            description="Ask the reporter for structured follow-up details."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/request-information",
+                params: {
+                  caseId: caseData.id,
+                },
+              })
+            }
+          />
+
+          <ActionTile
+            icon="refresh-cw"
+            title="Update status"
+            description="Move the case forward with a status summary."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/status",
+                params: {
+                  caseId: caseData.id,
+                  reference: caseData.case_reference,
+                },
+              })
+            }
+          />
+
+          <ActionTile
+            icon="arrow-up-right"
+            title="Resolution"
+            description="Prepare escalation, closure or resolution notes."
+            onPress={() =>
+              router.push({
+                pathname: "/officer/resolution",
+                params: {
+                  caseId: caseData.id,
+                  reference: caseData.case_reference,
+                },
+              })
+            }
+          />
+        </View>
+
         {caseData.reporter_id && !caseData.is_anonymous && (
           <>
             <Text style={styles.sectionTitle}>Reporter communication</Text>
@@ -1133,6 +1196,38 @@ function PriorityBadge({ priority }: { priority: CasePriority }) {
   );
 }
 
+function ActionTile({
+  icon,
+  title,
+  description,
+  onPress,
+}: {
+  icon: AppIconName;
+  title: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [styles.actionTile, pressed && styles.pressed]}
+    >
+      <View style={styles.actionTileIcon}>
+        <AppIcon name={icon} size={18} color={colors.royal[700]} />
+      </View>
+
+      <View style={styles.actionTileContent}>
+        <Text style={styles.actionTileTitle}>{title}</Text>
+        <Text style={styles.actionTileDescription}>{description}</Text>
+      </View>
+
+      <AppIcon name="chevron-right" size={18} color={colors.textSoft} />
+    </Pressable>
+  );
+}
+
 function formatStatus(status: CaseStatus | null) {
   if (!status) {
     return "Unknown";
@@ -1325,6 +1420,43 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 19,
     color: colors.navy[700],
+  },
+  actionGrid: {
+    gap: 9,
+  },
+  actionTile: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+  },
+  actionTileIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.royal[50],
+  },
+  actionTileContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionTileTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  actionTileDescription: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
   evidenceButton: {
     minHeight: 82,
@@ -1584,6 +1716,9 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.55,
+  },
+  pressed: {
+    opacity: 0.82,
   },
   noteCard: {
     marginTop: 9,

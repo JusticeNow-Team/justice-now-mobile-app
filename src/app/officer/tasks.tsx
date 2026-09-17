@@ -272,39 +272,15 @@ export default function OfficerTasksScreen() {
 
     const nextTasks: OfficerTask[] = [];
 
-    if (pendingEvidence.length > 0) {
-      const first = pendingEvidence[0];
-
-      nextTasks.push({
-        id: "assign-evidence",
-        title: "Assign evidence for validation",
-        description: `${pendingEvidence.length} pending evidence item${
-          pendingEvidence.length === 1 ? "" : "s"
-        } need an Evidence Checker assignment.`,
-        meta: `Next item: ${first.title}`,
-        icon: "user-plus",
-        tone: "royal",
-        actionLabel: "Assign now",
-        onPress: () =>
-          router.push({
-            pathname: "/officer/assign-evidence",
-            params: {
-              caseId: first.case_id,
-              evidenceId: first.id,
-            },
-          }),
-      });
-    }
-
     if (reviewEvidence.length > 0) {
       nextTasks.push({
         id: "review-evidence",
         title: "Review case evidence",
         description:
-          "Open submitted evidence, record officer findings and track validation status.",
-        meta: `${reviewEvidence.length} active evidence item${
+          "Open submitted files and record investigation findings from the case workspace.",
+        meta: `${reviewEvidence.length} evidence item${
           reviewEvidence.length === 1 ? "" : "s"
-        }`,
+        } · ${pendingEvidence.length} pending`,
         icon: "file-search",
         tone: "teal",
         actionLabel: "Open files",
