@@ -16,6 +16,14 @@ if (!supabaseUrl || !supabasePublishableKey) {
   );
 }
 
+// Safe WebSocket transport fallback for Node/SSR bundling environments
+const RealtimeTransport =
+  typeof WebSocket !== "undefined"
+    ? WebSocket
+    : typeof globalThis !== "undefined" && (globalThis as any).WebSocket
+      ? (globalThis as any).WebSocket
+      : class DummyWebSocket {};
+
 export const supabase = createClient(
   supabaseUrl,
   supabasePublishableKey,
@@ -27,9 +35,12 @@ export const supabase = createClient(
           }
         : {}),
 
-      autoRefreshToken: true,
+      autoRefreshToken: typeof window !== "undefined",
       persistSession: true,
       detectSessionInUrl: false,
+    },
+    realtime: {
+      transport: RealtimeTransport,
     },
   }
 );

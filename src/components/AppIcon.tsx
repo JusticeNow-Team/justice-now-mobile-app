@@ -1,4 +1,11 @@
 import React from "react";
+import {
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import { Text, View } from "react-native";
 import * as lucide from "lucide-react-native";
@@ -69,6 +76,18 @@ export type AppIconName =
   | "warning"
   | "x";
 
+const ICONS_MAP: Record<AppIconName, string> = {
+  activity: "📈",
+  "alert-circle": "⚠️",
+  "alert-triangle": "⚠️",
+  "arrow-right": "→",
+  "arrow-up-right": "↗",
+  balance: "⚖️",
+  bell: "🔔",
+  category: "🏷️",
+  check: "✓",
+  "check-circle": "✅",
+  "chevron-down": "▼",
 const ICON_GLYPHS: Record<AppIconName, string> = {
   activity: "⚡",
   "alert-circle": "ⓘ",
@@ -91,6 +110,39 @@ const ICON_GLYPHS: Record<AppIconName, string> = {
   clock: "🕒",
   document: "📄",
   download: "📥",
+  "eye-off": "👁️",
+  "file-search": "🔍",
+  "file-text": "📄",
+  "file-up": "📤",
+  filter: "🔍",
+  flag: "🚩",
+  "folder-open": "📁",
+  globe: "🌐",
+  history: "⏱️",
+  house: "🏠",
+  "id-card": "🪪",
+  image: "🖼️",
+  info: "ℹ️",
+  key: "🔑",
+  languages: "🌐",
+  "layout-dashboard": "▦",
+  "list-checks": "☑️",
+  lock: "🔒",
+  "log-out": "🚪",
+  mail: "✉️",
+  "message-square": "💬",
+  mic: "🎙️",
+  "notebook-pen": "📝",
+  plus: "+",
+  "refresh-cw": "🔄",
+  roles: "👥",
+  scale: "⚖️",
+  search: "🔍",
+  settings: "⚙️",
+  shield: "🛡️",
+  "shield-alert": "🛡️",
+  "shield-check": "🛡️",
+  sliders: "🎛️",
   "eye-off": "🙈",
   "file-search": "🔍",
   "file-text": "📄",
@@ -132,6 +184,10 @@ const ICON_GLYPHS: Record<AppIconName, string> = {
   video: "📹",
   warning: "⚠️",
   x: "✕",
+};
+
+export function isAppIconName(value: string): value is AppIconName {
+  return value in ICONS_MAP;
   activity: "^",
   "alert-circle": "!",
   "alert-triangle": "!",
@@ -277,10 +333,19 @@ export function AppIcon({
   name,
   color = "#173458",
   size = 20,
-  strokeWidth = 2,
   style,
-  ...props
 }: AppIconProps) {
+  const symbol = ICONS_MAP[name] || "•";
+  const isAscii =
+    name === "chevron-left" ||
+    name === "chevron-right" ||
+    name === "chevron-down" ||
+    name === "arrow-right" ||
+    name === "arrow-up-right" ||
+    name === "check" ||
+    name === "x" ||
+    name === "plus" ||
+    name === "layout-dashboard";
   const glyph = ICON_GLYPHS[name] || "•";
 
   const lucideName = LUCIDE_NAME_MAP[name];
@@ -302,6 +367,24 @@ export function AppIcon({
   return (
     <View
       style={[
+        styles.container,
+        { width: size, height: size },
+        style,
+      ]}
+    >
+      <Text
+        style={[
+          styles.iconText,
+          {
+            fontSize: isAscii ? size * 0.95 : size * 0.82,
+            lineHeight: size,
+            color: color,
+            fontWeight: isAscii ? "700" : "normal",
+          },
+        ]}
+        accessibilityRole="image"
+      >
+        {symbol}
         {
           width: size,
           height: size,
@@ -328,3 +411,15 @@ export function AppIcon({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconText: {
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
+  },
+});

@@ -6,9 +6,9 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from "expo-router/ui";
-import { ArrowUpRight } from "lucide-react-native";
 import { Pressable, useColorScheme, View, StyleSheet } from "react-native";
 
+import { AppIcon } from "./AppIcon";
 import { ExternalLink } from "./external-link";
 import { ThemedText } from "./themed-text";
 import { ThemedView } from "./themed-view";
@@ -64,7 +64,7 @@ export function CustomTabList(props: TabListProps) {
         <ExternalLink href="https://docs.expo.dev" asChild>
           <Pressable style={styles.externalPressable}>
             <ThemedText type="link">Docs</ThemedText>
-            <ArrowUpRight color={colors.text} size={12} />
+            <AppIcon name="arrow-up-right" color={colors.text} size={12} />
           </Pressable>
         </ExternalLink>
       </ThemedView>

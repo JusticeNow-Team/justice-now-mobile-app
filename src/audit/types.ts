@@ -6,6 +6,7 @@ export type AuditEventType =
   | "ACCOUNT_DEACTIVATED"
   | "ROLE_ASSIGNED"
   | "ROLE_CHANGED"
+  | "CHECKER_AVAILABILITY_CHANGED"
   | "SECURITY_POLICY_VIOLATION";
 
 export interface AuditEvent {

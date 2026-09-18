@@ -141,6 +141,13 @@ export default function AdminDashboardScreen() {
     (account) => account.role === "case_officer" && account.isActive,
   ).length;
 
+  const activeCheckers = staff.filter(
+    (account) =>
+      (account.role === "evidence_checker" ||
+        (account.role as string) === "evidence_validator") &&
+      account.isActive,
+  ).length;
+
   const inactiveAccounts = staff.filter((account) => !account.isActive).length;
 
   const kpis: {
@@ -162,6 +169,12 @@ export default function AdminDashboardScreen() {
       route: "/admin/staff",
     },
     {
+      label: "Active checkers",
+      value: activeCheckers,
+      tone: "ok",
+      route: "/admin/checkers",
+    },
+    {
       label: "Pending account requests",
       value: inactiveAccounts,
       tone: "warn",
@@ -177,11 +190,6 @@ export default function AdminDashboardScreen() {
       label: "Active cases",
       value: 212,
       tone: "info",
-    },
-    {
-      label: "Storage used",
-      value: "78%",
-      tone: "warn",
     },
   ];
 
@@ -361,6 +369,39 @@ export default function AdminDashboardScreen() {
                   Open backup & system health
                 </Text>
               </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Evidence Operations</Text>
+                <Text style={styles.sectionDescription}>
+                  Checker availability & workload distribution
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/checkers" as any)}>
+                <Text style={styles.auditLink}>Manage</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Evidence Checkers</Text>
+                  <Text style={styles.healthValue}>
+                    {activeCheckers} active authorized staff ready for assignment
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/checkers" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
 
@@ -707,5 +748,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 11.5,
     color: colors.textSecondary,
+  },
+  actionPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.royal[700],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textInverse,
   },
 });
