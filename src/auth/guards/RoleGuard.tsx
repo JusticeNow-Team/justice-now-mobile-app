@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { Href, useRouter } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -45,7 +45,7 @@ export function RoleGuard({
             style={styles.authButton}
             onPress={async () => {
               await signOut();
-              router.replace("/login");
+              router.replace("/secure-role" as Href);
             }}
             accessibilityRole="button"
           >

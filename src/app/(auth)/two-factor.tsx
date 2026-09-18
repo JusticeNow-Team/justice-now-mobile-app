@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { resolvePostLoginRedirect } from "../../auth";
+import { STAFF_MFA_TEMPORARILY_DISABLED, resolvePostLoginRedirect } from "../../auth";
 import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
@@ -210,13 +210,18 @@ export default function TwoFactorScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (STAFF_MFA_TEMPORARILY_DISABLED) {
+        void routeVerifiedStaff();
+        return;
+      }
+
       void prepareMfa();
     }, 0);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [prepareMfa]);
+  }, [prepareMfa, routeVerifiedStaff]);
 
   const updateDigit = (value: string, index: number) => {
     setErrorMessage("");

@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
@@ -106,14 +107,13 @@ export default function RequestInformationScreen() {
         return;
       }
 
-      const { data: aal, error: aalError } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const mfa = await hasCompletedStaffMfa();
 
-      if (aalError) {
-        throw aalError;
+      if (mfa.error) {
+        throw mfa.error;
       }
 
-      if (aal.currentLevel !== "aal2") {
+      if (!mfa.verified) {
         router.replace("/two-factor");
         return;
       }
@@ -293,14 +293,13 @@ export default function RequestInformationScreen() {
     try {
       setSaving(true);
 
-      const { data: aal, error: aalError } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const mfa = await hasCompletedStaffMfa();
 
-      if (aalError) {
-        throw aalError;
+      if (mfa.error) {
+        throw mfa.error;
       }
 
-      if (aal.currentLevel !== "aal2") {
+      if (!mfa.verified) {
         router.replace("/two-factor");
         return;
       }

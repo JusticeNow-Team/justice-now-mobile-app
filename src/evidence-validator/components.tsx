@@ -381,7 +381,7 @@ export function EvidenceQueueCard({
 
           <Text style={styles.fileMeta} numberOfLines={1}>
             {formatLabel(item.evidenceType)} · {formatBytes(item.fileSizeBytes)}{" "}
-            · uploaded {formatDateTime(item.evidenceCreatedAt)}
+            · assigned {formatDateTime(item.assignedAt || item.evidenceCreatedAt)}
           </Text>
 
           <View style={styles.badgeRow}>
