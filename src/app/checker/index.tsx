@@ -145,7 +145,15 @@ export default function EvidenceCheckerDashboard() {
     const list = validatedRecords.filter(({ record, validation }) => {
       if (activeTab === "pending" && record.validationStatus !== "pending") return false;
       if (activeTab === "under_review" && record.validationStatus !== "under_review") return false;
-      if (activeTab === "validated" && record.validationStatus !== "validated") return false;
+      if (
+        activeTab === "completed" &&
+        record.validationStatus !== "validated" &&
+        record.validationStatus !== "approved" &&
+        record.validationStatus !== "rejected"
+      )
+        return false;
+      if (activeTab === "validated" && record.validationStatus !== "validated" && record.validationStatus !== "approved")
+        return false;
       if (activeTab === "rejected" && record.validationStatus !== "rejected") return false;
       if (activeTab === "archived" && record.validationStatus !== "archived") return false;
       if (activeTab === "invalid_metadata" && validation.isValid) return false;
@@ -162,10 +170,14 @@ export default function EvidenceCheckerDashboard() {
       );
     });
 
-    return list.sort(
-      (a, b) => new Date(b.record.uploadDate).getTime() - new Date(a.record.uploadDate).getTime(),
-    );
+    return list.sort((a, b) => {
+      const timeA = new Date(a.record.assignedAt || a.record.uploadDate).getTime();
+      const timeB = new Date(b.record.assignedAt || b.record.uploadDate).getTime();
+      return timeB - timeA;
+    });
   }, [validatedRecords, activeTab, searchQuery]);
+
+  const completedCount = stats.validatedCount + stats.rejectedCount;
 
   return (
     <RoleGuard allowedRoles={["evidence_validator"]}>
@@ -244,6 +256,11 @@ export default function EvidenceCheckerDashboard() {
               onPress={() => setActiveTab("pending")}
             />
             <TabButton
+              label={`Completed (${completedCount})`}
+              active={activeTab === "completed"}
+              onPress={() => setActiveTab("completed")}
+            />
+            <TabButton
               label={`All (${stats.totalCount})`}
               active={activeTab === "all"}
               onPress={() => setActiveTab("all")}
@@ -289,16 +306,26 @@ export default function EvidenceCheckerDashboard() {
             renderItem={({ item }) => {
               const { record, validation } = item;
               const ext = record.fileName.split(".").pop()?.toUpperCase() || "FILE";
-              const formattedDate = new Date(record.uploadDate).toLocaleString(undefined, {
+              const formattedUploadDate = new Date(record.uploadDate).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              });
+              const assignedDateSource = record.assignedAt || record.uploadDate;
+              const formattedAssignedDate = new Date(assignedDateSource).toLocaleString(undefined, {
                 dateStyle: "medium",
                 timeStyle: "short",
               });
               const isMissingFile = record.fileExistsInStorage === false;
               const preview = getPreviewBadge(validation.previewKind);
+              const isCompleted =
+                record.validationStatus === "validated" ||
+                record.validationStatus === "approved" ||
+                record.validationStatus === "rejected" ||
+                record.validationStatus === "archived";
 
               return (
                 <Pressable
-                  style={styles.evidenceCard}
+                  style={[styles.evidenceCard, isCompleted && styles.completedEvidenceCard]}
                   onPress={() =>
                     router.push({
                       pathname: "/checker/evidence/[id]",
@@ -313,12 +340,20 @@ export default function EvidenceCheckerDashboard() {
                       <AppIcon name="id-card" size={11} color={colors.navy[700]} />
                       <Text style={styles.idText}>{record.id}</Text>
                     </View>
-                    <StatusBadge status={record.validationStatus} />
+                    <View style={styles.badgeRowHeader}>
+                      {isCompleted ? (
+                        <View style={styles.completedTagBadge}>
+                          <AppIcon name="check" size={10} color="#065F46" />
+                          <Text style={styles.completedTagText}>Completed Item</Text>
+                        </View>
+                      ) : null}
+                      <StatusBadge status={record.validationStatus} />
+                    </View>
                   </View>
 
                   <View style={styles.fileRow}>
-                    <View style={styles.fileTypeBadge}>
-                      <Text style={styles.fileTypeBadgeText}>{ext}</Text>
+                    <View style={[styles.fileTypeBadge, isCompleted && styles.completedFileTypeBadge]}>
+                      <Text style={[styles.fileTypeBadgeText, isCompleted && styles.completedFileTypeBadgeText]}>{ext}</Text>
                     </View>
 
                     <View style={styles.fileMainInfo}>
@@ -328,7 +363,7 @@ export default function EvidenceCheckerDashboard() {
 
                       <View style={styles.previewTagRow}>
                         <Text style={styles.fileMetaText}>
-                          {record.fileType} · {formatBytes(record.fileSizeBytes)}
+                          Type: {record.evidenceType} ({record.fileType}) · {formatBytes(record.fileSizeBytes)}
                         </Text>
 
                         <View style={styles.previewBadge}>
@@ -339,13 +374,21 @@ export default function EvidenceCheckerDashboard() {
                     </View>
                   </View>
 
-                  <View style={styles.linkContainer}>
+                  <View style={[styles.linkContainer, isCompleted && styles.completedLinkContainer]}>
                     <View style={styles.linkRow}>
                       <AppIcon name="folder-open" size={11} color={colors.navy[600]} />
-                      <Text style={styles.linkLabel}>Case Link:</Text>
+                      <Text style={styles.linkLabel}>Case Reference:</Text>
                       <Text style={styles.linkValue} numberOfLines={1}>
                         {record.caseInfo?.caseReference || record.caseId || "UNLINKED"}
                         {record.caseInfo?.title ? ` - ${record.caseInfo.title}` : ""}
+                      </Text>
+                    </View>
+
+                    <View style={styles.linkRow}>
+                      <AppIcon name="calendar" size={11} color={colors.navy[600]} />
+                      <Text style={styles.linkLabel}>Assignment Date:</Text>
+                      <Text style={styles.linkValue} numberOfLines={1}>
+                        {formattedAssignedDate}
                       </Text>
                     </View>
 
@@ -361,7 +404,7 @@ export default function EvidenceCheckerDashboard() {
                       <AppIcon name="clock" size={11} color={colors.navy[600]} />
                       <Text style={styles.linkLabel}>Submitted:</Text>
                       <Text style={styles.linkValue} numberOfLines={1}>
-                        {formattedDate}
+                        {formattedUploadDate}
                       </Text>
                     </View>
                   </View>
@@ -515,14 +558,20 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "700", color: colors.navy[800], marginTop: 12 },
   emptySub: { fontSize: 12.5, color: colors.textSecondary, textAlign: "center", marginTop: 4 },
   evidenceCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, boxShadow: shadows.elevated, elevation: 1 },
+  completedEvidenceCard: { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   idContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.navy[50], paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, gap: 4 },
   idText: { fontSize: 12, fontWeight: "700", color: colors.navy[800] },
+  badgeRowHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  completedTagBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  completedTagText: { fontSize: 10, fontWeight: "700", color: "#065F46" },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   statusBadgeText: { fontSize: 11, fontWeight: "700" },
   fileRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   fileTypeBadge: { width: 38, height: 38, borderRadius: 8, backgroundColor: colors.royal[50], alignItems: "center", justifyContent: "center", marginRight: 10, borderWidth: 1, borderColor: colors.royal[100] },
   fileTypeBadgeText: { fontSize: 10, fontWeight: "800", color: colors.royal[700] },
+  completedFileTypeBadge: { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
+  completedFileTypeBadgeText: { color: "#047857" },
   fileMainInfo: { flex: 1 },
   fileNameText: { fontSize: 14, fontWeight: "700", color: colors.navy[900] },
   fileMetaText: { fontSize: 11.5, color: colors.textSecondary, marginTop: 2 },
@@ -530,6 +579,7 @@ const styles = StyleSheet.create({
   previewBadge: { backgroundColor: colors.royal[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.royal[100], flexDirection: "row", alignItems: "center", gap: 4 },
   previewBadgeText: { fontSize: 10, fontWeight: "700", color: colors.royal[700] },
   linkContainer: { backgroundColor: "#F1F5F9", padding: 8, borderRadius: 8, marginBottom: 10 },
+  completedLinkContainer: { backgroundColor: "#F3F4F6" },
   linkRow: { flexDirection: "row", alignItems: "center", marginVertical: 2, gap: 5 },
   linkLabel: { fontSize: 11, fontWeight: "600", color: colors.navy[600], marginRight: 2 },
   linkValue: { fontSize: 11.5, fontWeight: "700", color: colors.navy[900], flex: 1 },

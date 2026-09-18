@@ -173,6 +173,11 @@ export interface EvidenceRecord {
   validatedBy?: string;
   controlledDownloadLogs?: ControlledDownloadLog[];
 
+  // JN-185 & JN-186 Assignment Details
+  assignedCheckerId?: string;
+  assignedAt?: string;
+  assignedByName?: string;
+  assignmentStatus?: string;
   // JN-198 & JN-204 Verification Record & Lock Protection
   verificationRecord?: EvidenceVerificationRecord;
   isLocked?: boolean;
@@ -224,6 +229,7 @@ export type CheckerFilterTab =
   | "all"
   | "pending"
   | "under_review"
+  | "completed"
   | "validated"
   | "rejected"
   | "archived"
