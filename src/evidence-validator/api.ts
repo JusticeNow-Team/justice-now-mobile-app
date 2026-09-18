@@ -184,14 +184,19 @@ export async function createEvidenceSignedUrl(
 export async function submitEvidenceDecision(
   input: SubmitEvidenceDecisionInput,
 ) {
+  const reasonText = input.reason ? input.reason.trim() : "";
+  if (!reasonText) {
+    throw new Error("A documented reason or comment is required.");
+  }
+
   const { data, error } = await supabase.rpc(
     "submit_evidence_verification_decision",
     {
       p_assignment_id: input.assignmentId,
       p_decision: input.decision,
-      p_reason: input.reason.trim(),
-      p_internal_notes: input.internalNotes.trim() || null,
-      p_reporter_message: input.reporterMessage.trim() || null,
+      p_reason: reasonText,
+      p_internal_notes: input.internalNotes ? input.internalNotes.trim() || null : null,
+      p_reporter_message: input.reporterMessage ? input.reporterMessage.trim() || null : null,
     },
   );
 

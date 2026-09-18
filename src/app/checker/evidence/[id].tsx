@@ -156,10 +156,26 @@ export default function EvidenceAuditDetailScreen() {
   };
 
   const openDecisionModal = (type: EvidenceValidationStatus) => {
+    if (!record) return;
     if (!isAuthorized) {
       Alert.alert(
         "Access Denied",
         "Validation decisions require active Evidence Checker authorization."
+      );
+      return;
+    }
+
+    // JN-204: Overwrite Protection
+    const isCompleted =
+      record.isLocked ||
+      record.validationStatus === "validated" ||
+      record.validationStatus === "approved" ||
+      record.validationStatus === "rejected";
+
+    if (isCompleted) {
+      Alert.alert(
+        "Completed Decision Locked",
+        "A completed evidence decision cannot be silently overwritten."
       );
       return;
     }
@@ -178,10 +194,12 @@ export default function EvidenceAuditDetailScreen() {
   const handleApplyDecision = async () => {
     if (!record || !decisionType) return;
 
-    if (decisionType === "rejected" && !rejectionReason.trim()) {
+    // JN-201: Mandatory Reason or Comment Validation
+    const effectiveComment = (rejectionReason || checkerNotes || "").trim();
+    if (!effectiveComment) {
       Alert.alert(
-        "Rejection Reason Required",
-        "Please enter an explanation for rejecting this evidence metadata."
+        "Reason or Comment Required",
+        "A documented reason or comment is required to record this evidence decision."
       );
       return;
     }
@@ -191,13 +209,13 @@ export default function EvidenceAuditDetailScreen() {
       const res = await updateEvidenceValidationDecision({
         evidenceId: record.id,
         status: decisionType,
-        rejectionReason: decisionType === "rejected" ? rejectionReason : undefined,
-        notes: checkerNotes,
-        checkerId: "Evidence Checker Squad #1",
+        rejectionReason: decisionType === "rejected" ? effectiveComment : undefined,
+        notes: effectiveComment,
+        checkerId: record.assignedCheckerId || "Evidence Checker Squad #1",
       });
 
       if (res.ok) {
-        Alert.alert("Status Updated", res.message);
+        Alert.alert("Decision Documented", res.message);
         setModalVisible(false);
         await loadRecord();
       } else {
@@ -986,53 +1004,117 @@ export default function EvidenceAuditDetailScreen() {
         {/* Evidence Checker Action Controls */}
         <View style={styles.actionCard}>
           <Text style={styles.actionCardTitle}>Evidence Checker Decision</Text>
-          <Text style={styles.actionCardSub}>
-            Record your validation assessment for downstream investigators:
-          </Text>
 
-          <View style={styles.actionButtonsCol}>
-            {record.validationStatus === "pending" && (
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: "#0284C7" }]}
-                onPress={handleMarkUnderReview}
-                accessibilityRole="button"
-              >
-                <Text style={styles.validateBtnText}>
-                  Begin Examination (Mark Under Review)
+          {record.isLocked ||
+          record.validationStatus === "validated" ||
+          record.validationStatus === "approved" ||
+          record.validationStatus === "rejected" ? (
+            <View style={styles.lockedDecisionContainer}>
+              <View style={styles.lockedHeaderRow}>
+                <AppIcon name="lock" size={16} color={colors.navy[800]} />
+                <Text style={styles.lockedTitle}>Completed Decision Recorded & Locked</Text>
+              </View>
+
+              <Text style={styles.lockedSub}>
+                A completed evidence decision cannot be silently overwritten.
+              </Text>
+
+              <View style={styles.lockedMetaRow}>
+                <Text style={styles.lockedMetaLabel}>Decision Outcome:</Text>
+                <Text
+                  style={[
+                    styles.lockedMetaValue,
+                    {
+                      color:
+                        record.validationStatus === "validated" || record.validationStatus === "approved"
+                          ? "#047857"
+                          : "#B91C1C",
+                    },
+                  ]}
+                >
+                  {record.validationStatus === "validated" || record.validationStatus === "approved"
+                    ? "VERIFIED & VALIDATED"
+                    : "REJECTED"}
                 </Text>
-              </Pressable>
-            )}
+              </View>
 
-            <Pressable
-              style={[styles.actionBtn, styles.validateBtn]}
-              onPress={() => openDecisionModal("validated")}
-              accessibilityRole="button"
-            >
-              <Text style={styles.validateBtnText}>
-                Validate & Accept Metadata
-              </Text>
-            </Pressable>
+              <View style={styles.lockedMetaRow}>
+                <Text style={styles.lockedMetaLabel}>Completion Date:</Text>
+                <Text style={styles.lockedMetaValue}>
+                  {record.validatedAt
+                    ? new Date(record.validatedAt).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : "Recorded"}
+                </Text>
+              </View>
 
-            <Pressable
-              style={[styles.actionBtn, styles.rejectBtn]}
-              onPress={() => openDecisionModal("rejected")}
-              accessibilityRole="button"
-            >
-              <Text style={styles.rejectBtnText}>
-                Reject Evidence (Invalid / Unsupported)
-              </Text>
-            </Pressable>
+              <View style={styles.lockedMetaRow}>
+                <Text style={styles.lockedMetaLabel}>Checker Identity:</Text>
+                <Text style={styles.lockedMetaValue}>
+                  {record.validatedBy || record.assignedByName || "Evidence Checker Squad #1"}
+                </Text>
+              </View>
 
-            <Pressable
-              style={[styles.actionBtn, styles.infoBtn]}
-              onPress={() => openDecisionModal("info_requested")}
-              accessibilityRole="button"
-            >
-              <Text style={styles.infoBtnText}>
-                Request Additional Metadata Info
+              <View style={styles.lockedMetaRowVertical}>
+                <Text style={styles.lockedMetaLabel}>Documented Reason / Comment:</Text>
+                <Text style={styles.lockedReasonBox}>
+                  {record.checkerNotes || record.rejectionReason || "Validation audit completed."}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.actionCardSub}>
+                Record your validation assessment for downstream investigators:
               </Text>
-            </Pressable>
-          </View>
+
+              <View style={styles.actionButtonsCol}>
+                {record.validationStatus === "pending" && (
+                  <Pressable
+                    style={[styles.actionBtn, { backgroundColor: "#0284C7" }]}
+                    onPress={handleMarkUnderReview}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.validateBtnText}>
+                      Begin Examination (Mark Under Review)
+                    </Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  style={[styles.actionBtn, styles.validateBtn]}
+                  onPress={() => openDecisionModal("validated")}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.validateBtnText}>
+                    Mark Verified & Accept Metadata
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.actionBtn, styles.rejectBtn]}
+                  onPress={() => openDecisionModal("rejected")}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.rejectBtnText}>
+                    Mark Rejected (Invalid / Unsupported)
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.actionBtn, styles.infoBtn]}
+                  onPress={() => openDecisionModal("info_requested")}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.infoBtnText}>
+                    Request Additional Metadata Info
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
         </View>
         </View>
       </ScrollView>
@@ -2082,6 +2164,62 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: "700",
     fontSize: 13,
+  },
+
+  lockedDecisionContainer: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 6,
+  },
+  lockedHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  lockedTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: colors.navy[900],
+  },
+  lockedSub: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  lockedMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  lockedMetaLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: "600",
+  },
+  lockedMetaValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.navy[900],
+  },
+  lockedMetaRowVertical: {
+    marginTop: 8,
+  },
+  lockedReasonBox: {
+    marginTop: 4,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 12,
+    color: colors.navy[900],
+    lineHeight: 17,
   },
 });
 
