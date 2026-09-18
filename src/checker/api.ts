@@ -405,8 +405,13 @@ export async function updateEvidenceValidationDecision(params: {
   evidenceId: string;
   status: EvidenceValidationStatus;
   rejectionReason?: string;
+  commonRejectionReason?: string;
   notes?: string;
+  internalComment?: string;
+  publicFeedback?: string;
   checkerId?: string;
+  checkerName?: string;
+  checkerRole?: string;
   role?: "checker" | "case_officer" | "system" | "reporter";
 }): Promise<{ ok: boolean; message: string; historyEntry?: StatusHistoryRecord }> {
   try {
@@ -446,9 +451,28 @@ export async function updateEvidenceValidationDecision(params: {
       };
     }
 
-    // JN-201: Mandatory Reason or Comment Validation
-    const effectiveReason = (params.rejectionReason || params.notes || "").trim();
-    if ((nextStatus === "validated" || nextStatus === "approved" || nextStatus === "rejected") && !effectiveReason) {
+    // JN-208 & JN-209: Mandatory Rejection Reason & Non-Blank Comment Validation
+    const rawReason = params.rejectionReason || params.commonRejectionReason || "";
+    const rawNotes = params.internalComment || params.notes || "";
+    const rawPublicFeedback = params.publicFeedback || "";
+
+    const effectiveReason = rawReason.trim();
+    const effectiveNotes = rawNotes.trim();
+    const effectivePublicFeedback = rawPublicFeedback.trim();
+
+    const combinedSummary = [effectiveReason, effectiveNotes, effectivePublicFeedback]
+      .filter(Boolean)
+      .join(" | ");
+
+    if (nextStatus === "rejected" && !effectiveReason && !effectiveNotes) {
+      return {
+        ok: false,
+        message: "A rejection reason is mandatory for rejected evidence.",
+      };
+    }
+
+    // JN-201 & JN-209: Reject Blank Comments Where Required
+    if ((nextStatus === "validated" || nextStatus === "approved" || nextStatus === "rejected") && !combinedSummary) {
       return {
         ok: false,
         message: "A documented reason or comment is required to record this evidence decision.",
@@ -464,9 +488,10 @@ export async function updateEvidenceValidationDecision(params: {
       };
     }
 
-    // JN-198 & JN-199 & JN-202: Construct Verification & History Entry
+    // JN-198 & JN-207 & JN-211: Construct Verification Record & History Entry with Author Identity and Date
     const now = new Date().toISOString();
-    const checkerIdentity = params.checkerId || currentRecord.assignedByName || "Evidence Checker Squad #1";
+    const checkerIdentity = params.checkerName || params.checkerId || currentRecord.assignedByName || "Evidence Checker Squad #1";
+    const checkerRoleTitle = params.checkerRole || "Evidence Checker";
     const decisionId = `DEC-${Date.now()}`;
 
     const newHistoryEntry = createStatusHistoryEntry({
@@ -476,8 +501,8 @@ export async function updateEvidenceValidationDecision(params: {
       changedByRole: params.role || "checker",
       changedById: params.checkerId || "checker-squad-1",
       changedByName: checkerIdentity,
-      notes: effectiveReason || `Status changed from '${currentStatus}' to '${nextStatus}'.`,
-      rejectionReason: params.rejectionReason,
+      notes: combinedSummary || `Status changed from '${currentStatus}' to '${nextStatus}'.`,
+      rejectionReason: effectiveReason || undefined,
     });
 
     const existingHistory = currentRecord.statusHistory || [
@@ -497,9 +522,13 @@ export async function updateEvidenceValidationDecision(params: {
       decisionId,
       evidenceId: params.evidenceId,
       decision: nextStatus,
-      reason: effectiveReason,
+      reason: effectiveReason || combinedSummary,
+      commonRejectionReason: params.commonRejectionReason,
+      internalComment: effectiveNotes || undefined,
+      publicFeedback: effectivePublicFeedback || undefined,
       checkerId: params.checkerId || "checker-squad-1",
       checkerName: checkerIdentity,
+      checkerRole: checkerRoleTitle,
       completedAt: now,
       isLocked: true,
     };
@@ -508,8 +537,11 @@ export async function updateEvidenceValidationDecision(params: {
     inMemoryStore[idx] = {
       ...currentRecord,
       validationStatus: nextStatus,
-      rejectionReason: params.rejectionReason || currentRecord.rejectionReason,
-      checkerNotes: effectiveReason || currentRecord.checkerNotes,
+      rejectionReason: effectiveReason || currentRecord.rejectionReason,
+      commonRejectionReason: params.commonRejectionReason || currentRecord.commonRejectionReason,
+      internalComment: effectiveNotes || currentRecord.internalComment,
+      publicFeedback: effectivePublicFeedback || currentRecord.publicFeedback,
+      checkerNotes: effectiveNotes || effectiveReason || currentRecord.checkerNotes,
       validatedAt: now,
       validatedBy: checkerIdentity,
       lastStatusChangedAt: now,

@@ -30,6 +30,7 @@ import {
   getCaseOfficerStatusView,
 } from "../../../checker/statusTransitionService";
 import {
+  COMMON_REJECTION_REASONS,
   EvidenceRecord,
   EvidenceValidationStatus,
   MetadataValidationResult,
@@ -51,7 +52,10 @@ export default function EvidenceAuditDetailScreen() {
   // Decision Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [decisionType, setDecisionType] = useState<EvidenceValidationStatus | null>(null);
+  const [commonReasonKey, setCommonReasonKey] = useState<string>("");
   const [rejectionReason, setRejectionReason] = useState("");
+  const [internalComment, setInternalComment] = useState("");
+  const [publicFeedback, setPublicFeedback] = useState("");
   const [checkerNotes, setCheckerNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [generatingSignedUrl, setGeneratingSignedUrl] = useState(false);
@@ -98,25 +102,14 @@ export default function EvidenceAuditDetailScreen() {
 
     try {
       const userRole = isAuthorized ? "evidence_validator" : "unauthorized_guest";
-      const path = record.storagePath || `cases/${record.caseId}/evidence/${record.id}_file`;
-
-      const res = await generateSecureSignedUrl({
-        evidenceId: record.id,
-        storagePath: path,
-        userRole,
-        expirySeconds: 900,
-      });
+      const res = await generateSecureSignedUrl(record.id, userRole, "Audit & Verification Inspection");
 
       setGeneratingSignedUrl(false);
 
       if (res.success && res.signedUrl) {
         setSignedUrlToken(res.signedUrl);
-        Alert.alert(
-          "Secure Signed Token Generated",
-          `Access Granted for Role: ${userRole}\n\nSigned Token URL:\n${res.signedUrl}\n\nExpires At: ${res.expiresAt}`
-        );
+        Alert.alert("Token Issued", `15-minute access token generated successfully.`);
       } else {
-        setSignedUrlToken("");
         Alert.alert("Access Denied", res.error || "Unauthorized request.");
       }
     } catch (err: any) {
@@ -181,7 +174,10 @@ export default function EvidenceAuditDetailScreen() {
     }
 
     setDecisionType(type);
+    setCommonReasonKey("");
     setRejectionReason("");
+    setInternalComment("");
+    setPublicFeedback("");
     setCheckerNotes("");
 
     // Auto-fill common rejection reasons if rejecting
@@ -194,9 +190,25 @@ export default function EvidenceAuditDetailScreen() {
   const handleApplyDecision = async () => {
     if (!record || !decisionType) return;
 
-    // JN-201: Mandatory Reason or Comment Validation
-    const effectiveComment = (rejectionReason || checkerNotes || "").trim();
-    if (!effectiveComment) {
+    const selectedPresetLabel = COMMON_REJECTION_REASONS.find(r => r.id === commonReasonKey)?.label || "";
+    const effectiveRejectionReason = (rejectionReason || selectedPresetLabel).trim();
+    const effectiveInternalComment = (internalComment || checkerNotes).trim();
+    const effectivePublicFeedback = publicFeedback.trim();
+
+    // JN-208 & JN-209: Mandatory Rejection Reason & Non-Blank Comment Check
+    if (decisionType === "rejected" && !effectiveRejectionReason && !effectiveInternalComment) {
+      Alert.alert(
+        "Rejection Reason Required",
+        "A rejection reason is mandatory when rejecting evidence. Please select a common reason or enter custom notes."
+      );
+      return;
+    }
+
+    const combinedSummary = [effectiveRejectionReason, effectiveInternalComment, effectivePublicFeedback]
+      .filter(Boolean)
+      .join(" | ");
+
+    if (!combinedSummary) {
       Alert.alert(
         "Reason or Comment Required",
         "A documented reason or comment is required to record this evidence decision."
@@ -209,9 +221,15 @@ export default function EvidenceAuditDetailScreen() {
       const res = await updateEvidenceValidationDecision({
         evidenceId: record.id,
         status: decisionType,
-        rejectionReason: decisionType === "rejected" ? effectiveComment : undefined,
-        notes: effectiveComment,
-        checkerId: record.assignedCheckerId || "Evidence Checker Squad #1",
+        rejectionReason: effectiveRejectionReason || undefined,
+        commonRejectionReason: selectedPresetLabel || undefined,
+        notes: effectiveInternalComment || combinedSummary,
+        internalComment: effectiveInternalComment || undefined,
+        publicFeedback: effectivePublicFeedback || undefined,
+        checkerId: record.assignedCheckerId || "checker-squad-1",
+        checkerName: "Evidence Checker",
+        checkerRole: "Evidence Validator",
+        role: "checker",
       });
 
       if (res.ok) {
@@ -1146,25 +1164,78 @@ export default function EvidenceAuditDetailScreen() {
             {decisionType === "rejected" && (
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
-                  Rejection Reason (Required):
+                  Common Rejection Reason (Mandatory Selection):
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 6 }}>
+                  {COMMON_REJECTION_REASONS.map((item) => {
+                    const isSelected = commonReasonKey === item.id;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => {
+                          setCommonReasonKey(item.id);
+                          if (!rejectionReason) {
+                            setRejectionReason(item.label);
+                          }
+                        }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isSelected ? colors.error : colors.border,
+                          backgroundColor: isSelected ? "#FEE2E2" : "#F8FAFC",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: isSelected ? "800" : "600",
+                            color: isSelected ? colors.error : colors.navy[800],
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={[styles.inputLabel, { marginTop: 8 }]}>
+                  Custom Rejection Explanation (Required):
                 </Text>
                 <TextInput
                   style={[styles.textInput, styles.textArea]}
                   value={rejectionReason}
                   onChangeText={setRejectionReason}
-                  placeholder="e.g. Unsupported file format .exe / File exceeds 100MB..."
+                  placeholder="Provide detailed explanation for rejecting this evidence..."
                   multiline
                 />
               </View>
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Checker Internal Notes (Optional):</Text>
+              <Text style={styles.inputLabel}>
+                Internal Comment for Case Officer (Checker Confidential):
+              </Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                value={internalComment}
+                onChangeText={setInternalComment}
+                placeholder="Internal examination notes visible to Case Officers..."
+                multiline
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Public Feedback for Reporter (Separated Public View):
+              </Text>
               <TextInput
                 style={styles.textInput}
-                value={checkerNotes}
-                onChangeText={setCheckerNotes}
-                placeholder="Notes for audit log..."
+                value={publicFeedback}
+                onChangeText={setPublicFeedback}
+                placeholder="Instructions or feedback visible to the Reporter..."
               />
             </View>
 
