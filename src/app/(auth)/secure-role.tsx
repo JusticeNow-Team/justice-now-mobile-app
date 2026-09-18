@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { resolvePostLoginRedirect } from "../../auth";
+import { hasCompletedStaffMfa, resolvePostLoginRedirect } from "../../auth";
 import { UserProfile } from "../../auth/types";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
@@ -151,16 +151,15 @@ export default function SecureRoleScreen() {
         return;
       }
 
-      const { data: aal, error: aalError } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const mfa = await hasCompletedStaffMfa();
 
-      if (aalError) {
+      if (mfa.error) {
         await supabase.auth.signOut();
-        Alert.alert("Security check failed", aalError.message);
+        Alert.alert("Security check failed", mfa.error.message);
         return;
       }
 
-      if (aal.currentLevel === "aal2") {
+      if (mfa.verified) {
         await routeStaff(profile);
         return;
       }

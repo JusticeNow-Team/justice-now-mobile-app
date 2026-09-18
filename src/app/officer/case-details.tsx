@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
@@ -215,15 +216,14 @@ export default function CaseDetailsScreen() {
   const [activeTab, setActiveTab] = useState<CaseDetailsTab>("overview");
 
   const verifySecureSession = useCallback(async () => {
-    const { data, error } =
-      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const mfa = await hasCompletedStaffMfa();
 
-    if (error) {
-      console.error("AAL ERROR:", error);
+    if (mfa.error) {
+      console.error("AAL ERROR:", mfa.error);
       return false;
     }
 
-    if (data.currentLevel !== "aal2") {
+    if (!mfa.verified) {
       router.replace("/two-factor");
       return false;
     }
