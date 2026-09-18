@@ -1,8 +1,8 @@
-import { ChevronRight } from "lucide-react-native";
 import { PropsWithChildren, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
+import { AppIcon } from "@/components/AppIcon";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
@@ -19,10 +19,10 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
         onPress={() => setIsOpen((value) => !value)}
       >
         <ThemedView type="backgroundElement" style={styles.button}>
-          <ChevronRight
+          <AppIcon
+            name="chevron-right"
             size={14}
             color={theme.text}
-            strokeWidth={2.5}
             style={{ transform: [{ rotate: isOpen ? "-90deg" : "90deg" }] }}
           />
         </ThemedView>
