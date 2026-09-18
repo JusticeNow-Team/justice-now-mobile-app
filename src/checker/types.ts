@@ -65,6 +65,18 @@ export interface ControlledDownloadLog {
   tokenExpirySeconds: number;
 }
 
+export interface EvidenceVerificationRecord {
+  decisionId: string;
+  evidenceId: string;
+  assignmentId?: string;
+  decision: EvidenceValidationStatus;
+  reason: string;
+  checkerId: string;
+  checkerName: string;
+  completedAt: string; // ISO date string
+  isLocked: boolean;
+}
+
 export interface EvidenceRecord {
   id: string; // Unique identifier (e.g. UUID or EVD-2026-XXXX)
   caseId: string;
@@ -100,6 +112,10 @@ export interface EvidenceRecord {
   validatedAt?: string;
   validatedBy?: string;
   controlledDownloadLogs?: ControlledDownloadLog[];
+
+  // JN-198 & JN-204 Verification Record & Lock Protection
+  verificationRecord?: EvidenceVerificationRecord;
+  isLocked?: boolean;
 
   // JN-170 Track Evidence Status Additions
   statusHistory?: StatusHistoryRecord[];
