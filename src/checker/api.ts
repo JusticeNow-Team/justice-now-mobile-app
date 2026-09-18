@@ -13,6 +13,10 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     evidenceType: "image",
     fileSizeBytes: 4280000, // 4.2 MB
     uploadDate: "2026-08-20T14:30:00Z",
+    assignedAt: "2026-08-20T14:35:00Z",
+    assignedCheckerId: "CHK-1001",
+    assignedByName: "Case Officer Sarah",
+    assignmentStatus: "assigned",
     validationStatus: "pending",
     lastStatusChangedAt: "2026-08-20T14:30:00Z",
     statusHistory: [
@@ -59,6 +63,10 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     evidenceType: "audio",
     fileSizeBytes: 18500000, // 18.5 MB
     uploadDate: "2026-08-20T15:05:12Z",
+    assignedAt: "2026-08-20T15:10:00Z",
+    assignedCheckerId: "CHK-1001",
+    assignedByName: "Case Officer Sarah",
+    assignmentStatus: "assigned",
     validationStatus: "pending",
     mediaDurationSeconds: 342, // 5 min 42 sec
     caseInfo: {
@@ -91,6 +99,10 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     evidenceType: "document",
     fileSizeBytes: 2450000, // 2.45 MB
     uploadDate: "2026-08-19T09:12:44Z",
+    assignedAt: "2026-08-19T09:30:00Z",
+    assignedCheckerId: "CHK-1001",
+    assignedByName: "Case Officer Sarah",
+    assignmentStatus: "completed",
     validationStatus: "validated",
     documentPageCount: 8,
     documentSnippet: `FORENSIC MEDICAL EXAMINATION REPORT

@@ -13,3 +13,4 @@ export * from "./roleAssignmentService";
 export * from "./permissionMatrix";
 export * from "./backendAuthorization";
 export * from "./unauthorizedHandler";
+export * from "./mfa";
