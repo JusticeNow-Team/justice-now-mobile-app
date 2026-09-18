@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { ControlledDownloadLog, EvidenceRecord, EvidenceValidationStatus, StatusHistoryRecord } from "./types";
+import { ClarificationRequestRecord, ControlledDownloadLog, EvidenceRecord, EvidenceValidationStatus, StatusHistoryRecord } from "./types";
 import { validateStatusTransition, createStatusHistoryEntry } from "./statusTransitionService";
 
 // Seed mock records for offline/demo testing of all acceptance criteria
@@ -637,6 +637,184 @@ export async function requestControlledDownload(params: {
     ok: true,
     message: "Controlled download token generated & audit logged successfully.",
     log,
+  };
+}
+
+/**
+ * JN-214 - JN-218: Request replacement evidence or clarification from Case Officer and Reporter.
+ */
+export async function requestEvidenceClarificationOrReplacement(params: {
+  evidenceId: string;
+  requestType: "replacement" | "clarification";
+  reasonCategory?: string;
+  reason: string;
+  internalNotes?: string;
+  reporterInstructions: string;
+  checkerId?: string;
+  checkerName?: string;
+}): Promise<{
+  ok: boolean;
+  message: string;
+  requestRecord?: ClarificationRequestRecord;
+  historyEntry?: StatusHistoryRecord;
+}> {
+  try {
+    const idx = inMemoryStore.findIndex((e) => e.id === params.evidenceId);
+    if (idx === -1) {
+      return { ok: false, message: "Evidence record not found." };
+    }
+
+    const record = inMemoryStore[idx];
+    const currentStatus = record.validationStatus || "pending";
+    const nextStatus = "info_requested";
+
+    // JN-215: Add request type and reason validation
+    const effectiveReason = params.reason.trim();
+    const effectiveInstructions = params.reporterInstructions.trim();
+
+    if (!effectiveReason) {
+      return {
+        ok: false,
+        message: "A mandatory reason is required to request evidence clarification or replacement.",
+      };
+    }
+
+    if (!effectiveInstructions) {
+      return {
+        ok: false,
+        message: "Reporter-facing instructions are required to specify what material must be provided.",
+      };
+    }
+
+    const now = new Date().toISOString();
+    const checkerIdentity = params.checkerName || params.checkerId || record.assignedByName || "Evidence Checker Squad #1";
+    const requestId = `REQ-${Date.now()}`;
+
+    // JN-216: Connect to Case Officer workflow
+    const clarificationRequest: ClarificationRequestRecord = {
+      requestId,
+      evidenceId: record.id,
+      caseId: record.caseId,
+      requestType: params.requestType,
+      reasonCategory: params.reasonCategory,
+      reason: effectiveReason,
+      internalNotes: params.internalNotes?.trim() || undefined,
+      reporterInstructions: effectiveInstructions,
+      requestedByCheckerId: params.checkerId || "checker-squad-1",
+      requestedByCheckerName: checkerIdentity,
+      assignedOfficerId: record.caseInfo?.id || "officer-assigned-1",
+      workflowStatus: "pending_officer_review",
+      requestedAt: now,
+    };
+
+    // JN-218: Construct status history entry
+    const historyNote = `[${params.requestType.toUpperCase()} REQUESTED]: ${effectiveReason} | Reporter Instructions: ${effectiveInstructions}`;
+    const historyEntry = createStatusHistoryEntry({
+      evidenceId: record.id,
+      fromStatus: currentStatus,
+      toStatus: nextStatus,
+      changedByRole: "checker",
+      changedById: params.checkerId || "checker-squad-1",
+      changedByName: checkerIdentity,
+      notes: historyNote,
+      rejectionReason: params.requestType === "replacement" ? effectiveReason : undefined,
+    });
+
+    const existingRequests = record.clarificationRequests || [];
+    const existingHistory = record.statusHistory || [];
+
+    inMemoryStore[idx] = {
+      ...record,
+      validationStatus: nextStatus,
+      lastStatusChangedAt: now,
+      internalComment: params.internalNotes?.trim() || record.internalComment,
+      publicFeedback: effectiveInstructions,
+      activeClarificationRequest: clarificationRequest,
+      clarificationRequests: [clarificationRequest, ...existingRequests],
+      statusHistory: [historyEntry, ...existingHistory],
+    };
+
+    // Sync to Supabase if connected
+    await supabase
+      .from("case_evidence")
+      .update({
+        validation_status: nextStatus,
+      })
+      .eq("id", record.id);
+
+    return {
+      ok: true,
+      message: `Clarification request (${params.requestType}) logged & forwarded to Case Officer workflow.`,
+      requestRecord: clarificationRequest,
+      historyEntry,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      message: err.message || "Failed to submit clarification request.",
+    };
+  }
+}
+
+/**
+ * JN-219: Link replacement evidence to original evidence record.
+ */
+export async function linkReplacementEvidence(params: {
+  originalEvidenceId: string;
+  replacementEvidenceId: string;
+  checkerId?: string;
+}): Promise<{
+  ok: boolean;
+  message: string;
+  originalRecord?: EvidenceRecord;
+  replacementRecord?: EvidenceRecord;
+}> {
+  const origIdx = inMemoryStore.findIndex((e) => e.id === params.originalEvidenceId);
+  const replIdx = inMemoryStore.findIndex((e) => e.id === params.replacementEvidenceId);
+
+  if (origIdx === -1) {
+    return { ok: false, message: `Original evidence '${params.originalEvidenceId}' not found.` };
+  }
+  if (replIdx === -1) {
+    return { ok: false, message: `Replacement evidence '${params.replacementEvidenceId}' not found.` };
+  }
+
+  const origRecord = inMemoryStore[origIdx];
+  const replRecord = inMemoryStore[replIdx];
+  const now = new Date().toISOString();
+
+  // Fulfill active clarification request if present
+  let updatedActiveRequest = origRecord.activeClarificationRequest;
+  if (updatedActiveRequest) {
+    updatedActiveRequest = {
+      ...updatedActiveRequest,
+      workflowStatus: "fulfilled",
+      replacementEvidenceId: replRecord.id,
+    };
+  }
+
+  // Update original evidence record
+  inMemoryStore[origIdx] = {
+    ...origRecord,
+    replacedByEvidenceId: replRecord.id,
+    activeClarificationRequest: updatedActiveRequest,
+    validationStatus: "under_review",
+    lastStatusChangedAt: now,
+  };
+
+  // Update replacement evidence record
+  inMemoryStore[replIdx] = {
+    ...replRecord,
+    replacesEvidenceId: origRecord.id,
+    validationStatus: "under_review",
+    lastStatusChangedAt: now,
+  };
+
+  return {
+    ok: true,
+    message: `Successfully linked replacement evidence '${replRecord.id}' to original evidence '${origRecord.id}'.`,
+    originalRecord: inMemoryStore[origIdx],
+    replacementRecord: inMemoryStore[replIdx],
   };
 }
 
