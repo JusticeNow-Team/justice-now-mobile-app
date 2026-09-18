@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
@@ -175,13 +176,12 @@ export default function AssignEvidenceScreen() {
           return;
         }
 
-        const { data: assurance, error: assuranceError } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const mfa = await hasCompletedStaffMfa();
 
-        if (assuranceError) {
-          throw new Error(assuranceError.message);
+        if (mfa.error) {
+          throw new Error(mfa.error.message);
         }
-        if (assurance.currentLevel !== "aal2") {
+        if (!mfa.verified) {
           router.replace("/two-factor");
           return;
         }

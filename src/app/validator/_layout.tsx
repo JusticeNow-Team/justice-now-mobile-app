@@ -2,6 +2,7 @@ import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
+import { hasCompletedStaffMfa } from "../../auth";
 import { supabase } from "../../lib/supabase";
 import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
 import { colors } from "../../theme";
@@ -25,14 +26,13 @@ export default function ValidatorLayout() {
           return;
         }
 
-        const { data: assuranceLevel, error: assuranceError } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const mfa = await hasCompletedStaffMfa();
 
-        if (assuranceError) {
-          throw assuranceError;
+        if (mfa.error) {
+          throw mfa.error;
         }
 
-        if (assuranceLevel.currentLevel !== "aal2") {
+        if (!mfa.verified) {
           router.replace("/two-factor");
           return;
         }
