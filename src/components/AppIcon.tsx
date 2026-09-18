@@ -84,12 +84,25 @@ const SYMBOL_MAP: Record<AppIconName, string> = {
   category: "🏷️",
   check: "✓",
   "check-circle": "✓",
+const ICON_GLYPHS: Record<AppIconName, string> = {
+  activity: "⚡",
+  "alert-circle": "ⓘ",
+  "alert-triangle": "⚠️",
+  "arrow-right": "➔",
+  "arrow-up-right": "↗",
+  balance: "⚖",
+  bell: "🔔",
+  category: "🏷",
+  check: "✓",
+  "check-circle": "✅",
   "chevron-down": "⌄",
   "chevron-left": "‹",
   "chevron-right": "›",
   circle: "○",
   "circle-check": "✓",
   "circle-help": "?",
+  "circle-check": "✅",
+  "circle-help": "❓",
   "circle-x": "✕",
   "clipboard-check": "📋",
   clock: "🕒",
@@ -128,6 +141,40 @@ const SYMBOL_MAP: Record<AppIconName, string> = {
   "shield-alert": "🛡️",
   "shield-check": "🛡️",
   sliders: "🎛️",
+  download: "📥",
+  "eye-off": "🙈",
+  "file-search": "🔍",
+  "file-text": "📄",
+  "file-up": "📤",
+  filter: "🎛",
+  flag: "🚩",
+  "folder-open": "📁",
+  globe: "🌐",
+  history: "⏱",
+  house: "🏠",
+  "id-card": "🪪",
+  image: "🖼",
+  info: "ℹ",
+  key: "🔑",
+  languages: "🌐",
+  "layout-dashboard": "📊",
+  "list-checks": "☑",
+  lock: "🔒",
+  "log-out": "🚪",
+  mail: "✉",
+  "message-square": "💬",
+  mic: "🎙",
+  "notebook-pen": "📝",
+  plus: "+",
+  "refresh-cw": "🔄",
+  roles: "⚙",
+  scale: "⚖",
+  search: "🔍",
+  settings: "⚙",
+  shield: "🛡",
+  "shield-alert": "🛡",
+  "shield-check": "🛡",
+  sliders: "🎛",
   "test-tube": "🧪",
   upload: "📤",
   user: "👤",
@@ -205,6 +252,13 @@ const LUCIDE_NAME_MAP: Partial<Record<AppIconName, string>> = {
 
 export function isAppIconName(value: string): value is AppIconName {
   return value in SYMBOL_MAP;
+  video: "📹",
+  warning: "⚠️",
+  x: "✕",
+};
+
+export function isAppIconName(value: string): value is AppIconName {
+  return value in ICON_GLYPHS;
 }
 
 export type AppIconProps = {
@@ -219,7 +273,6 @@ export function AppIcon({
   name,
   color = "#173458",
   size = 20,
-  strokeWidth = 2,
   style,
   ...props
 }: AppIconProps) {
@@ -238,6 +291,7 @@ export function AppIcon({
       );
     }
   }
+  const glyph = ICON_GLYPHS[name] || "•";
 
   const symbol = SYMBOL_MAP[name] || "•";
   return (
@@ -251,17 +305,21 @@ export function AppIcon({
         },
         style,
       ]}
+      {...props}
     >
       <Text
         style={{
           color,
           fontSize: Math.round(size * 0.75),
           fontWeight: "700",
+          fontSize: Math.round(size * 0.8),
+          lineHeight: size,
           textAlign: "center",
           includeFontPadding: false,
         }}
       >
         {symbol}
+        {glyph}
       </Text>
     </View>
   );

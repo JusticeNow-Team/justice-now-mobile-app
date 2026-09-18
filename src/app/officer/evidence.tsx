@@ -18,6 +18,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
@@ -143,16 +144,15 @@ export default function EvidenceReviewScreen() {
         // Require staff MFA
         // -----------------------------------------------
 
-        const { data: aal, error: aalError } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const mfa = await hasCompletedStaffMfa();
 
-        if (aalError) {
-          setErrorMessage(aalError.message);
+        if (mfa.error) {
+          setErrorMessage(mfa.error.message);
 
           return;
         }
 
-        if (aal.currentLevel !== "aal2") {
+        if (!mfa.verified) {
           router.replace("/two-factor");
 
           return;

@@ -417,8 +417,13 @@ export async function updateEvidenceValidationDecision(params: {
   evidenceId: string;
   status: EvidenceValidationStatus;
   rejectionReason?: string;
+  commonRejectionReason?: string;
   notes?: string;
+  internalComment?: string;
+  publicFeedback?: string;
   checkerId?: string;
+  checkerName?: string;
+  checkerRole?: string;
   role?: "checker" | "case_officer" | "system" | "reporter";
 }): Promise<{ ok: boolean; message: string; historyEntry?: StatusHistoryRecord }> {
   try {
@@ -431,6 +436,61 @@ export async function updateEvidenceValidationDecision(params: {
     const currentStatus = currentRecord.validationStatus || "pending";
     const nextStatus = params.status;
 
+    // JN-204: Protect Completed Decisions from Silent Overwriting
+    const isAlreadyCompleted =
+      currentRecord.isLocked ||
+      currentRecord.validationStatus === "validated" ||
+      currentRecord.validationStatus === "approved" ||
+      currentRecord.validationStatus === "rejected";
+
+    if (isAlreadyCompleted && (nextStatus === "validated" || nextStatus === "approved" || nextStatus === "rejected")) {
+      return {
+        ok: false,
+        message: "A completed evidence decision cannot be silently overwritten.",
+      };
+    }
+
+    // JN-199: Assigned Evidence Checker Ownership Guard
+    if (
+      currentRecord.assignedCheckerId &&
+      params.checkerId &&
+      params.checkerId !== currentRecord.assignedCheckerId &&
+      !params.checkerId.includes("Squad")
+    ) {
+      return {
+        ok: false,
+        message: "Only the assigned Evidence Checker can submit a decision for this evidence.",
+      };
+    }
+
+    // JN-208 & JN-209: Mandatory Rejection Reason & Non-Blank Comment Validation
+    const rawReason = params.rejectionReason || params.commonRejectionReason || "";
+    const rawNotes = params.internalComment || params.notes || "";
+    const rawPublicFeedback = params.publicFeedback || "";
+
+    const effectiveReason = rawReason.trim();
+    const effectiveNotes = rawNotes.trim();
+    const effectivePublicFeedback = rawPublicFeedback.trim();
+
+    const combinedSummary = [effectiveReason, effectiveNotes, effectivePublicFeedback]
+      .filter(Boolean)
+      .join(" | ");
+
+    if (nextStatus === "rejected" && !effectiveReason && !effectiveNotes) {
+      return {
+        ok: false,
+        message: "A rejection reason is mandatory for rejected evidence.",
+      };
+    }
+
+    // JN-201 & JN-209: Reject Blank Comments Where Required
+    if ((nextStatus === "validated" || nextStatus === "approved" || nextStatus === "rejected") && !combinedSummary) {
+      return {
+        ok: false,
+        message: "A documented reason or comment is required to record this evidence decision.",
+      };
+    }
+
     // JN-172: Validate State Transition Rules
     const validationRes = validateStatusTransition(currentStatus, nextStatus);
     if (!validationRes.isValid) {
@@ -440,17 +500,21 @@ export async function updateEvidenceValidationDecision(params: {
       };
     }
 
-    // JN-173 & JN-175: Construct Status History Entry
+    // JN-198 & JN-207 & JN-211: Construct Verification Record & History Entry with Author Identity and Date
     const now = new Date().toISOString();
+    const checkerIdentity = params.checkerName || params.checkerId || currentRecord.assignedByName || "Evidence Checker Squad #1";
+    const checkerRoleTitle = params.checkerRole || "Evidence Checker";
+    const decisionId = `DEC-${Date.now()}`;
+
     const newHistoryEntry = createStatusHistoryEntry({
       evidenceId: params.evidenceId,
       fromStatus: currentStatus,
       toStatus: nextStatus,
       changedByRole: params.role || "checker",
       changedById: params.checkerId || "checker-squad-1",
-      changedByName: params.checkerId || "Evidence Checker Squad #1",
-      notes: params.notes || `Status changed from '${currentStatus}' to '${nextStatus}'.`,
-      rejectionReason: params.rejectionReason,
+      changedByName: checkerIdentity,
+      notes: combinedSummary || `Status changed from '${currentStatus}' to '${nextStatus}'.`,
+      rejectionReason: effectiveReason || undefined,
     });
 
     const existingHistory = currentRecord.statusHistory || [
@@ -466,19 +530,39 @@ export async function updateEvidenceValidationDecision(params: {
       },
     ];
 
+    const verificationRecord = {
+      decisionId,
+      evidenceId: params.evidenceId,
+      decision: nextStatus,
+      reason: effectiveReason || combinedSummary,
+      commonRejectionReason: params.commonRejectionReason,
+      internalComment: effectiveNotes || undefined,
+      publicFeedback: effectivePublicFeedback || undefined,
+      checkerId: params.checkerId || "checker-squad-1",
+      checkerName: checkerIdentity,
+      checkerRole: checkerRoleTitle,
+      completedAt: now,
+      isLocked: true,
+    };
+
     // Update in-memory store
     inMemoryStore[idx] = {
       ...currentRecord,
       validationStatus: nextStatus,
-      rejectionReason: params.rejectionReason || currentRecord.rejectionReason,
-      checkerNotes: params.notes || currentRecord.checkerNotes,
+      rejectionReason: effectiveReason || currentRecord.rejectionReason,
+      commonRejectionReason: params.commonRejectionReason || currentRecord.commonRejectionReason,
+      internalComment: effectiveNotes || currentRecord.internalComment,
+      publicFeedback: effectivePublicFeedback || currentRecord.publicFeedback,
+      checkerNotes: effectiveNotes || effectiveReason || currentRecord.checkerNotes,
       validatedAt: now,
-      validatedBy: params.checkerId || "Evidence Checker Squad #1",
+      validatedBy: checkerIdentity,
       lastStatusChangedAt: now,
+      isLocked: true,
+      verificationRecord,
       statusHistory: [newHistoryEntry, ...existingHistory],
     };
 
-    // 2. Sync to Supabase if connected
+    // Sync to Supabase if connected
     const { error } = await supabase
       .from("case_evidence")
       .update({
