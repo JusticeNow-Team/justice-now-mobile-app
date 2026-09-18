@@ -14,10 +14,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { resolvePostLoginRedirect, useAuth } from "../../auth";
+import { hasCompletedStaffMfa, resolvePostLoginRedirect, useAuth } from "../../auth";
 import { SystemRole, UserProfile } from "../../auth/types";
-import { hasCompletedStaffMfa, resolvePostLoginRedirect } from "../../auth";
-import { UserProfile } from "../../auth/types";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";

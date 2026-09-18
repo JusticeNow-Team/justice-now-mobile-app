@@ -134,6 +134,25 @@ export interface EvidenceVerificationRecord {
   isLocked: boolean;
 }
 
+export type ClarificationRequestType = "replacement" | "clarification";
+
+export interface ClarificationRequestRecord {
+  requestId: string;
+  evidenceId: string;
+  caseId: string;
+  requestType: ClarificationRequestType;
+  reasonCategory?: string;
+  reason: string; // Mandatory reason
+  internalNotes?: string;
+  reporterInstructions: string; // Mandatory reporter-facing message
+  requestedByCheckerId: string;
+  requestedByCheckerName: string;
+  assignedOfficerId?: string;
+  workflowStatus: "pending_officer_review" | "relayed_to_reporter" | "fulfilled";
+  requestedAt: string; // ISO date string
+  replacementEvidenceId?: string; // Linked replacement evidence ID
+}
+
 export interface EvidenceRecord {
   id: string; // Unique identifier (e.g. UUID or EVD-2026-XXXX)
   caseId: string;
@@ -181,6 +200,12 @@ export interface EvidenceRecord {
   // JN-198 & JN-204 Verification Record & Lock Protection
   verificationRecord?: EvidenceVerificationRecord;
   isLocked?: boolean;
+
+  // JN-214 to JN-219 Clarification & Replacement Request Additions
+  clarificationRequests?: ClarificationRequestRecord[];
+  activeClarificationRequest?: ClarificationRequestRecord;
+  replacesEvidenceId?: string; // Link to original evidence if this record is a replacement upload
+  replacedByEvidenceId?: string; // Link to replacement evidence file uploaded in response to request
 
   // JN-170 Track Evidence Status Additions
   statusHistory?: StatusHistoryRecord[];
