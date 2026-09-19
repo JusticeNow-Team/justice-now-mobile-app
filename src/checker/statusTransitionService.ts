@@ -5,10 +5,11 @@ import { EvidenceStatus, PublicStatusInfo, StatusHistoryRecord, EvidenceRecord }
  * Defines allowed destination statuses for each current status.
  */
 export const ALLOWED_STATUS_TRANSITIONS: Record<EvidenceStatus, EvidenceStatus[]> = {
-  pending: ["under_review", "validated", "rejected", "info_requested"],
-  under_review: ["validated", "rejected", "info_requested", "pending"],
-  info_requested: ["under_review", "pending", "rejected", "validated"],
+  pending: ["under_review", "validated", "approved", "rejected", "info_requested"],
+  under_review: ["validated", "approved", "rejected", "info_requested", "pending"],
+  info_requested: ["under_review", "pending", "rejected", "validated", "approved"],
   validated: ["under_review", "archived"],
+  approved: ["under_review", "archived"],
   rejected: ["under_review"], // Re-examination / Appeal
   archived: [], // Terminal archived state
 };
@@ -120,6 +121,7 @@ export function getPublicStatusForReporter(status: EvidenceStatus): PublicStatus
         actionRequiredForReporter: false,
       };
 
+    case "approved":
     case "validated":
       return {
         publicLabel: "Verified & Attached to Case",

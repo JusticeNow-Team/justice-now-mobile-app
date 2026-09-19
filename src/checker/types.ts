@@ -2,6 +2,7 @@ export type EvidenceStatus =
   | "pending"
   | "under_review"
   | "validated"
+  | "approved"
   | "info_requested"
   | "rejected"
   | "archived";

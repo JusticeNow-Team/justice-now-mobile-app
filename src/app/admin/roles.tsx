@@ -106,13 +106,6 @@ export default function AdminRolesScreen() {
     [accounts, selectedId],
   );
 
-  useEffect(() => {
-    if (selectedAccount) {
-      setProposedRole(selectedAccount.role);
-      setReason("");
-    }
-  }, [selectedAccount]);
-
   const filteredAccounts = useMemo(() => {
     const value = search.trim().toLowerCase();
     if (!value) return accounts.slice(0, 50);
@@ -317,7 +310,11 @@ export default function AdminRolesScreen() {
               return (
                 <Pressable
                   key={account.id}
-                  onPress={() => setSelectedId(account.id)}
+                  onPress={() => {
+                    setSelectedId(account.id);
+                    setProposedRole(account.role);
+                    setReason("");
+                  }}
                   style={[
                     styles.accountCard,
                     active && styles.accountCardActive,

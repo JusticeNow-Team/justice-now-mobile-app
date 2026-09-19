@@ -125,7 +125,7 @@ export default function InformationRequestScreen() {
     }
 
     router.replace("/reporter/cases" as Href);
-  }, [request?.case_id, router]);
+  }, [request, router]);
 
   const loadRequest = useCallback(async () => {
     if (!requestId) {
@@ -440,7 +440,7 @@ export default function InformationRequestScreen() {
               <PrimaryButton
                 title="Attach a supporting file"
                 variant="outline"
-                icon="📎"
+                icon="upload"
                 onPress={() =>
                   router.push({
                     pathname: "/reporter/cases/upload",
@@ -498,7 +498,7 @@ export default function InformationRequestScreen() {
               <View style={styles.submitBtn}>
                 <PrimaryButton
                   title="Submit response"
-                  icon="✈"
+                  icon="arrow-right"
                   loading={submitting}
                   disabled={savingDraft}
                   onPress={() => void submitResponse()}

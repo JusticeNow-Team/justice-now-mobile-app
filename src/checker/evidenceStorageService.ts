@@ -144,13 +144,27 @@ export async function saveEvidenceReferenceWithCaseLink(
  * Rejects unauthorized users or requests exceeding 1 hour duration.
  */
 export async function generateSecureSignedUrl(
-  params: {
-    evidenceId: string;
-    storagePath: string;
-    userRole: string;
-    expirySeconds?: number;
-  }
+  paramsOrId:
+    | {
+        evidenceId: string;
+        storagePath: string;
+        userRole: string;
+        expirySeconds?: number;
+      }
+    | string,
+  userRoleArg?: string,
+  _purposeArg?: string,
 ): Promise<SignedUrlResponse> {
+  const params =
+    typeof paramsOrId === "string"
+      ? {
+          evidenceId: paramsOrId,
+          storagePath: `evidence/${paramsOrId}`,
+          userRole: userRoleArg || "evidence_checker",
+          expirySeconds: DEFAULT_SIGNED_URL_EXPIRY_SECONDS,
+        }
+      : paramsOrId;
+
   const expiry = params.expirySeconds ?? DEFAULT_SIGNED_URL_EXPIRY_SECONDS;
 
   // Authorization Check (JN-153 & JN-155)

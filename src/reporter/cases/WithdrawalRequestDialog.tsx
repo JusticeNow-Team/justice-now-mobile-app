@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Modal,
   Pressable,
@@ -31,12 +31,11 @@ export default function WithdrawalRequestDialog({
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState("");
 
-  useEffect(() => {
-    if (visible) {
-      setReason("");
-      setLocalError("");
-    }
-  }, [visible]);
+  const handleClose = () => {
+    setReason("");
+    setLocalError("");
+    onClose();
+  };
 
   const handleConfirm = () => {
     const trimmed = reason.trim();
@@ -57,7 +56,7 @@ export default function WithdrawalRequestDialog({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
         <View style={styles.panel} accessibilityRole="alert">
@@ -80,7 +79,7 @@ export default function WithdrawalRequestDialog({
               </Text>
             </View>
             <Pressable
-              onPress={onClose}
+              onPress={handleClose}
               accessibilityRole="button"
               accessibilityLabel="Close dialog"
               disabled={loading}
@@ -115,7 +114,7 @@ export default function WithdrawalRequestDialog({
               <PrimaryButton
                 title="Keep case open"
                 variant="outline"
-                onPress={onClose}
+                onPress={handleClose}
                 disabled={loading}
               />
             </View>
