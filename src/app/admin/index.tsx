@@ -407,6 +407,39 @@ export default function AdminDashboardScreen() {
 
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Workflow Statuses</Text>
+                <Text style={styles.sectionDescription}>
+                  Controlled case & evidence status values (JN-273 - JN-278)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/statuses" as any)}>
+                <Text style={styles.auditLink}>Configure</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Status Definitions</Text>
+                  <Text style={styles.healthValue}>
+                    8 Case statuses · 6 Evidence statuses active with record safety guards
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/statuses" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
                 Recent administrative activity
               </Text>

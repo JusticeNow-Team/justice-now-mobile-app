@@ -33,8 +33,11 @@ export default function WithdrawalRequestDialog({
 
   useEffect(() => {
     if (visible) {
-      setReason("");
-      setLocalError("");
+      const timer = setTimeout(() => {
+        setReason("");
+        setLocalError("");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [visible]);
 

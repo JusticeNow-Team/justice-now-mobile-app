@@ -108,8 +108,11 @@ export default function AdminRolesScreen() {
 
   useEffect(() => {
     if (selectedAccount) {
-      setProposedRole(selectedAccount.role);
-      setReason("");
+      const timer = setTimeout(() => {
+        setProposedRole(selectedAccount.role);
+        setReason("");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [selectedAccount]);
 
