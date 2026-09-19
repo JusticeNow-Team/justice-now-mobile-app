@@ -36,6 +36,15 @@ export default function WithdrawalRequestDialog({
     setLocalError("");
     onClose();
   };
+  useEffect(() => {
+    if (visible) {
+      const timer = setTimeout(() => {
+        setReason("");
+        setLocalError("");
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
 
   const handleConfirm = () => {
     const trimmed = reason.trim();

@@ -106,6 +106,16 @@ export default function AdminRolesScreen() {
     [accounts, selectedId],
   );
 
+  useEffect(() => {
+    if (selectedAccount) {
+      const timer = setTimeout(() => {
+        setProposedRole(selectedAccount.role);
+        setReason("");
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedAccount]);
+
   const filteredAccounts = useMemo(() => {
     const value = search.trim().toLowerCase();
     if (!value) return accounts.slice(0, 50);

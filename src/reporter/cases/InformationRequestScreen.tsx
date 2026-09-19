@@ -499,6 +499,7 @@ export default function InformationRequestScreen() {
                 <PrimaryButton
                   title="Submit response"
                   icon="arrow-right"
+                  icon="arrow-up-right"
                   loading={submitting}
                   disabled={savingDraft}
                   onPress={() => void submitResponse()}

@@ -11,6 +11,7 @@ export type AppIconName =
   | "activity"
   | "alert-circle"
   | "alert-triangle"
+  | "arrow-left"
   | "arrow-right"
   | "arrow-up-right"
   | "balance"
@@ -30,6 +31,7 @@ export type AppIconName =
   | "clock"
   | "document"
   | "download"
+  | "edit"
   | "eye-off"
   | "file-search"
   | "file-text"
@@ -64,6 +66,7 @@ export type AppIconName =
   | "shield-check"
   | "sliders"
   | "test-tube"
+  | "trash"
   | "upload"
   | "user"
   | "user-plus"
@@ -85,6 +88,20 @@ const ICON_FALLBACK_GLYPHS: Record<AppIconName, string> = {
   check: "✓",
   "check-circle": "✅",
   "chevron-down": "⌄",
+const ICONS_MAP: Record<AppIconName, string> = {
+  activity: "📈",
+  "alert-circle": "⚠️",
+  "alert-triangle": "⚠️",
+  "arrow-left": "←",
+  "arrow-right": "→",
+  "arrow-up-right": "↗",
+  balance: "⚖️",
+  bell: "🔔",
+  calendar: "📅",
+  category: "🏷️",
+  check: "✓",
+  "check-circle": "✅",
+  "chevron-down": "▼",
   "chevron-left": "‹",
   "chevron-right": "›",
   circle: "○",
@@ -95,6 +112,7 @@ const ICON_FALLBACK_GLYPHS: Record<AppIconName, string> = {
   clock: "🕒",
   document: "📄",
   download: "📥",
+  edit: "✏️",
   "eye-off": "👁️",
   "file-search": "🔍",
   "file-text": "📄",
@@ -129,6 +147,7 @@ const ICON_FALLBACK_GLYPHS: Record<AppIconName, string> = {
   "shield-check": "🛡️",
   sliders: "🎛️",
   "test-tube": "🧪",
+  trash: "🗑️",
   upload: "📤",
   user: "👤",
   "user-plus": "👤+",
@@ -140,6 +159,7 @@ const ICON_FALLBACK_GLYPHS: Record<AppIconName, string> = {
 
 export function isAppIconName(value: string): value is AppIconName {
   return value in ICON_FALLBACK_GLYPHS;
+  return value in ICONS_MAP;
 }
 
 export type AppIconProps = {
@@ -158,6 +178,17 @@ export function AppIcon({
   ...props
 }: AppIconProps) {
   const glyph = ICON_FALLBACK_GLYPHS[name] || "•";
+  const symbol = ICONS_MAP[name] || "•";
+  const isAscii =
+    name === "chevron-left" ||
+    name === "chevron-right" ||
+    name === "chevron-down" ||
+    name === "arrow-right" ||
+    name === "arrow-up-right" ||
+    name === "check" ||
+    name === "x" ||
+    name === "plus" ||
+    name === "layout-dashboard";
 
   return (
     <View
@@ -178,6 +209,20 @@ export function AppIcon({
         }}
       >
         {glyph}
+    >
+      <Text
+        style={[
+          styles.iconText,
+          {
+            fontSize: isAscii ? size * 0.95 : size * 0.82,
+            lineHeight: size,
+            color: color,
+            fontWeight: isAscii ? "700" : "normal",
+          },
+        ]}
+        accessibilityRole="image"
+      >
+        {symbol}
       </Text>
     </View>
   );
