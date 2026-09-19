@@ -102,7 +102,11 @@ export default function EvidenceAuditDetailScreen() {
 
     try {
       const userRole = isAuthorized ? "evidence_validator" : "unauthorized_guest";
-      const res = await generateSecureSignedUrl(record.id, userRole, "Audit & Verification Inspection");
+      const res = await generateSecureSignedUrl({
+        evidenceId: record.id,
+        storagePath: record.storagePath || `case-evidence/${record.id}`,
+        userRole,
+      });
 
       setGeneratingSignedUrl(false);
 
