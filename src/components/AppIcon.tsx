@@ -75,6 +75,19 @@ export type AppIconName =
   | "warning"
   | "x";
 
+const ICON_FALLBACK_GLYPHS: Record<AppIconName, string> = {
+  activity: "⚡",
+  "alert-circle": "ⓘ",
+  "alert-triangle": "⚠️",
+  "arrow-right": "➔",
+  "arrow-up-right": "↗",
+  balance: "⚖",
+  bell: "🔔",
+  calendar: "📅",
+  category: "🏷",
+  check: "✓",
+  "check-circle": "✅",
+  "chevron-down": "⌄",
 const ICONS_MAP: Record<AppIconName, string> = {
   activity: "📈",
   "alert-circle": "⚠️",
@@ -145,6 +158,7 @@ const ICONS_MAP: Record<AppIconName, string> = {
 };
 
 export function isAppIconName(value: string): value is AppIconName {
+  return value in ICON_FALLBACK_GLYPHS;
   return value in ICONS_MAP;
 }
 
@@ -161,7 +175,9 @@ export function AppIcon({
   color = "#173458",
   size = 20,
   style,
+  ...props
 }: AppIconProps) {
+  const glyph = ICON_FALLBACK_GLYPHS[name] || "•";
   const symbol = ICONS_MAP[name] || "•";
   const isAscii =
     name === "chevron-left" ||
@@ -181,6 +197,18 @@ export function AppIcon({
         { width: size, height: size },
         style,
       ]}
+      {...props}
+    >
+      <Text
+        style={{
+          color,
+          fontSize: Math.max(10, Math.round(size * 0.75)),
+          lineHeight: size,
+          textAlign: "center",
+          includeFontPadding: false,
+        }}
+      >
+        {glyph}
     >
       <Text
         style={[
@@ -204,10 +232,5 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  iconText: {
-    textAlign: "center",
-    textAlignVertical: "center",
-    includeFontPadding: false,
   },
 });

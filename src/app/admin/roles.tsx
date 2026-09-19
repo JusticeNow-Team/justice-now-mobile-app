@@ -320,7 +320,11 @@ export default function AdminRolesScreen() {
               return (
                 <Pressable
                   key={account.id}
-                  onPress={() => setSelectedId(account.id)}
+                  onPress={() => {
+                    setSelectedId(account.id);
+                    setProposedRole(account.role);
+                    setReason("");
+                  }}
                   style={[
                     styles.accountCard,
                     active && styles.accountCardActive,

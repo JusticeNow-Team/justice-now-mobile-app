@@ -121,6 +121,7 @@ export function getPublicStatusForReporter(status: EvidenceStatus): PublicStatus
         actionRequiredForReporter: false,
       };
 
+    case "approved":
     case "validated":
       return {
         publicLabel: "Verified & Attached to Case",
