@@ -498,7 +498,6 @@ export default function InformationRequestScreen() {
               <View style={styles.submitBtn}>
                 <PrimaryButton
                   title="Submit response"
-                  icon="arrow-right"
                   icon="arrow-up-right"
                   loading={submitting}
                   disabled={savingDraft}

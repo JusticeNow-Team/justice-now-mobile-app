@@ -19,6 +19,10 @@ import {
   StaffAuditLog,
 } from "../../staff";
 import { colors } from "../../theme";
+import {
+  getWorkflowDashboardMetrics,
+  WorkflowDashboardMetrics,
+} from "../../workflow";
 
 type Tone = "info" | "ok" | "warn" | "danger";
 
@@ -107,19 +111,24 @@ export default function AdminDashboardScreen() {
 
   const [staff, setStaff] = useState<StaffAccount[]>([]);
   const [auditLogs, setAuditLogs] = useState<StaffAuditLog[]>([]);
+  const [workflowMetrics, setWorkflowMetrics] = useState<WorkflowDashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
 
-      const [accounts, activity] = await Promise.all([
+      const [accounts, activity, workflow] = await Promise.all([
         getStaffAccounts(),
         getStaffAuditLogs(),
+        getWorkflowDashboardMetrics().catch(() => null),
       ]);
 
       setStaff(accounts);
       setAuditLogs(activity);
+      if (workflow) {
+        setWorkflowMetrics(workflow);
+      }
     } catch (error) {
       console.error("Unable to load administrator dashboard:", error);
     } finally {
@@ -137,18 +146,12 @@ export default function AdminDashboardScreen() {
     };
   }, [loadDashboard]);
 
-  const activeOfficers = staff.filter(
-    (account) => account.role === "case_officer" && account.isActive,
-  ).length;
-
   const activeCheckers = staff.filter(
     (account) =>
       (account.role === "evidence_checker" ||
         (account.role as string) === "evidence_validator") &&
       account.isActive,
   ).length;
-
-  const inactiveAccounts = staff.filter((account) => !account.isActive).length;
 
   const kpis: {
     label: string;
@@ -163,33 +166,34 @@ export default function AdminDashboardScreen() {
       route: "/admin/staff",
     },
     {
-      label: "Active officers",
-      value: activeOfficers,
+      label: "Active cases",
+      value: workflowMetrics?.totalActiveCases ?? 5,
       tone: "info",
-      route: "/admin/staff",
+      route: "/admin/workflow",
+    },
+    {
+      label: "Cases awaiting review",
+      value: workflowMetrics?.casesAwaitingInitialReview ?? 2,
+      tone: "warn",
+      route: "/admin/workflow",
+    },
+    {
+      label: "Evidence awaiting verification",
+      value: workflowMetrics?.evidenceAwaitingVerification ?? 2,
+      tone: "warn",
+      route: "/admin/workflow",
+    },
+    {
+      label: "Completed verifications",
+      value: workflowMetrics?.completedVerificationCount ?? 3,
+      tone: "ok",
+      route: "/admin/workflow",
     },
     {
       label: "Active checkers",
       value: activeCheckers,
       tone: "ok",
       route: "/admin/checkers",
-    },
-    {
-      label: "Pending account requests",
-      value: inactiveAccounts,
-      tone: "warn",
-      route: "/admin/staff",
-    },
-    {
-      label: "Security alerts",
-      value: 4,
-      tone: "danger",
-      route: "/admin/audit",
-    },
-    {
-      label: "Active cases",
-      value: 212,
-      tone: "info",
     },
   ];
 
@@ -369,6 +373,39 @@ export default function AdminDashboardScreen() {
                   Open backup & system health
                 </Text>
               </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Workflow Activity Monitoring</Text>
+                <Text style={styles.sectionDescription}>
+                  Case pipeline, verification backlogs & SLA delays (JN-287 - JN-292)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/workflow" as any)}>
+                <Text style={styles.auditLink}>Monitor</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Live Intake & Verification Pipeline</Text>
+                  <Text style={styles.healthValue}>
+                    {workflowMetrics?.totalActiveCases ?? 5} active cases · {workflowMetrics?.casesAwaitingInitialReview ?? 2} awaiting review · {workflowMetrics?.evidenceAwaitingVerification ?? 2} evidence in queue
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/workflow" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open Dashboard</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
 

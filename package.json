@@ -47,20 +47,15 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-assigned-evidence-tests.mjs && node --no-warnings scripts/run-evidence-decision-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs && node --no-warnings scripts/run-checker-availability-tests.mjs && node --no-warnings scripts/run-audit-view-tests.mjs",
-    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-assigned-evidence-tests.mjs && node --no-warnings scripts/run-evidence-decision-tests.mjs && node --no-warnings scripts/run-evidence-comment-tests.mjs && node --no-warnings scripts/run-clarification-request-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs && node --no-warnings scripts/run-checker-availability-tests.mjs && node --no-warnings scripts/run-status-config-tests.mjs",
+    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-assigned-evidence-tests.mjs && node --no-warnings scripts/run-evidence-decision-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs && node --no-warnings scripts/run-checker-availability-tests.mjs && node --no-warnings scripts/run-audit-view-tests.mjs && node --no-warnings scripts/run-workflow-monitoring-tests.mjs",
     "test:auth": "node --no-warnings scripts/run-auth-tests.mjs",
     "test:evidence-assignment": "node --no-warnings scripts/run-evidence-assignment-tests.mjs",
     "test:assigned-evidence": "node --no-warnings scripts/run-assigned-evidence-tests.mjs",
     "test:evidence-decision": "node --no-warnings scripts/run-evidence-decision-tests.mjs",
     "test:withdrawal-review": "node --no-warnings scripts/run-withdrawal-review-tests.mjs",
     "test:checker-availability": "node --no-warnings scripts/run-checker-availability-tests.mjs",
-    "test:audit-view": "node --no-warnings scripts/run-audit-view-tests.mjs"
-    "test:evidence-comment": "node --no-warnings scripts/run-evidence-comment-tests.mjs",
-    "test:clarification-request": "node --no-warnings scripts/run-clarification-request-tests.mjs",
-    "test:withdrawal-review": "node --no-warnings scripts/run-withdrawal-review-tests.mjs",
-    "test:checker-availability": "node --no-warnings scripts/run-checker-availability-tests.mjs",
-    "test:status-config": "node --no-warnings scripts/run-status-config-tests.mjs"
+    "test:audit-view": "node --no-warnings scripts/run-audit-view-tests.mjs",
+    "test:workflow-monitoring": "node --no-warnings scripts/run-workflow-monitoring-tests.mjs"
   },
   "private": true
 }

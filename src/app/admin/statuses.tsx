@@ -28,6 +28,7 @@ import {
   CreateStatusConfigInput,
   StatusConfigTone,
   StatusEntityType,
+  StatusFilterOptions,
   WorkflowStatusConfig,
 } from "../../status-config/types";
 import { canDeleteStatus, slugifyStatusCode } from "../../status-config/validation";
