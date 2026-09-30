@@ -14,8 +14,8 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 4280000, // 4.2 MB
     uploadDate: "2026-08-20T14:30:00Z",
     assignedAt: "2026-08-20T14:35:00Z",
-    assignedCheckerId: "CHK-1001",
-    assignedByName: "Case Officer Sarah",
+    assignedCheckerId: "CHK-001-ELENA",
+    assignedByName: "Elena Rostova",
     assignmentStatus: "assigned",
     validationStatus: "pending",
     lastStatusChangedAt: "2026-08-20T14:30:00Z",
@@ -100,8 +100,8 @@ export const INITIAL_MOCK_EVIDENCE: EvidenceRecord[] = [
     fileSizeBytes: 2450000, // 2.45 MB
     uploadDate: "2026-08-19T09:12:44Z",
     assignedAt: "2026-08-19T09:30:00Z",
-    assignedCheckerId: "CHK-1001",
-    assignedByName: "Case Officer Sarah",
+    assignedCheckerId: "CHK-002-MARCUS",
+    assignedByName: "Dr. Marcus Vance",
     assignmentStatus: "completed",
     validationStatus: "validated",
     documentPageCount: 8,
@@ -148,6 +148,8 @@ Official Forensic Clinic Signature Verified - Legal Compliance Passed.`,
     evidenceType: "document",
     fileSizeBytes: 15400000, // 15.4 MB
     uploadDate: "2026-08-20T16:00:00Z",
+    assignedCheckerId: "CHK-004-ALEX",
+    assignedByName: "Alex Chen",
     validationStatus: "rejected",
     rejectionReason: "Unsupported file type '.exe'. Allowed formats: JPG, PNG, MP4, M4A, PDF.",
     caseInfo: {
@@ -180,6 +182,8 @@ Official Forensic Clinic Signature Verified - Legal Compliance Passed.`,
     evidenceType: "video",
     fileSizeBytes: 145000000, // 145 MB (exceeds 100 MB max size!)
     uploadDate: "2026-08-20T18:22:10Z",
+    assignedCheckerId: "CHK-003-SAMIRA",
+    assignedByName: "Samira Khan",
     validationStatus: "pending",
     mediaDurationSeconds: 1240, // 20 mins 40 sec
     caseInfo: {

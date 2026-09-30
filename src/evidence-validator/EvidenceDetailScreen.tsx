@@ -442,7 +442,7 @@ export default function EvidenceDetailScreen() {
           disabled={!allChecked}
           onPress={() =>
             router.push(
-              `/validator/evidence/${item.assignmentId}/decision` as Href,
+              `/validator/decision/${item.assignmentId}` as Href,
             )
           }
           style={({ pressed }) => [
