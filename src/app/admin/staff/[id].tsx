@@ -1,1 +1,1 @@
-export { UserDetailScreen as default } from "../../../admin/AdminScreens";
+export { UserDetailScreen as default } from "@/admin/AdminScreens";

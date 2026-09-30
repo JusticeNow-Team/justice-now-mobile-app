@@ -3,7 +3,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 
 import { RoleGuard } from "../../auth";
-import AdminBottomNavigation from "../../components/admin/AdminBottomNavigation";
+import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
 import { colors } from "../../theme";
 
 export default function AdminLayout() {
@@ -19,7 +19,7 @@ export default function AdminLayout() {
           }}
         />
 
-        <AdminBottomNavigation />
+        <RoleBottomNavigation role="system_admin" />
       </View>
     </RoleGuard>
   );

@@ -29,7 +29,7 @@ export function ValidatorHeader({
 }: {
   title: string;
   subtitle?: string;
-  backTo?: Href;
+  backTo?: Href | string;
   rightAction?: ReactNode;
 }) {
   const router = useRouter();
@@ -38,7 +38,7 @@ export function ValidatorHeader({
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace(backTo);
+      router.replace(backTo as Href);
     }
   };
 

@@ -1,1 +1,1 @@
-export { AuditDetailScreen as default } from "../../../admin/AdminScreens";
+export { AuditDetailScreen as default } from "@/admin/AdminScreens";
