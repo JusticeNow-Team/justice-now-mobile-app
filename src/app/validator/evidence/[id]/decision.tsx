@@ -1,1 +1,3 @@
-export { default } from "../../../../evidence-validator/EvidenceDecisionScreen";
+import EvidenceDecisionScreen from "../../../../evidence-validator/EvidenceDecisionScreen";
+
+export default EvidenceDecisionScreen;
