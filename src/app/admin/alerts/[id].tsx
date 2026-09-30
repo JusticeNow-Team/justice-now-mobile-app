@@ -1,1 +1,1 @@
-export { AlertDetailScreen as default } from "../../../admin/AdminScreens";
+export { AlertDetailScreen as default } from "@/admin/AdminScreens";

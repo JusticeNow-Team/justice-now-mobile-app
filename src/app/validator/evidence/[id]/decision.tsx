@@ -1,1 +1,1 @@
-export { default } from "../../../../evidence-validator/EvidenceDecisionScreen";
+// Deprecated directory route - replaced by src/app/validator/decision/[id].tsx
