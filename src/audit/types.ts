@@ -8,6 +8,7 @@ export type AuditCategory =
   | "evidence"
   | "status"
   | "category"
+  | "settings"
   | "security";
 
 export type AuditResultFilter = "all" | "success" | "failure";
@@ -47,6 +48,10 @@ export type AuditEventType =
   | "CATEGORY_ACTIVATED"
   | "CATEGORY_DEACTIVATED"
   | "CATEGORY_DELETED"
+  // Settings Events
+  | "SETTING_UPDATED"
+  | "SYSTEM_SETTINGS_CHANGED"
+  | "MAINTENANCE_MODE_TOGGLED"
   // Security & Policy Events
   | "SECURITY_POLICY_VIOLATION"
   | "UNAUTHORIZED_ACCESS_ATTEMPT"

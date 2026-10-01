@@ -84,6 +84,14 @@ export function getEventCategory(eventType: AuditEventType | string): AuditCateg
   }
 
   if (
+    norm.startsWith("SETTING_") ||
+    norm.startsWith("SYSTEM_SETTINGS_") ||
+    norm.startsWith("MAINTENANCE_")
+  ) {
+    return "settings";
+  }
+
+  if (
     norm.startsWith("SECURITY_") ||
     norm.startsWith("UNAUTHORIZED_") ||
     norm.startsWith("BULK_") ||
