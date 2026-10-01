@@ -19,7 +19,6 @@ import { RoleGuard } from "../../auth";
 import { useAuth } from "../../auth/useAuth";
 import { fetchEvidenceCheckerQueue } from "../../checker/api";
 import {
-  DEFAULT_FILTER_OPTIONS,
   EvidenceStatusFilter,
   EvidenceTypeFilter,
   filterEvidenceRecords,
@@ -316,7 +315,7 @@ export default function EvidenceCheckerDashboard() {
             <View style={styles.activeFilterChipsContainer}>
               {searchQuery.trim().length > 0 ? (
                 <View style={styles.filterChip}>
-                  <Text style={styles.filterChipText}>Case/Query: "{searchQuery}"</Text>
+                  <Text style={styles.filterChipText}>Case/Query: &quot;{searchQuery}&quot;</Text>
                   <Pressable onPress={() => setSearchQuery("")} hitSlop={6}>
                     <AppIcon name="x" size={12} color={colors.royal[700]} />
                   </Pressable>

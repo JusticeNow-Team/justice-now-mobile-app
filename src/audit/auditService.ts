@@ -79,6 +79,10 @@ export function getEventCategory(eventType: AuditEventType | string): AuditCateg
     return "status";
   }
 
+  if (norm.startsWith("CATEGORY_")) {
+    return "category";
+  }
+
   if (
     norm.startsWith("SECURITY_") ||
     norm.startsWith("UNAUTHORIZED_") ||
