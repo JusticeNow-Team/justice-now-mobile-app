@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,172 +14,347 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAuth } from "../../auth";
+import { normalizeRole } from "../../auth/roles";
 import {
   createCategory,
+  deleteCategory,
   getCategories,
   ReportCategory,
   toggleCategoryActive,
+  updateCategory,
 } from "../../categories";
+import { canDeleteCategory, slugifyCategoryCode } from "../../categories/validation";
 import { AppIcon, AppIconName, isAppIconName } from "../../components/AppIcon";
-import { colors, iconSizes } from "../../theme";
+import { colors } from "../../theme";
+
+const POPULAR_ICONS: { name: AppIconName; label: string }[] = [
+  { name: "category", label: "Tag" },
+  { name: "scale", label: "Justice" },
+  { name: "lock", label: "Security" },
+  { name: "shield", label: "Protection" },
+  { name: "shield-alert", label: "Emergency" },
+  { name: "document", label: "Document" },
+  { name: "activity", label: "Health" },
+  { name: "message-square", label: "Speech" },
+  { name: "alert-triangle", label: "Harassment" },
+  { name: "users", label: "Community" },
+];
 
 export default function AdminCategoriesScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const userRole = normalizeRole(user?.role);
+  const isAuthorized = userRole === "system_admin";
+
   const [categories, setCategories] = useState<ReportCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeOnly, setActiveOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [showModal, setShowModal] = useState(false);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const [hint, setHint] = useState("");
-  const [icon, setIcon] = useState<AppIconName>("category");
+  // Create Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createCode, setCreateCode] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
+  const [createHint, setCreateHint] = useState("");
+  const [createIcon, setCreateIcon] = useState<AppIconName>("category");
+  const [createIsActive, setCreateIsActive] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [createError, setCreateError] = useState("");
+
+  // Edit Modal State
+  const [editingCategory, setEditingCategory] = useState<ReportCategory | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editHint, setEditHint] = useState("");
+  const [editIcon, setEditIcon] = useState<AppIconName>("category");
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  // Safe Deletion Blocked Modal State
+  const [blockedModal, setBlockedModal] = useState<{
+    visible: boolean;
+    category: ReportCategory | null;
+    reason: string;
+    activeCaseCount: number;
+  }>({
+    visible: false,
+    category: null,
+    reason: "",
+    activeCaseCount: 0,
+  });
 
   const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
-
       const records = await getCategories({
-        activeOnly,
+        statusFilter,
+        searchQuery: searchQuery.trim() || undefined,
       });
-
       setCategories(records);
     } catch (error) {
-      console.error("Unable to load categories:", error);
+      console.error("Unable to load report categories:", error);
     } finally {
       setLoading(false);
     }
-  }, [activeOnly]);
+  }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       void loadCategories();
     }, 0);
 
-    return () => {
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [loadCategories]);
 
-  const resetForm = () => {
-    setName("");
-    setCode("");
-    setDescription("");
-    setHint("");
-    setIcon("category");
-    setFormError("");
+  // KPI Calculations
+  const stats = useMemo(() => {
+    const total = categories.length;
+    const active = categories.filter((c) => c.isActive).length;
+    const inactive = total - active;
+    const totalCases = categories.reduce((sum, c) => sum + (c.activeCaseCount ?? 0), 0);
+    return { total, active, inactive, totalCases };
+  }, [categories]);
+
+  // Actor payload for auditing
+  const actor = useMemo(
+    () => ({
+      userId: user?.id,
+      email: user?.email,
+      role: user?.role,
+    }),
+    [user],
+  );
+
+  // Reset Create Form
+  const resetCreateForm = () => {
+    setCreateName("");
+    setCreateCode("");
+    setCreateDescription("");
+    setCreateHint("");
+    setCreateIcon("category");
+    setCreateIsActive(true);
+    setCreateError("");
   };
 
-  const closeModal = () => {
-    if (creating) {
-      return;
-    }
-
-    setShowModal(false);
-    resetForm();
+  const openCreateModal = () => {
+    resetCreateForm();
+    setShowCreateModal(true);
   };
 
-  const createNewCategory = async () => {
-    setFormError("");
+  const closeCreateModal = () => {
+    if (creating) return;
+    setShowCreateModal(false);
+    resetCreateForm();
+  };
 
-    if (!name.trim()) {
-      setFormError("Category name is required.");
+  // Open Edit Modal
+  const openEditModal = (cat: ReportCategory) => {
+    setEditingCategory(cat);
+    setEditName(cat.name);
+    setEditDescription(cat.description);
+    setEditHint(cat.hint || "");
+    setEditIcon(isAppIconName(cat.icon ?? "") ? (cat.icon as AppIconName) : "category");
+    setEditIsActive(cat.isActive);
+    setEditError("");
+  };
+
+  const closeEditModal = () => {
+    if (updating) return;
+    setEditingCategory(null);
+    setEditError("");
+  };
+
+  // Handle Create Category (JN-380)
+  const handleCreateCategory = async () => {
+    setCreateError("");
+
+    if (!createName.trim()) {
+      setCreateError("Category name is required.");
       return;
     }
 
-    if (!description.trim()) {
-      setFormError("Category description is required.");
+    if (!createDescription.trim()) {
+      setCreateError("Category description is required.");
       return;
     }
-
-    const generatedCode =
-      code.trim().toLowerCase() ||
-      name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
 
     try {
       setCreating(true);
+      const codeToUse =
+        createCode.trim().toLowerCase() || slugifyCategoryCode(createName);
 
-      const result = await createCategory({
-        name: name.trim(),
-        code: generatedCode,
-        description: description.trim(),
-        hint: hint.trim() || undefined,
-        icon: icon || "category",
-        isActive: true,
-        displayOrder: categories.length + 1,
-      });
+      const result = await createCategory(
+        {
+          name: createName.trim(),
+          code: codeToUse,
+          description: createDescription.trim(),
+          hint: createHint.trim() || undefined,
+          icon: createIcon,
+          isActive: createIsActive,
+          displayOrder: categories.length + 1,
+        },
+        actor,
+      );
 
       if (!result.success) {
-        setFormError(result.error || "The category could not be created.");
+        setCreateError(result.error || "The category could not be created.");
         return;
       }
 
-      setShowModal(false);
-      resetForm();
+      setShowCreateModal(false);
+      resetCreateForm();
       await loadCategories();
-
-      Alert.alert("Category created", `${name.trim()} was added successfully.`);
-    } catch (error: any) {
-      setFormError(error?.message || "The category could not be created.");
+      Alert.alert("Category Created", `"${createName.trim()}" was created successfully.`);
+    } catch (err: any) {
+      setCreateError(err?.message || "Failed to create category.");
     } finally {
       setCreating(false);
     }
   };
 
-  const toggleCategory = async (category: ReportCategory) => {
-    const nextValue = !category.isActive;
+  // Handle Update Category (JN-381)
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) return;
+    setEditError("");
 
-    const result = await toggleCategoryActive(category.id, nextValue);
-
-    if (!result.success) {
-      Alert.alert(
-        "Update failed",
-        result.error || "The category status could not be updated.",
-      );
+    if (!editName.trim()) {
+      setEditError("Category name is required.");
       return;
     }
 
-    if (activeOnly && !nextValue) {
-      setCategories((current) =>
-        current.filter((item) => item.id !== category.id),
+    if (!editDescription.trim()) {
+      setEditError("Category description is required.");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const result = await updateCategory(
+        editingCategory.id,
+        {
+          name: editName.trim(),
+          description: editDescription.trim(),
+          hint: editHint.trim() || undefined,
+          icon: editIcon,
+          isActive: editIsActive,
+        },
+        actor,
       );
-    } else {
-      setCategories((current) =>
-        current.map((item) =>
-          item.id === category.id
-            ? {
-                ...item,
-                isActive: nextValue,
-              }
-            : item,
-        ),
-      );
+
+      if (!result.success) {
+        setEditError(result.error || "The category could not be updated.");
+        return;
+      }
+
+      setEditingCategory(null);
+      await loadCategories();
+      Alert.alert("Category Updated", `"${editName.trim()}" was updated successfully.`);
+    } catch (err: any) {
+      setEditError(err?.message || "Failed to update category.");
+    } finally {
+      setUpdating(false);
     }
   };
 
+  // Handle Toggle Active (JN-382)
+  const handleToggleActive = async (category: ReportCategory) => {
+    const nextVal = !category.isActive;
+    const result = await toggleCategoryActive(category.id, nextVal, actor);
+
+    if (!result.success) {
+      Alert.alert("Update Failed", result.error || "Could not update status.");
+      return;
+    }
+
+    setCategories((prev) =>
+      prev.map((c) => (c.id === category.id ? { ...c, isActive: nextVal } : c)),
+    );
+  };
+
+  // Handle Delete Category (JN-383 / AC 5)
+  const handleDeleteCategory = async (category: ReportCategory) => {
+    const safety = canDeleteCategory(category);
+
+    if (!safety.allowed) {
+      setBlockedModal({
+        visible: true,
+        category,
+        reason: safety.reason || "Category cannot be deleted.",
+        activeCaseCount: safety.activeCaseCount || 0,
+      });
+      return;
+    }
+
+    Alert.alert(
+      "Delete Category",
+      `Are you sure you want to permanently remove "${category.name}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteCategory(category.id, actor);
+            if (!result.success) {
+              Alert.alert("Deletion Failed", result.error || "Could not delete category.");
+              return;
+            }
+            await loadCategories();
+            Alert.alert("Category Deleted", `"${category.name}" was removed.`);
+          },
+        },
+      ],
+    );
+  };
+
+  // One-tap deactivation from blocked modal
+  const handleDeactivateFromBlockedModal = async () => {
+    if (!blockedModal.category) return;
+    const cat = blockedModal.category;
+    setBlockedModal((prev) => ({ ...prev, visible: false }));
+    await handleToggleActive(cat);
+  };
+
+  if (!isAuthorized) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.unauthorizedContainer}>
+          <AppIcon name="lock" size={48} color={colors.error} />
+          <Text style={styles.unauthorizedTitle}>Access Restricted</Text>
+          <Text style={styles.unauthorizedSubtitle}>
+            Only System Administrators have permission to manage report categories and incident classifications.
+          </Text>
+          <Pressable style={styles.backButton} onPress={() => router.replace("/admin")}>
+            <Text style={styles.backButtonText}>Return to Admin Hub</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <AppIcon name="settings" size={20} color={colors.navy[700]} />
-        </View>
-
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>System configuration</Text>
+        <Pressable
+          style={styles.headerBackBtn}
+          onPress={() => router.push("/admin")}
+          accessibilityRole="button"
+        >
+          <AppIcon name="arrow-left" size={20} color={colors.navy[900]} />
+        </Pressable>
+        <View style={styles.headerTitleGroup}>
+          <Text style={styles.headerTitle}>Report Categories</Text>
           <Text style={styles.headerSubtitle}>
-            Categories and case classifications
+            Incident classifications & routing
           </Text>
         </View>
-
-        <Pressable style={styles.addButton} onPress={() => setShowModal(true)}>
+        <Pressable style={styles.addButton} onPress={openCreateModal}>
           <AppIcon name="plus" size={16} color={colors.textInverse} />
-          <Text style={styles.addButtonText}>Add</Text>
+          <Text style={styles.addButtonText}>New</Text>
         </Pressable>
       </View>
 
@@ -186,262 +362,389 @@ export default function AdminCategoriesScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.filterRow}>
-          <Pressable
-            style={[styles.filterPill, !activeOnly && styles.activeFilterPill]}
-            onPress={() => setActiveOnly(false)}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                !activeOnly && styles.activeFilterPillText,
-              ]}
-            >
-              All categories
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.filterPill, activeOnly && styles.activeFilterPill]}
-            onPress={() => setActiveOnly(true)}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                activeOnly && styles.activeFilterPillText,
-              ]}
-            >
-              Active only
-            </Text>
-          </Pressable>
+        {/* KPI Summary Cards */}
+        <View style={styles.kpiRow}>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiValue}>{stats.total}</Text>
+            <Text style={styles.kpiLabel}>Total Categories</Text>
+          </View>
+          <View style={[styles.kpiCard, styles.kpiCardActive]}>
+            <Text style={[styles.kpiValue, { color: colors.success }]}>{stats.active}</Text>
+            <Text style={styles.kpiLabel}>Active for Intake</Text>
+          </View>
+          <View style={[styles.kpiCard, styles.kpiCardInactive]}>
+            <Text style={[styles.kpiValue, { color: colors.navy[600] }]}>{stats.inactive}</Text>
+            <Text style={styles.kpiLabel}>Deactivated</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={[styles.kpiValue, { color: colors.royal[700] }]}>{stats.totalCases}</Text>
+            <Text style={styles.kpiLabel}>Linked Cases</Text>
+          </View>
         </View>
 
-        <View style={styles.configurationCard}>
-          <View style={styles.groupHeader}>
-            <Text style={styles.groupHeaderText}>CASE HANDLING</Text>
-          </View>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <AppIcon name="search" size={18} color={colors.navy[500]} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search categories by name, code or description..."
+            placeholderTextColor={colors.navy[400]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <AppIcon name="x" size={16} color={colors.navy[500]} />
+            </Pressable>
+          ) : null}
+        </View>
 
-          <View style={styles.configurationSummary}>
-            <View style={styles.summaryIcon}>
-              <AppIcon name="category" size={18} color={colors.royal[700]} />
-            </View>
-
-            <View style={styles.summaryContent}>
-              <Text style={styles.summaryTitle}>Case categories</Text>
-              <Text style={styles.summaryHint}>
-                {categories.filter((category) => category.isActive).length}{" "}
-                active categories
-              </Text>
-            </View>
-          </View>
-
-          {loading ? (
-            <View style={styles.loadingState}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : categories.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No categories found</Text>
-            </View>
-          ) : (
-            <View style={styles.categoriesList}>
-              {categories.map((category, index) => (
-                <View
-                  key={category.id}
+        {/* Filter Pills */}
+        <View style={styles.filterRow}>
+          {(
+            [
+              { key: "all", label: `All (${stats.total})` },
+              { key: "active", label: `Active (${stats.active})` },
+              { key: "inactive", label: `Inactive (${stats.inactive})` },
+            ] as const
+          ).map((filter) => {
+            const isSelected = statusFilter === filter.key;
+            return (
+              <Pressable
+                key={filter.key}
+                style={[styles.filterPill, isSelected && styles.activeFilterPill]}
+                onPress={() => setStatusFilter(filter.key)}
+              >
+                <Text
                   style={[
-                    styles.categoryRow,
-                    index === categories.length - 1 && styles.lastCategoryRow,
+                    styles.filterPillText,
+                    isSelected && styles.activeFilterPillText,
                   ]}
                 >
-                  <View style={styles.categoryIcon}>
-                    <AppIcon
-                      name={
-                        isAppIconName(category.icon ?? "")
-                          ? ((category.icon ?? "category") as AppIconName)
-                          : "category"
-                      }
-                      size={20}
-                      color={colors.navy[700]}
-                    />
-                  </View>
+                  {filter.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-                  <View style={styles.categoryInformation}>
-                    <View style={styles.categoryNameRow}>
-                      <Text style={styles.categoryName}>{category.name}</Text>
+        {/* Category List */}
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.royal[700]} />
+            <Text style={styles.loadingText}>Loading report categories...</Text>
+          </View>
+        ) : categories.length === 0 ? (
+          <View style={styles.emptyState}>
+            <AppIcon name="category" size={40} color={colors.navy[400]} />
+            <Text style={styles.emptyTitle}>No Categories Found</Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery
+                ? "No categories match your search term. Try a different query."
+                : "No categories match the active filter."}
+            </Text>
+            {searchQuery ? (
+              <Pressable
+                style={styles.emptyButton}
+                onPress={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                }}
+              >
+                <Text style={styles.emptyButtonText}>Clear Filters</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.emptyButton} onPress={openCreateModal}>
+                <Text style={styles.emptyButtonText}>Create First Category</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <View style={styles.categoryList}>
+            {categories.map((category) => {
+              const iconGlyph = isAppIconName(category.icon ?? "")
+                ? (category.icon as AppIconName)
+                : "category";
 
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          category.isActive
-                            ? styles.activeBadge
-                            : styles.inactiveBadge,
-                        ]}
-                      >
+              return (
+                <View key={category.id} style={styles.categoryCard}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.iconContainer}>
+                      <AppIcon name={iconGlyph} size={22} color={colors.royal[700]} />
+                    </View>
+
+                    <View style={styles.titleContainer}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.categoryName}>{category.name}</Text>
                         <View
                           style={[
-                            styles.statusDot,
-                            {
-                              backgroundColor: category.isActive
-                                ? colors.success
-                                : colors.textSoft,
-                            },
-                          ]}
-                        />
-
-                        <Text
-                          style={[
-                            styles.statusText,
-                            {
-                              color: category.isActive
-                                ? colors.success
-                                : colors.textSecondary,
-                            },
+                            styles.badge,
+                            category.isActive ? styles.badgeActive : styles.badgeInactive,
                           ]}
                         >
-                          {category.isActive ? "Active" : "Inactive"}
+                          <Text
+                            style={[
+                              styles.badgeText,
+                              category.isActive
+                                ? styles.badgeTextActive
+                                : styles.badgeTextInactive,
+                            ]}
+                          >
+                            {category.isActive ? "ACTIVE" : "INACTIVE"}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.codeMetaRow}>
+                        <Text style={styles.codeBadge}>code: {category.code}</Text>
+                        {category.isSystemDefault ? (
+                          <Text style={styles.systemBadge}>Default</Text>
+                        ) : null}
+                        <Text style={styles.casesCountBadge}>
+                          {category.activeCaseCount ?? 0} cases linked
                         </Text>
                       </View>
                     </View>
-
-                    <Text style={styles.categoryDescription} numberOfLines={2}>
-                      {category.description}
-                    </Text>
-
-                    <Text style={styles.categoryCode}>{category.code}</Text>
                   </View>
 
-                  <Switch
-                    value={category.isActive}
-                    onValueChange={() => void toggleCategory(category)}
-                    trackColor={{
-                      false: colors.border,
-                      true: colors.teal[200],
-                    }}
-                    thumbColor={
-                      category.isActive ? colors.teal[600] : colors.textSoft
-                    }
-                  />
+                  <Text style={styles.categoryDescription}>
+                    {category.description}
+                  </Text>
+
+                  {category.hint ? (
+                    <View style={styles.hintContainer}>
+                      <AppIcon name="info" size={14} color={colors.navy[600]} />
+                      <Text style={styles.hintText}>
+                        Reporter Guidance: {category.hint}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.cardFooter}>
+                    <View style={styles.switchGroup}>
+                      <Text style={styles.switchLabel}>
+                        {category.isActive ? "Active in intake" : "Hidden from intake"}
+                      </Text>
+                      <Switch
+                        value={category.isActive}
+                        onValueChange={() => void handleToggleActive(category)}
+                        trackColor={{
+                          false: colors.navy[200],
+                          true: colors.teal[300],
+                        }}
+                        thumbColor={
+                          category.isActive ? colors.teal[700] : colors.navy[400]
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.actionButtons}>
+                      <Pressable
+                        style={styles.editButton}
+                        onPress={() => openEditModal(category)}
+                        accessibilityRole="button"
+                      >
+                        <AppIcon name="edit" size={14} color={colors.royal[700]} />
+                        <Text style={styles.editButtonText}>Edit</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.deleteButton}
+                        onPress={() => void handleDeleteCategory(category)}
+                        accessibilityRole="button"
+                      >
+                        <AppIcon name="trash" size={14} color={colors.error} />
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-              ))}
-            </View>
-          )}
-        </View>
+              );
+            })}
+          </View>
+        )}
 
-        <View style={styles.notice}>
-          <AppIcon name="warning" size={iconSizes.md} color={colors.warning} />
-
-          <View style={styles.noticeContent}>
-            <Text style={styles.noticeTitle}>
-              Changes take effect immediately
-            </Text>
-
-            <Text style={styles.noticeText}>
-              Editing or disabling categories affects new reports. Existing case
-              records keep their original category for the audit trail.
+        {/* Safety & Audit Info Card */}
+        <View style={styles.infoBanner}>
+          <AppIcon name="shield-check" size={20} color={colors.royal[700]} />
+          <View style={styles.infoBannerContent}>
+            <Text style={styles.infoBannerTitle}>Audit Trails & Classification Safety</Text>
+            <Text style={styles.infoBannerText}>
+              Deactivating a category hides it from new reports while preserving classifications on existing case files. All changes are automatically recorded to administrative audit logs.
             </Text>
           </View>
         </View>
       </ScrollView>
 
+      {/* CREATE MODAL (JN-380) */}
       <Modal
-        visible={showModal}
+        visible={showCreateModal}
         transparent
         animationType="fade"
-        onRequestClose={closeModal}
+        onRequestClose={closeCreateModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
+          <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Add report category</Text>
+                <Text style={styles.modalTitle}>Add Report Category</Text>
                 <Text style={styles.modalSubtitle}>
                   Configure a new case classification
                 </Text>
               </View>
-
-              <Pressable onPress={closeModal} disabled={creating}>
+              <Pressable onPress={closeCreateModal} disabled={creating}>
                 <AppIcon name="x" size={20} color={colors.navy[700]} />
               </Pressable>
             </View>
 
             <ScrollView
-              contentContainerStyle={styles.modalContent}
+              contentContainerStyle={styles.modalForm}
               keyboardShouldPersistTaps="handled"
             >
-              {formError ? (
-                <View style={styles.errorNotice}>
-                  <Text style={styles.errorText}>{formError}</Text>
+              {createError ? (
+                <View style={styles.errorBox}>
+                  <AppIcon name="alert-triangle" size={16} color={colors.error} />
+                  <Text style={styles.errorBoxText}>{createError}</Text>
                 </View>
               ) : null}
 
-              <FormField
-                label="Category name"
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. Unlawful detention"
-              />
-
-              <FormField
-                label="Category code"
-                value={code}
-                onChangeText={setCode}
-                placeholder="Generated automatically if empty"
-                autoCapitalize="none"
-              />
-
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Description</Text>
-
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Category Name <Text style={styles.requiredStar}>*</Text>
+                </Text>
                 <TextInput
-                  value={description}
-                  onChangeText={setDescription}
-                  style={styles.textArea}
-                  placeholder="Explain when this category should be selected"
-                  placeholderTextColor={colors.textSoft}
+                  style={styles.formInput}
+                  placeholder="e.g. Environmental Rights Violation"
+                  placeholderTextColor={colors.navy[400]}
+                  value={createName}
+                  onChangeText={(val) => {
+                    setCreateName(val);
+                    if (!createCode || createCode === slugifyCategoryCode(createName)) {
+                      setCreateCode(slugifyCategoryCode(val));
+                    }
+                  }}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  System Code <Text style={styles.requiredStar}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.formInput, styles.codeFormInput]}
+                  placeholder="e.g. environmental_rights"
+                  placeholderTextColor={colors.navy[400]}
+                  value={createCode}
+                  onChangeText={setCreateCode}
+                  autoCapitalize="none"
+                />
+                <Text style={styles.fieldHelper}>
+                  Unique identifier used in database and routing queries.
+                </Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Description <Text style={styles.requiredStar}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.formInput, styles.formTextArea]}
+                  placeholder="Explain legal parameters or criteria for this incident type..."
+                  placeholderTextColor={colors.navy[400]}
+                  value={createDescription}
+                  onChangeText={setCreateDescription}
                   multiline
+                  numberOfLines={3}
                   textAlignVertical="top"
                 />
               </View>
 
-              <FormField
-                label="Reporter guidance"
-                value={hint}
-                onChangeText={setHint}
-                placeholder="Optional guidance for reporters"
-              />
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Reporter Guidance Hint (Optional)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. Unfair treatment based on who you are"
+                  placeholderTextColor={colors.navy[400]}
+                  value={createHint}
+                  onChangeText={setCreateHint}
+                />
+                <Text style={styles.fieldHelper}>
+                  Displayed to citizens and reporters in the mobile report flow.
+                </Text>
+              </View>
 
-              <FormField
-                label="Icon"
-                value={icon}
-                onChangeText={(value) => setIcon(isAppIconName(value) ? value : "category")}
-                placeholder="category"
-              />
+              {/* Icon Picker */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Category Icon</Text>
+                <View style={styles.iconChipRow}>
+                  {POPULAR_ICONS.map((iconItem) => {
+                    const isSelected = createIcon === iconItem.name;
+                    return (
+                      <Pressable
+                        key={iconItem.name}
+                        style={[
+                          styles.iconChip,
+                          isSelected && styles.iconChipSelected,
+                        ]}
+                        onPress={() => setCreateIcon(iconItem.name)}
+                      >
+                        <AppIcon
+                          name={iconItem.name}
+                          size={18}
+                          color={isSelected ? colors.royal[700] : colors.navy[600]}
+                        />
+                        <Text
+                          style={[
+                            styles.iconChipText,
+                            isSelected && styles.iconChipTextSelected,
+                          ]}
+                        >
+                          {iconItem.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
 
-              <View style={styles.modalActions}>
+              {/* Initial Active State */}
+              <View style={styles.modalSwitchRow}>
+                <View>
+                  <Text style={styles.modalSwitchLabel}>Activate Immediately</Text>
+                  <Text style={styles.modalSwitchSub}>
+                    Make available for case submission upon creation
+                  </Text>
+                </View>
+                <Switch
+                  value={createIsActive}
+                  onValueChange={setCreateIsActive}
+                  trackColor={{ false: colors.navy[200], true: colors.teal[300] }}
+                  thumbColor={createIsActive ? colors.teal[700] : colors.navy[400]}
+                />
+              </View>
+
+              {/* Actions */}
+              <View style={styles.modalActionRow}>
                 <Pressable
-                  style={styles.cancelButton}
-                  onPress={closeModal}
+                  style={styles.modalCancelBtn}
+                  onPress={closeCreateModal}
                   disabled={creating}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
                 </Pressable>
-
                 <Pressable
-                  style={styles.createButton}
-                  onPress={() => void createNewCategory()}
+                  style={styles.modalSubmitBtn}
+                  onPress={() => void handleCreateCategory()}
                   disabled={creating}
                 >
                   {creating ? (
-                    <ActivityIndicator color={colors.textInverse} />
+                    <ActivityIndicator color={colors.textInverse} size="small" />
                   ) : (
                     <>
-                      <AppIcon
-                        name="plus"
-                        size={16}
-                        color={colors.textInverse}
-                      />
-                      <Text style={styles.createButtonText}>Create</Text>
+                      <AppIcon name="plus" size={16} color={colors.textInverse} />
+                      <Text style={styles.modalSubmitBtnText}>Create Category</Text>
                     </>
                   )}
                 </Pressable>
@@ -450,29 +753,193 @@ export default function AdminCategoriesScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
-  );
-}
 
-function FormField({
-  label,
-  ...props
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  autoCapitalize?: any;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        {...props}
-        style={styles.input}
-        placeholderTextColor={colors.textSoft}
-      />
-    </View>
+      {/* EDIT MODAL (JN-381) */}
+      <Modal
+        visible={Boolean(editingCategory)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEditModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Edit Category</Text>
+                <Text style={styles.modalSubtitle}>
+                  Update classification properties [code: {editingCategory?.code}]
+                </Text>
+              </View>
+              <Pressable onPress={closeEditModal} disabled={updating}>
+                <AppIcon name="x" size={20} color={colors.navy[700]} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.modalForm}
+              keyboardShouldPersistTaps="handled"
+            >
+              {editError ? (
+                <View style={styles.errorBox}>
+                  <AppIcon name="alert-triangle" size={16} color={colors.error} />
+                  <Text style={styles.errorBoxText}>{editError}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Category Name <Text style={styles.requiredStar}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. Environmental Rights Violation"
+                  placeholderTextColor={colors.navy[400]}
+                  value={editName}
+                  onChangeText={setEditName}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Description <Text style={styles.requiredStar}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.formInput, styles.formTextArea]}
+                  placeholder="Explain incident parameters..."
+                  placeholderTextColor={colors.navy[400]}
+                  value={editDescription}
+                  onChangeText={setEditDescription}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Reporter Guidance Hint (Optional)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Guidance shown in reporter submission"
+                  placeholderTextColor={colors.navy[400]}
+                  value={editHint}
+                  onChangeText={setEditHint}
+                />
+              </View>
+
+              {/* Icon Picker */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Category Icon</Text>
+                <View style={styles.iconChipRow}>
+                  {POPULAR_ICONS.map((iconItem) => {
+                    const isSelected = editIcon === iconItem.name;
+                    return (
+                      <Pressable
+                        key={iconItem.name}
+                        style={[
+                          styles.iconChip,
+                          isSelected && styles.iconChipSelected,
+                        ]}
+                        onPress={() => setEditIcon(iconItem.name)}
+                      >
+                        <AppIcon
+                          name={iconItem.name}
+                          size={18}
+                          color={isSelected ? colors.royal[700] : colors.navy[600]}
+                        />
+                        <Text
+                          style={[
+                            styles.iconChipText,
+                            isSelected && styles.iconChipTextSelected,
+                          ]}
+                        >
+                          {iconItem.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.modalSwitchRow}>
+                <View>
+                  <Text style={styles.modalSwitchLabel}>Active Status</Text>
+                  <Text style={styles.modalSwitchSub}>
+                    {editIsActive ? "Available to reporters" : "Hidden from new reports"}
+                  </Text>
+                </View>
+                <Switch
+                  value={editIsActive}
+                  onValueChange={setEditIsActive}
+                  trackColor={{ false: colors.navy[200], true: colors.teal[300] }}
+                  thumbColor={editIsActive ? colors.teal[700] : colors.navy[400]}
+                />
+              </View>
+
+              {/* Actions */}
+              <View style={styles.modalActionRow}>
+                <Pressable
+                  style={styles.modalCancelBtn}
+                  onPress={closeEditModal}
+                  disabled={updating}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modalSubmitBtn}
+                  onPress={() => void handleUpdateCategory()}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <ActivityIndicator color={colors.textInverse} size="small" />
+                  ) : (
+                    <>
+                      <AppIcon name="check" size={16} color={colors.textInverse} />
+                      <Text style={styles.modalSubmitBtnText}>Save Changes</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* BLOCKED DELETION MODAL (JN-383 / AC 5) */}
+      <Modal
+        visible={blockedModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBlockedModal((prev) => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.blockedCard}>
+            <View style={styles.blockedIcon}>
+              <AppIcon name="shield-alert" size={32} color={colors.warning} />
+            </View>
+            <Text style={styles.blockedTitle}>Deletion Protected</Text>
+            <Text style={styles.blockedText}>{blockedModal.reason}</Text>
+
+            <View style={styles.blockedActions}>
+              <Pressable
+                style={styles.blockedDeactivateBtn}
+                onPress={() => void handleDeactivateFromBlockedModal()}
+              >
+                <Text style={styles.blockedDeactivateBtnText}>
+                  Deactivate Category Instead
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.blockedDismissBtn}
+                onPress={() => setBlockedModal((prev) => ({ ...prev, visible: false }))}
+              >
+                <Text style={styles.blockedDismissBtnText}>Keep Active & Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -482,358 +949,598 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    minHeight: 62,
-    paddingHorizontal: 14,
-    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.navy[200],
     backgroundColor: colors.surface,
+    gap: 12,
   },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+  headerBackBtn: {
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: colors.navy[50],
   },
-  headerText: {
+  headerTitleGroup: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    color: colors.navy[800],
+    color: colors.navy[900],
   },
   headerSubtitle: {
-    marginTop: 2,
     fontSize: 12,
-    color: colors.textSecondary,
+    color: colors.navy[500],
   },
   addButton: {
-    minHeight: 40,
-    paddingHorizontal: 12,
-    borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     backgroundColor: colors.royal[700],
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
   },
   addButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
     color: colors.textInverse,
+    fontWeight: "600",
+    fontSize: 14,
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 16,
-    paddingBottom: 28,
-    gap: 13,
+    gap: 16,
+    paddingBottom: 40,
+  },
+  kpiRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  kpiCard: {
+    flex: 1,
+    minWidth: "47%",
+    backgroundColor: colors.surface,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+  },
+  kpiCardActive: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.success,
+  },
+  kpiCardInactive: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.navy[400],
+  },
+  kpiValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.navy[900],
+  },
+  kpiLabel: {
+    fontSize: 11,
+    color: colors.navy[600],
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 42,
+    fontSize: 14,
+    color: colors.navy[900],
   },
   filterRow: {
     flexDirection: "row",
     gap: 8,
   },
   filterPill: {
-    minHeight: 38,
+    paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
   },
   activeFilterPill: {
-    borderColor: colors.navy[800],
-    backgroundColor: colors.navy[800],
+    backgroundColor: colors.royal[700],
+    borderColor: colors.royal[700],
   },
   filterPillText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[700],
   },
   activeFilterPillText: {
     color: colors.textInverse,
   },
-  configurationCard: {
-    overflow: "hidden",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  groupHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  groupHeaderText: {
-    fontSize: 11.5,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    color: colors.textSecondary,
-  },
-  configurationSummary: {
-    minHeight: 68,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  summaryIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.royal[50],
-  },
-  summaryContent: {
-    flex: 1,
-  },
-  summaryTitle: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: colors.navy[800],
-  },
-  summaryHint: {
-    marginTop: 2,
-    fontSize: 11.5,
-    color: colors.textSecondary,
-  },
   loadingState: {
-    minHeight: 160,
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 40,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.navy[600],
   },
   emptyState: {
-    minHeight: 140,
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    gap: 8,
   },
   emptyTitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
-    color: colors.textSecondary,
+    color: colors.navy[900],
+    marginTop: 8,
   },
-  categoriesList: {
-    paddingHorizontal: 14,
+  emptySubtitle: {
+    fontSize: 13,
+    color: colors.navy[600],
+    textAlign: "center",
+    lineHeight: 18,
   },
-  categoryRow: {
-    minHeight: 94,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  emptyButton: {
+    marginTop: 12,
+    backgroundColor: colors.navy[100],
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  lastCategoryRow: {
-    borderBottomWidth: 0,
+  emptyButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.navy[800],
   },
-  categoryIcon: {
-    width: 40,
-    height: 40,
+  categoryList: {
+    gap: 12,
+  },
+  categoryCard: {
+    backgroundColor: colors.surface,
     borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    gap: 10,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  iconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: colors.royal[50],
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.navy[50],
   },
-  categoryInformation: {
+  titleContainer: {
     flex: 1,
-    minWidth: 0,
+    gap: 4,
   },
-  categoryNameRow: {
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.navy[900],
+    flex: 1,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  badgeActive: {
+    backgroundColor: colors.teal[50],
+  },
+  badgeInactive: {
+    backgroundColor: colors.navy[100],
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  badgeTextActive: {
+    color: colors.teal[700],
+  },
+  badgeTextInactive: {
+    color: colors.navy[600],
+  },
+  codeMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    alignItems: "center",
+  },
+  codeBadge: {
+    fontSize: 11,
+    fontFamily: "monospace",
+    color: colors.navy[600],
+    backgroundColor: colors.navy[50],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  systemBadge: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.royal[700],
+    backgroundColor: colors.royal[50],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  casesCountBadge: {
+    fontSize: 11,
+    color: colors.navy[500],
+  },
+  categoryDescription: {
+    fontSize: 13,
+    color: colors.navy[700],
+    lineHeight: 18,
+  },
+  hintContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    backgroundColor: colors.navy[50],
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
-  categoryName: {
-    flexShrink: 1,
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: colors.navy[800],
+  hintText: {
+    fontSize: 12,
+    color: colors.navy[700],
+    flex: 1,
+    fontStyle: "italic",
   },
-  categoryDescription: {
-    marginTop: 3,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: colors.textSecondary,
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.navy[100],
   },
-  categoryCode: {
-    marginTop: 4,
-    fontSize: 10.5,
-    fontWeight: "700",
-    color: colors.royal[700],
+  switchGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 7,
+  switchLabel: {
+    fontSize: 12,
+    color: colors.navy[600],
+    fontWeight: "500",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  editButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: colors.royal[50],
   },
-  activeBadge: {
-    backgroundColor: "#EAF6F0",
+  editButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.royal[700],
   },
-  inactiveBadge: {
-    backgroundColor: colors.navy[50],
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 9.5,
-    fontWeight: "700",
-  },
-  notice: {
-    padding: 13,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#FAEBC8",
-    backgroundColor: "#FDF6E7",
-  },
-  noticeContent: {
-    flex: 1,
-  },
-  noticeTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.warning,
-  },
-  noticeText: {
-    marginTop: 3,
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: colors.textSecondary,
-  },
-  modalOverlay: {
-    flex: 1,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(10,27,46,0.58)",
-  },
-  modal: {
-    width: "100%",
-    maxWidth: 560,
-    maxHeight: "92%",
-    overflow: "hidden",
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-  },
-  modalHeader: {
-    padding: 17,
+  deleteButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "#FDECEC",
   },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.navy[800],
-  },
-  modalSubtitle: {
-    marginTop: 2,
-    fontSize: 11.5,
-    color: colors.textSecondary,
-  },
-  modalContent: {
-    padding: 17,
-    gap: 13,
-  },
-  errorNotice: {
-    padding: 11,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#F6DAD6",
-    backgroundColor: "#FBEEEC",
-  },
-  errorText: {
-    fontSize: 11.5,
+  deleteButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
     color: colors.error,
   },
-  field: {
+  infoBanner: {
+    flexDirection: "row",
+    backgroundColor: colors.royal[50],
+    borderWidth: 1,
+    borderColor: colors.royal[200],
+    borderRadius: 10,
+    padding: 14,
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  infoBannerContent: {
+    flex: 1,
+    gap: 2,
+  },
+  infoBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.royal[800],
+  },
+  infoBannerText: {
+    fontSize: 12,
+    color: colors.royal[700],
+    lineHeight: 16,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "90%",
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.navy[100],
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.navy[900],
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: colors.navy[500],
+  },
+  modalForm: {
+    padding: 16,
+    gap: 14,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FDECEC",
+    borderColor: colors.error,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+  },
+  errorBoxText: {
+    fontSize: 13,
+    color: colors.error,
+    flex: 1,
+    fontWeight: "500",
+  },
+  formGroup: {
     gap: 6,
   },
-  fieldLabel: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: colors.navy[800],
-  },
-  input: {
-    minHeight: 46,
-    paddingHorizontal: 13,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-    fontSize: 13.5,
-    color: colors.navy[800],
-    outlineStyle: "none",
-  } as any,
-  textArea: {
-    minHeight: 90,
-    padding: 13,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-    fontSize: 13.5,
-    color: colors.navy[800],
-    outlineStyle: "none",
-  } as any,
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 9,
-  },
-  cancelButton: {
-    minHeight: 42,
-    paddingHorizontal: 17,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.navy[200],
-  },
-  cancelButtonText: {
+  formLabel: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  requiredStar: {
+    color: colors.error,
+  },
+  formInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: colors.navy[900],
+  },
+  codeFormInput: {
+    fontFamily: "monospace",
+  },
+  formTextArea: {
+    minHeight: 72,
+  },
+  fieldHelper: {
+    fontSize: 11,
+    color: colors.navy[500],
+  },
+  iconChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  iconChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: colors.navy[50],
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+  },
+  iconChipSelected: {
+    backgroundColor: colors.royal[50],
+    borderColor: colors.royal[700],
+  },
+  iconChipText: {
+    fontSize: 12,
     color: colors.navy[700],
   },
-  createButton: {
-    minWidth: 110,
-    minHeight: 42,
+  iconChipTextSelected: {
+    color: colors.royal[700],
+    fontWeight: "600",
+  },
+  modalSwitchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  modalSwitchLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  modalSwitchSub: {
+    fontSize: 11,
+    color: colors.navy[500],
+  },
+  modalActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.navy[100],
+  },
+  modalCancelBtn: {
     paddingHorizontal: 16,
-    borderRadius: 11,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: colors.navy[100],
+  },
+  modalCancelBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.navy[700],
+  },
+  modalSubmitBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 8,
     backgroundColor: colors.royal[700],
   },
-  createButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
+  modalSubmitBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
     color: colors.textInverse,
   },
+  // Blocked Deletion Modal Styles
+  blockedCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    width: "100%",
+    maxWidth: 440,
+    alignItems: "center",
+    gap: 12,
+  },
+  blockedIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#FDF6E7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  blockedTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.navy[900],
+  },
+  blockedText: {
+    fontSize: 13,
+    color: colors.navy[700],
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  blockedActions: {
+    width: "100%",
+    gap: 8,
+    marginTop: 8,
+  },
+  blockedDeactivateBtn: {
+    backgroundColor: colors.royal[700],
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  blockedDeactivateBtnText: {
+    color: colors.textInverse,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  blockedDismissBtn: {
+    backgroundColor: colors.navy[100],
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  blockedDismissBtnText: {
+    color: colors.navy[800],
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  // Unauthorized Screen
+  unauthorizedContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+    gap: 14,
+  },
+  unauthorizedTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.navy[900],
+  },
+  unauthorizedSubtitle: {
+    fontSize: 14,
+    color: colors.navy[600],
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  backButton: {
+    marginTop: 12,
+    backgroundColor: colors.royal[700],
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: colors.textInverse,
+    fontWeight: "600",
+    fontSize: 14,
+  },
 });
-
-
-

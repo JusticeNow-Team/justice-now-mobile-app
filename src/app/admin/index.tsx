@@ -477,6 +477,39 @@ export default function AdminDashboardScreen() {
 
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Report Categories</Text>
+                <Text style={styles.sectionDescription}>
+                  Manage incident categories & case classifications (JN-378 - JN-384)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/categories" as any)}>
+                <Text style={styles.auditLink}>Manage</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Incident Classifications</Text>
+                  <Text style={styles.healthValue}>
+                    10 Categories configured with active-case protection & audit logging
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/categories" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
                 Recent administrative activity
               </Text>

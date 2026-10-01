@@ -8,10 +8,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Being held in custody, arrested, or detained without lawful authority, due process, or judicial review.",
     hint: "Being held without lawful reason or process",
-    icon: "⛓️",
+    icon: "lock",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 1,
+    activeCaseCount: 14,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_discrimination",
@@ -20,10 +23,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Unfair treatment or denial of rights based on ethnicity, religion, gender, sexual orientation, disability, or social status.",
     hint: "Unfair treatment based on who you are",
-    icon: "⚖️",
+    icon: "scale",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 2,
+    activeCaseCount: 9,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_violence_abuse",
@@ -32,10 +38,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Physical assault, excessive use of force by authorities, torture, cruel, inhuman, or degrading treatment.",
     hint: "Physical harm, threats or ill-treatment",
-    icon: "🛡️",
+    icon: "shield-alert",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 3,
+    activeCaseCount: 22,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_harassment",
@@ -44,10 +53,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Repeated stalking, digital harassment, surveillance, extortion, or threats aimed at silencing individuals.",
     hint: "Repeated unwanted behaviour or intimidation",
-    icon: "⚠️",
+    icon: "alert-triangle",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 4,
+    activeCaseCount: 11,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_freedom_expression",
@@ -56,10 +68,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Suppression of free speech, peaceful assembly, press freedom, censorship, or unlawful confiscation of reporting equipment.",
     hint: "Being stopped from speaking or assembling",
-    icon: "📢",
+    icon: "message-square",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 5,
+    activeCaseCount: 6,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_workplace_rights",
@@ -68,10 +83,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Forced labor, hazardous working conditions, withholding of wages, union busting, or child labor.",
     hint: "Unsafe, unpaid or unfair working conditions",
-    icon: "🏭",
+    icon: "document",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 6,
+    activeCaseCount: 8,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_child_rights",
@@ -80,10 +98,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Harm, exploitation, neglect, denial of education, or abuse affecting minors and children.",
     hint: "Harm or denial of rights affecting a child",
-    icon: "🧸",
+    icon: "shield",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 7,
+    activeCaseCount: 4,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_gender_based_violence",
@@ -92,10 +113,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Violence, assault, coercive control, or domestic abuse inflicted against individuals based on gender identity.",
     hint: "Harm or abuse directed against a person based on gender",
-    icon: "💜",
+    icon: "alert-circle",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 8,
+    activeCaseCount: 16,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_health_basic_services",
@@ -104,10 +128,13 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Denial of emergency medical care, clean water, essential shelter, or discriminatory access to public relief.",
     hint: "Deprivation of essential healthcare, water, or shelter",
-    icon: "🏥",
+    icon: "activity",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 9,
+    activeCaseCount: 5,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "cat_other",
@@ -116,9 +143,12 @@ export const INITIAL_REPORT_CATEGORIES: ReportCategory[] = [
     description:
       "Other incidents or rights violations not specifically listed in the predefined categories above.",
     hint: "Something not listed here",
-    icon: "📋",
+    icon: "category",
     isActive: true,
+    isSystemDefault: true,
     displayOrder: 10,
+    activeCaseCount: 19,
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
   },
 ];
