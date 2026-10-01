@@ -112,18 +112,18 @@ const ROLE_NAVIGATION: Record<NavigationRole, NavigationItem[]> = {
     {
       label: "Dashboard",
       icon: "layout-dashboard",
-      href: "/admin/dashboard",
+      href: "/admin",
       exact: true,
     },
     {
       label: "Users",
       icon: "users",
-      href: "/admin/users",
+      href: "/admin/staff",
     },
     {
       label: "Activity",
       icon: "activity",
-      href: "/admin/activity",
+      href: "/admin/audit",
     },
     {
       label: "Alerts",

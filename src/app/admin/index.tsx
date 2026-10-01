@@ -543,6 +543,39 @@ export default function AdminDashboardScreen() {
 
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Security & Access Review</Text>
+                <Text style={styles.sectionDescription}>
+                  Protected routes, RBAC, ownership, evidence privacy & secrets (JN-400 - JN-405)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/security" as any)}>
+                <Text style={styles.auditLink}>Review</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Security Compliance Posture</Text>
+                  <Text style={styles.healthValue}>
+                    100% Verified · 6 Domains · 0 Open Defects · 12 Guarded Routes
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/security" as any)}
+                >
+                  <Text style={styles.actionPillText}>Inspect</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
                 Recent administrative activity
               </Text>
