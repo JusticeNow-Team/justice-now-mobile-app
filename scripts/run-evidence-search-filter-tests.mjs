@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 // Read UI screen file and service file for static contract verification
-// Read UI screen file for static contract verification
 const indexScreen = await readFile(
   new URL("../src/app/checker/index.tsx", import.meta.url),
   "utf8",
@@ -24,7 +23,12 @@ const DEFAULT_FILTER_OPTIONS = {
 function isUserAuthorizedToFilterCheckers(role) {
   if (!role) return true;
   const normRole = String(role).toLowerCase().trim();
-  if (normRole === "system_admin" || normRole === "case_officer" || normRole === "evidence_validator" || normRole === "evidence_checker") {
+  if (
+    normRole === "system_admin" ||
+    normRole === "case_officer" ||
+    normRole === "evidence_validator" ||
+    normRole === "evidence_checker"
+  ) {
     return true;
   }
   return false;
@@ -157,11 +161,11 @@ function filterEvidenceRecords(allRecords, options = {}) {
     filtered = filtered.filter(
       (r) =>
         r.evidenceType === evidenceTypeFilter ||
-        (evidenceTypeFilter === "image" && r.fileType.startsWith("image/")) ||
-        (evidenceTypeFilter === "video" && r.fileType.startsWith("video/")) ||
-        (evidenceTypeFilter === "audio" && r.fileType.startsWith("audio/")) ||
+        (evidenceTypeFilter === "image" && r.fileType?.startsWith("image/")) ||
+        (evidenceTypeFilter === "video" && r.fileType?.startsWith("video/")) ||
+        (evidenceTypeFilter === "audio" && r.fileType?.startsWith("audio/")) ||
         (evidenceTypeFilter === "document" &&
-          (r.fileType.includes("pdf") || r.fileType.includes("octet") || r.evidenceType === "document"))
+          (r.fileType?.includes("pdf") || r.fileType?.includes("octet") || r.evidenceType === "document"))
     );
   }
 
@@ -221,7 +225,6 @@ describe("Evidence Search & Filter Static Verification (JN-231 to JN-235)", () =
     assert.match(
       indexScreen,
       /typeFilter/,
-      "UI screen must handle typeFilter"
       "UI screen must handle typeFilter",
     );
   });
@@ -304,87 +307,7 @@ describe("Evidence Search & Filter Logic Unit Tests", () => {
       validatedRes.records.every(
         (r) => r.validationStatus === "validated" || r.validationStatus === "approved"
       )
-// Behavioral test mock data
-const TEST_EVIDENCE_RECORDS = [
-  {
-    id: "EVD-2026-9041",
-    caseId: "CASE-2026-0812",
-    caseInfo: { caseReference: "JN-2026-0812", title: "Police Harassment" },
-    fileName: "bodycam_footage.mp4",
-    fileType: "video/mp4",
-    evidenceType: "video",
-    validationStatus: "pending",
-    assignedCheckerId: "usr_checker_01",
-    assignedByName: "Sarah Chen",
-    uploadDate: "2026-08-10T14:30:00Z",
-  },
-  {
-    id: "EVD-2026-9042",
-    caseId: "CASE-2026-0812",
-    caseInfo: { caseReference: "JN-2026-0812", title: "Police Harassment" },
-    fileName: "injury_photo.jpg",
-    fileType: "image/jpeg",
-    evidenceType: "image",
-    validationStatus: "validated",
-    assignedCheckerId: "usr_checker_01",
-    assignedByName: "Sarah Chen",
-    uploadDate: "2026-08-10T14:35:00Z",
-  },
-  {
-    id: "EVD-2026-9043",
-    caseId: "CASE-2026-0798",
-    caseInfo: { caseReference: "JN-2026-0798", title: "Illegal Detention" },
-    fileName: "custody_record.pdf",
-    fileType: "application/pdf",
-    evidenceType: "document",
-    validationStatus: "under_review",
-    assignedCheckerId: "usr_checker_02",
-    assignedByName: "Marcus Vance",
-    uploadDate: "2026-08-09T09:15:00Z",
-  },
-  {
-    id: "EVD-2026-9044",
-    caseId: "CASE-2026-0820",
-    caseInfo: { caseReference: "JN-2026-0820", title: "Witness Intimidation" },
-    fileName: "voicemail.m4a",
-    fileType: "audio/mp4",
-    evidenceType: "audio",
-    validationStatus: "rejected",
-    assignedCheckerId: "usr_checker_03",
-    assignedByName: "Elena Rostova",
-    uploadDate: "2026-08-11T16:45:00Z",
-  },
-];
-
-function isUserAuthorizedToFilterCheckersLogic(role) {
-  if (!role) return true;
-  const normRole = String(role).toLowerCase().trim();
-  return (
-    normRole === "system_admin" ||
-    normRole === "case_officer" ||
-    normRole === "evidence_validator" ||
-    normRole === "evidence_checker"
-  );
-}
-
-function filterEvidenceRecordsLogic(allRecords, options = {}) {
-  const {
-    searchQuery = "",
-    statusFilter = "all",
-    evidenceTypeFilter = "all",
-    assignedCheckerFilter = "all",
-    userRole = null,
-    userId = undefined,
-  } = options;
-
-  const isAuthorized = isUserAuthorizedToFilterCheckersLogic(userRole);
-
-  let candidateRecords = [...allRecords];
-  if (!isAuthorized && userId) {
-    candidateRecords = candidateRecords.filter(
-      (r) => !r.assignedCheckerId || r.assignedCheckerId === userId,
     );
-  }
 
     const rejectedRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       statusFilter: "rejected",
@@ -393,17 +316,13 @@ function filterEvidenceRecordsLogic(allRecords, options = {}) {
 
     const completedRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       statusFilter: "completed",
-  let result = candidateRecords;
-
-  if (searchQuery.trim()) {
-    const q = searchQuery.trim().toLowerCase();
-    result = result.filter((r) => {
-      const caseRef = (r.caseInfo?.caseReference || r.caseId || "").toLowerCase();
-      const id = r.id.toLowerCase();
-      const fn = r.fileName.toLowerCase();
-      return caseRef.includes(q) || id.includes(q) || fn.includes(q);
     });
-  }
+    assert.ok(
+      completedRes.records.every((r) =>
+        ["validated", "approved", "rejected", "archived"].includes(r.validationStatus)
+      )
+    );
+  });
 
   it("JN-233: Filter by file / evidence type is supported", () => {
     const imageRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
@@ -417,43 +336,12 @@ function filterEvidenceRecordsLogic(allRecords, options = {}) {
 
     const audioRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       evidenceTypeFilter: "audio",
-  if (statusFilter !== "all") {
-    if (statusFilter === "completed") {
-      result = result.filter((r) =>
-        ["validated", "approved", "rejected", "archived"].includes(r.validationStatus),
-      );
-    } else if (statusFilter === "validated") {
-      result = result.filter((r) =>
-        r.validationStatus === "validated" || r.validationStatus === "approved",
-      );
-    } else {
-      result = result.filter((r) => r.validationStatus === statusFilter);
-    }
-  }
-
-  if (evidenceTypeFilter !== "all") {
-    result = result.filter((r) => {
-      const ext = r.fileName.split(".").pop()?.toLowerCase() || "";
-      const mime = (r.fileType || "").toLowerCase();
-      if (evidenceTypeFilter === "image") {
-        return r.evidenceType === "image" || mime.startsWith("image/");
-      }
-      if (evidenceTypeFilter === "video") {
-        return r.evidenceType === "video" || mime.startsWith("video/");
-      }
-      if (evidenceTypeFilter === "audio") {
-        return r.evidenceType === "audio" || mime.startsWith("audio/");
-      }
-      if (evidenceTypeFilter === "document") {
-        return (
-          r.evidenceType === "document" ||
-          mime.includes("pdf") ||
-          ["pdf", "doc", "docx"].includes(ext)
-        );
-      }
-      return true;
     });
-  }
+    assert.ok(
+      audioRes.records.every(
+        (r) => r.evidenceType === "audio" || r.fileType.startsWith("audio/")
+      )
+    );
 
     const videoRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       evidenceTypeFilter: "video",
@@ -481,80 +369,40 @@ function filterEvidenceRecordsLogic(allRecords, options = {}) {
     const elenaRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       assignedCheckerFilter: "CHK-001-ELENA",
       userRole: "system_admin",
-  if (assignedCheckerFilter !== "all") {
-    if (assignedCheckerFilter === "unassigned") {
-      result = result.filter((r) => !r.assignedCheckerId);
-    } else if (assignedCheckerFilter === "my_assigned") {
-      if (userId) {
-        result = result.filter((r) => r.assignedCheckerId === userId);
-      }
-    } else {
-      result = result.filter((r) => r.assignedCheckerId === assignedCheckerFilter);
-    }
-  }
-
-  return {
-    records: result,
-    totalCount: allRecords.length,
-    filteredCount: result.length,
-    isAuthorizedToFilterCheckers: isAuthorized,
-  };
-}
-
-describe("Evidence Search & Filter Logic Unit Tests", () => {
-  it("JN-231: Search by case reference is supported", () => {
-    const res1 = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      searchQuery: "JN-2026-0812",
     });
-    assert.equal(res1.filteredCount, 2);
+    assert.equal(elenaRes.filteredCount, 2);
 
     const unassignedRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       assignedCheckerFilter: "unassigned",
       userRole: "case_officer",
-    const res2 = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      searchQuery: "jn-2026-0798",
     });
-    assert.equal(res2.filteredCount, 1);
-    assert.equal(res2.records[0].id, "EVD-2026-9043");
+    assert.equal(unassignedRes.filteredCount, 1);
+    assert.equal(unassignedRes.records[0].id, "EVD-2026-9044");
   });
 
-  it("JN-232: Filter by evidence status is supported", () => {
-    const pendingRes = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      statusFilter: "pending",
+  it("JN-235: Unauthorized roles only see their assigned evidence and unassigned pool when restricted", () => {
+    const reporterRes = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
+      userRole: "reporter",
+      userId: "CHK-001-ELENA",
     });
-    assert.equal(pendingRes.filteredCount, 1);
-
-    const validatedRes = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      statusFilter: "validated",
-    });
-    assert.equal(validatedRes.filteredCount, 1);
-
-    const completedRes = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      statusFilter: "completed",
-    });
-    assert.equal(completedRes.filteredCount, 2);
+    assert.equal(reporterRes.isAuthorizedToFilterCheckers, false);
+    assert.equal(reporterRes.records.length, 3);
   });
 
   it("JN-236: Filter combinations work accurately", () => {
     const combo1 = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       searchQuery: "JN-2026-0812",
       statusFilter: "pending",
-  it("JN-233: Filter by file / evidence type is supported", () => {
-    const imageRes = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      evidenceTypeFilter: "image",
     });
-    assert.equal(imageRes.filteredCount, 1);
-    assert.equal(imageRes.records[0].id, "EVD-2026-9042");
+    assert.equal(combo1.filteredCount, 1);
+    assert.equal(combo1.records[0].id, "EVD-2026-9041");
 
     const combo2 = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       searchQuery: "JN-2026-0812",
       evidenceTypeFilter: "audio",
-    const videoRes = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      evidenceTypeFilter: "video",
     });
-    assert.equal(videoRes.filteredCount, 1);
-    assert.equal(videoRes.records[0].id, "EVD-2026-9041");
-  });
+    assert.equal(combo2.filteredCount, 1);
+    assert.equal(combo2.records[0].id, "EVD-2026-9042");
 
     const combo3 = filterEvidenceRecords(INITIAL_MOCK_EVIDENCE, {
       statusFilter: "validated",
@@ -570,11 +418,13 @@ describe("Evidence Search & Filter Logic Unit Tests", () => {
       statusFilter: "validated",
     });
     assert.equal(combo4.filteredCount, 0);
-  it("JN-234 & JN-235: Filter by assigned checker with authorization", () => {
-    const checkerRes = filterEvidenceRecordsLogic(TEST_EVIDENCE_RECORDS, {
-      assignedCheckerFilter: "usr_checker_01",
-      userRole: "system_admin",
-    });
-    assert.equal(checkerRes.filteredCount, 2);
+  });
+
+  it("AC 6: Reset filters returns default empty filter options", () => {
+    const reset = resetFilters();
+    assert.equal(reset.searchQuery, "");
+    assert.equal(reset.statusFilter, "all");
+    assert.equal(reset.evidenceTypeFilter, "all");
+    assert.equal(reset.assignedCheckerFilter, "all");
   });
 });

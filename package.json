@@ -47,8 +47,7 @@
     "ios": "expo start --ios --clear",
     "web": "expo start --web --clear",
     "lint": "expo lint",
-    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-assigned-evidence-tests.mjs && node --no-warnings scripts/run-evidence-decision-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs && node --no-warnings scripts/run-checker-availability-tests.mjs && node --no-warnings scripts/run-audit-view-tests.mjs && node --no-warnings scripts/run-workflow-monitoring-tests.mjs && node --no-warnings scripts/run-status-config-tests.mjs && node --no-warnings scripts/run-evidence-search-filter-tests.mjs && node --no-warnings scripts/run-statistics-tests.mjs",
-    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-assigned-evidence-tests.mjs && node --no-warnings scripts/run-evidence-decision-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs && node --no-warnings scripts/run-checker-availability-tests.mjs && node --no-warnings scripts/run-audit-view-tests.mjs && node --no-warnings scripts/run-workflow-monitoring-tests.mjs && node --no-warnings scripts/run-evidence-search-filter-tests.mjs && node --no-warnings scripts/run-category-management-tests.mjs",
+    "test": "node --no-warnings scripts/run-auth-tests.mjs && node --no-warnings scripts/run-evidence-assignment-tests.mjs && node --no-warnings scripts/run-assigned-evidence-tests.mjs && node --no-warnings scripts/run-evidence-decision-tests.mjs && node --no-warnings scripts/run-withdrawal-review-tests.mjs && node --no-warnings scripts/run-checker-availability-tests.mjs && node --no-warnings scripts/run-audit-view-tests.mjs && node --no-warnings scripts/run-workflow-monitoring-tests.mjs && node --no-warnings scripts/run-status-config-tests.mjs && node --no-warnings scripts/run-evidence-search-filter-tests.mjs && node --no-warnings scripts/run-category-management-tests.mjs && node --no-warnings scripts/run-statistics-tests.mjs && node --no-warnings scripts/run-settings-management-tests.mjs",
     "test:auth": "node --no-warnings scripts/run-auth-tests.mjs",
     "test:evidence-assignment": "node --no-warnings scripts/run-evidence-assignment-tests.mjs",
     "test:assigned-evidence": "node --no-warnings scripts/run-assigned-evidence-tests.mjs",
@@ -58,10 +57,10 @@
     "test:audit-view": "node --no-warnings scripts/run-audit-view-tests.mjs",
     "test:workflow-monitoring": "node --no-warnings scripts/run-workflow-monitoring-tests.mjs",
     "test:status-config": "node --no-warnings scripts/run-status-config-tests.mjs",
-    "test:statistics": "node --no-warnings scripts/run-statistics-tests.mjs",
-    "test:evidence-search-filter": "node --no-warnings scripts/run-evidence-search-filter-tests.mjs"
     "test:evidence-search-filter": "node --no-warnings scripts/run-evidence-search-filter-tests.mjs",
-    "test:categories": "node --no-warnings scripts/run-category-management-tests.mjs"
+    "test:categories": "node --no-warnings scripts/run-category-management-tests.mjs",
+    "test:statistics": "node --no-warnings scripts/run-statistics-tests.mjs",
+    "test:settings": "node --no-warnings scripts/run-settings-management-tests.mjs"
   },
   "private": true
 }
