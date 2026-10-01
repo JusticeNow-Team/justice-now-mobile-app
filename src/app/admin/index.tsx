@@ -445,6 +445,39 @@ export default function AdminDashboardScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <View>
+                <Text style={styles.sectionTitle}>System Statistics Dashboard</Text>
+                <Text style={styles.sectionDescription}>
+                  Platform activity, role distribution & category metrics (JN-386 - JN-391)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/statistics" as any)}>
+                <Text style={styles.auditLink}>View</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Real-time Platform Statistics</Text>
+                  <Text style={styles.healthValue}>
+                    Users by role · Cases by status & category · Evidence verification rates
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/statistics" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
                 <Text style={styles.sectionTitle}>Workflow Statuses</Text>
                 <Text style={styles.sectionDescription}>
                   Controlled case & evidence status values (JN-273 - JN-278)

@@ -493,6 +493,14 @@ export default function EvidenceCheckerDashboard() {
                     </View>
 
                     <View style={styles.linkRow}>
+                      <AppIcon name="calendar" size={11} color={colors.navy[600]} />
+                      <Text style={styles.linkLabel}>Assignment Date:</Text>
+                      <Text style={styles.linkValue} numberOfLines={1}>
+                        {record.assignedAt ? new Date(record.assignedAt).toLocaleDateString() : "Pending Assignment"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.linkRow}>
                       <AppIcon name="clock" size={11} color={colors.navy[600]} />
                       <Text style={styles.linkLabel}>Submitted:</Text>
                       <Text style={styles.linkValue} numberOfLines={1}>

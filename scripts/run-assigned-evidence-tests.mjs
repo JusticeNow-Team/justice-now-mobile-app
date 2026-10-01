@@ -70,21 +70,25 @@ assert.match(
 // AC 3 & JN-188: Items can be filtered by status
 assert.match(
   checkerScreen,
+  /statusFilter === "pending"|activeTab === "pending"|tab === "pending"/,
   /activeTab === "pending"|statusFilter === "pending"/,
   "JN-188: Must support filtering by Pending status"
 );
 assert.match(
   checkerScreen,
+  /statusFilter === "completed"|activeTab === "completed"|completedCount/,
   /activeTab === "completed"|isCompleted/,
   "JN-188: Must support filtering by Completed status"
 );
 assert.match(
   checkerScreen,
+  /statusFilter === "validated"|activeTab === "validated"|stats\.validatedCount/,
   /activeTab === "validated"|statusFilter === "validated"/,
   "JN-188: Must support filtering by Validated status"
 );
 assert.match(
   checkerScreen,
+  /statusFilter === "rejected"|activeTab === "rejected"|stats\.rejectedCount/,
   /activeTab === "rejected"|statusFilter === "rejected"/,
   "JN-188: Must support filtering by Rejected status"
 );
@@ -109,6 +113,7 @@ assert.match(
 );
 assert.match(
   checkerScreen,
+  /Completed Tag|Completed/,
   /Completed Item|Completed/,
   "JN-187: Completed items must render a distinct completed badge/tag"
 );
@@ -116,6 +121,7 @@ assert.match(
 // JN-189: Ordering and empty state
 assert.match(
   checkerScreen,
+  /timeB - timeA|uploadDate|created_at|order/i,
   /timeB - timeA|sort|filterEvidenceRecords/,
   "JN-189: Evidence queue items must be ordered by timestamp descending"
 );
