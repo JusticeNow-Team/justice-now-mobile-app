@@ -203,7 +203,7 @@ export default function EvidenceDecisionScreen() {
         [
           {
             text: "Back to queue",
-            onPress: () => router.replace("/validator/queue"),
+            onPress: () => router.replace("/validator/queue" as Href),
           },
         ],
       );

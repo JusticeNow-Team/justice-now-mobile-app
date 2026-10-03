@@ -18,27 +18,27 @@ import {
 import {
   fetchEvidenceCheckerQueue,
   updateEvidenceValidationDecision,
-} from "../../../checker/api";
+} from "@/checker/api";
 import {
   formatBytes,
   MAX_EVIDENCE_BYTES,
   validateEvidenceMetadata,
-} from "../../../checker/metadataValidation";
-import { generateSecureSignedUrl } from "../../../checker/evidenceStorageService";
+} from "@/checker/metadataValidation";
+import { generateSecureSignedUrl } from "@/checker/evidenceStorageService";
 import {
   getPublicStatusForReporter,
   getCaseOfficerStatusView,
-} from "../../../checker/statusTransitionService";
+} from "@/checker/statusTransitionService";
 import {
   COMMON_REJECTION_REASONS,
   EvidenceRecord,
   EvidenceValidationStatus,
   MetadataValidationResult,
-} from "../../../checker/types";
-import { AppIcon } from "../../../components/AppIcon";
-import { EvidenceSafePreview } from "../../../components/EvidenceSafePreview";
-import { EvidenceStatusTimeline } from "../../../components/EvidenceStatusTimeline";
-import { colors } from "../../../theme";
+} from "@/checker/types";
+import { AppIcon } from "@/components/AppIcon";
+import { EvidenceSafePreview } from "@/components/EvidenceSafePreview";
+import { EvidenceStatusTimeline } from "@/components/EvidenceStatusTimeline";
+import { colors } from "@/theme";
 
 export default function EvidenceAuditDetailScreen() {
   const router = useRouter();

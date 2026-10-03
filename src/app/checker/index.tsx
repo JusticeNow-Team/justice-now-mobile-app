@@ -3,9 +3,11 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -14,16 +16,22 @@ import {
 } from "react-native";
 
 import { RoleGuard } from "../../auth";
+import { useAuth } from "../../auth/useAuth";
 import { fetchEvidenceCheckerQueue } from "../../checker/api";
+import {
+  EvidenceStatusFilter,
+  EvidenceTypeFilter,
+  filterEvidenceRecords,
+  isUserAuthorizedToFilterCheckers,
+} from "../../checker/evidenceFilterService";
 import { formatBytes, validateEvidenceMetadata } from "../../checker/metadataValidation";
 import {
-  CheckerFilterTab,
   CheckerSummaryStats,
   EvidenceRecord,
   EvidenceValidationStatus,
 } from "../../checker/types";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
-import { supabase } from "../../lib/supabase";
+import { INITIAL_MOCK_CHECKERS } from "../../staff/checkerAvailabilityService";
 import { colors, iconSizes } from "../../theme";
 import { shadows } from "../../theme/shadows";
 
@@ -41,44 +49,30 @@ function getPreviewBadge(kind: ReturnType<typeof validateEvidenceMetadata>["prev
 
 export default function EvidenceCheckerDashboard() {
   const router = useRouter();
+  const auth = useAuth();
 
   const [records, setRecords] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Filter & Search state (JN-231 to JN-235)
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<CheckerFilterTab>("pending");
-  const [, setIsAuthorized] = useState<boolean | null>(null);
+  const [statusFilter, setStatusFilter] = useState<EvidenceStatusFilter>("pending");
+  const [typeFilter, setTypeFilter] = useState<EvidenceTypeFilter>("all");
+  const [checkerFilter, setCheckerFilter] = useState<string>("all");
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session?.user) {
-        setIsAuthorized(true);
-        return true;
-      }
+  const userRole = auth.role || "evidence_checker";
+  const userId = auth.user?.id || "CHK-001-ELENA";
+  const userName = auth.user?.full_name || "Elena Rostova";
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", sessionData.session.user.id)
-        .single();
-
-      if (profile && profile.role !== "evidence_validator" && profile.role !== "system_admin") {
-        setIsAuthorized(false);
-        return false;
-      }
-
-      setIsAuthorized(true);
-      return true;
-    } catch {
-      setIsAuthorized(true);
-      return true;
-    }
-  }, []);
+  const isAuthorizedForCheckers = useMemo(
+    () => isUserAuthorizedToFilterCheckers(userRole),
+    [userRole]
+  );
 
   const loadData = useCallback(async () => {
     try {
-      await checkAuth();
       const data = await fetchEvidenceCheckerQueue();
       setRecords(data);
     } catch (err) {
@@ -87,12 +81,12 @@ export default function EvidenceCheckerDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [checkAuth]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       void loadData();
-    }, [loadData]),
+    }, [loadData])
   );
 
   const onRefresh = () => {
@@ -106,9 +100,10 @@ export default function EvidenceCheckerDashboard() {
         record,
         validation: validateEvidenceMetadata(record),
       })),
-    [records],
+    [records]
   );
 
+  // Calculate summary stats across overall queue
   const stats: CheckerSummaryStats = useMemo(() => {
     let pendingCount = 0;
     let underReviewCount = 0;
@@ -141,89 +136,110 @@ export default function EvidenceCheckerDashboard() {
     };
   }, [records, validatedRecords]);
 
-  const filteredList = useMemo(() => {
-    const list = validatedRecords.filter(({ record, validation }) => {
-      if (activeTab === "pending" && record.validationStatus !== "pending") return false;
-      if (activeTab === "under_review" && record.validationStatus !== "under_review") return false;
-      if (
-        activeTab === "completed" &&
-        record.validationStatus !== "validated" &&
-        record.validationStatus !== "approved" &&
-        record.validationStatus !== "rejected"
-      )
-        return false;
-      if (activeTab === "validated" && record.validationStatus !== "validated" && record.validationStatus !== "approved")
-        return false;
-      if (activeTab === "rejected" && record.validationStatus !== "rejected") return false;
-      if (activeTab === "archived" && record.validationStatus !== "archived") return false;
-      if (activeTab === "invalid_metadata" && validation.isValid) return false;
-      if (activeTab === "storage_insecure" && validation.isStorageSecure) return false;
-
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-
-      return (
-        record.id.toLowerCase().includes(q) ||
-        (record.caseInfo?.caseReference || record.caseId).toLowerCase().includes(q) ||
-        (record.reporterInfo?.fullName || record.reporterId).toLowerCase().includes(q) ||
-        record.fileName.toLowerCase().includes(q)
-      );
+  // Apply multi-criteria search and filter engine (JN-231 to JN-235)
+  const filterResult = useMemo(() => {
+    return filterEvidenceRecords(records, {
+      searchQuery,
+      statusFilter,
+      evidenceTypeFilter: typeFilter,
+      assignedCheckerFilter: checkerFilter,
+      userRole,
+      userId,
+      userName,
     });
+  }, [records, searchQuery, statusFilter, typeFilter, checkerFilter, userRole, userId, userName]);
 
-    return list.sort((a, b) => {
-      const timeA = new Date(a.record.assignedAt || a.record.uploadDate).getTime();
-      const timeB = new Date(b.record.assignedAt || b.record.uploadDate).getTime();
-      return timeB - timeA;
-    });
-  }, [validatedRecords, activeTab, searchQuery]);
+  const filteredRecords = filterResult.records;
+
+  // Clear all filters action (AC 6)
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setTypeFilter("all");
+    setCheckerFilter("all");
+  };
 
   const completedCount = stats.validatedCount + stats.rejectedCount;
 
   return (
-    <RoleGuard allowedRoles={["evidence_validator"]}>
+    <RoleGuard allowedRoles={["evidence_validator", "evidence_checker", "system_admin", "case_officer"]}>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
 
+        {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.headerInner}>
             <View style={styles.headerTop}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <View style={styles.badgeRow}>
                   <View style={styles.roleBadge}>
-                    <Text style={styles.roleBadgeText}>Role: Evidence Validator</Text>
+                    <Text style={styles.roleBadgeText}>Role: Evidence Checker</Text>
                   </View>
                   <Text style={styles.sdgTag}>SDG 16 · Peace & Justice</Text>
                 </View>
 
-                <Text style={styles.headerTitle}>Evidence Metadata Audit</Text>
+                <Text style={styles.headerTitle}>Evidence Verification Queue</Text>
                 <Text style={styles.headerSubtitle}>
-                  Verification & safe evidence preview before legal case submission
+                  Search & filter evidence records by case reference, status, type & checker
                 </Text>
               </View>
 
               <Pressable
                 style={styles.simulatorButton}
                 onPress={() => router.push("/checker/simulator")}
+                accessibilityRole="button"
+                accessibilityLabel="Test criteria simulator"
               >
                 <AppIcon name="test-tube" size={14} color={colors.surface} />
                 <Text style={styles.simulatorButtonText}>Test Criteria</Text>
               </Pressable>
             </View>
 
-            <View style={styles.searchContainer}>
-              <AppIcon name="search" size={14} color={colors.navy[300]} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search evidence ID, file name, or case reference..."
-                placeholderTextColor={colors.navy[300]}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                clearButtonMode="while-editing"
-              />
+            {/* Search Input Bar (JN-231) */}
+            <View style={styles.searchRowContainer}>
+              <View style={styles.searchContainer}>
+                <AppIcon name="search" size={15} color={colors.navy[300]} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search case reference (e.g. JN-2026-0812), evidence ID, or file..."
+                  placeholderTextColor={colors.navy[300]}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  clearButtonMode="while-editing"
+                  accessibilityLabel="Search evidence by case reference or ID"
+                />
+                {searchQuery.length > 0 ? (
+                  <Pressable onPress={() => setSearchQuery("")} style={styles.clearSearchBtn}>
+                    <AppIcon name="x" size={14} color={colors.navy[300]} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <Pressable
+                style={[
+                  styles.filterToggleBtn,
+                  filterResult.hasActiveFilters && styles.filterToggleBtnActive,
+                ]}
+                onPress={() => setFilterModalVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Open filter settings"
+              >
+                <AppIcon
+                  name="filter"
+                  size={16}
+                  color={filterResult.hasActiveFilters ? colors.surface : colors.navy[200]}
+                />
+                {filterResult.activeFilterCount > 0 ? (
+                  <View style={styles.filterBadgeCount}>
+                    <Text style={styles.filterBadgeCountText}>{filterResult.activeFilterCount}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
             </View>
           </View>
         </View>
 
+        {/* Stats Summary Bar */}
         <View style={styles.statsBar}>
           <View style={styles.statsBarInner}>
             <View style={styles.statCard}>
@@ -248,43 +264,125 @@ export default function EvidenceCheckerDashboard() {
           </View>
         </View>
 
+        {/* Horizontal Status Filter Scroll Bar (JN-232) */}
         <View style={styles.tabsRow}>
-          <View style={styles.tabsRowInner}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabsRowInner}
+          >
             <TabButton
-              label={`Pending Queue (${stats.pendingCount})`}
-              active={activeTab === "pending"}
-              onPress={() => setActiveTab("pending")}
+              label={`Pending (${stats.pendingCount})`}
+              active={statusFilter === "pending"}
+              onPress={() => setStatusFilter("pending")}
+            />
+            <TabButton
+              label={`Under Review (${stats.underReviewCount})`}
+              active={statusFilter === "under_review"}
+              onPress={() => setStatusFilter("under_review")}
             />
             <TabButton
               label={`Completed (${completedCount})`}
-              active={activeTab === "completed"}
-              onPress={() => setActiveTab("completed")}
+              active={statusFilter === "completed"}
+              onPress={() => setStatusFilter("completed")}
             />
             <TabButton
-              label={`All (${stats.totalCount})`}
-              active={activeTab === "all"}
-              onPress={() => setActiveTab("all")}
+              label={`All Statuses (${stats.totalCount})`}
+              active={statusFilter === "all"}
+              onPress={() => setStatusFilter("all")}
             />
             <TabButton
               label={`Validated (${stats.validatedCount})`}
-              active={activeTab === "validated"}
-              onPress={() => setActiveTab("validated")}
+              active={statusFilter === "validated"}
+              onPress={() => setStatusFilter("validated")}
             />
             <TabButton
-              label={`Insecure (${stats.storageInsecureCount})`}
-              active={activeTab === "storage_insecure"}
-              onPress={() => setActiveTab("storage_insecure")}
-              isErrorTab
+              label={`Rejected (${stats.rejectedCount})`}
+              active={statusFilter === "rejected"}
+              onPress={() => setStatusFilter("rejected")}
             />
             <TabButton
-              label={`Errors (${stats.invalidMetadataCount})`}
-              active={activeTab === "invalid_metadata"}
-              onPress={() => setActiveTab("invalid_metadata")}
-              isErrorTab
+              label={`Info Requested`}
+              active={statusFilter === "info_requested"}
+              onPress={() => setStatusFilter("info_requested")}
             />
-          </View>
+          </ScrollView>
         </View>
 
+        {/* Active Filter Chips & Clear Action Banner (AC 6) */}
+        {filterResult.hasActiveFilters ? (
+          <View style={styles.activeFilterBanner}>
+            <View style={styles.activeFilterChipsContainer}>
+              {searchQuery.trim().length > 0 ? (
+                <View style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>Case/Query: &quot;{searchQuery}&quot;</Text>
+                  <Pressable onPress={() => setSearchQuery("")} hitSlop={6}>
+                    <AppIcon name="x" size={12} color={colors.royal[700]} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {typeFilter !== "all" ? (
+                <View style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>Type: {typeFilter.toUpperCase()}</Text>
+                  <Pressable onPress={() => setTypeFilter("all")} hitSlop={6}>
+                    <AppIcon name="x" size={12} color={colors.royal[700]} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {checkerFilter !== "all" ? (
+                <View style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>
+                    Checker: {checkerFilter === "unassigned" ? "Unassigned" : checkerFilter === "my_assigned" ? "Assigned to Me" : checkerFilter}
+                  </Text>
+                  <Pressable onPress={() => setCheckerFilter("all")} hitSlop={6}>
+                    <AppIcon name="x" size={12} color={colors.royal[700]} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {statusFilter !== "all" && statusFilter !== "pending" ? (
+                <View style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>Status: {statusFilter.replace("_", " ")}</Text>
+                  <Pressable onPress={() => setStatusFilter("all")} hitSlop={6}>
+                    <AppIcon name="x" size={12} color={colors.royal[700]} />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+
+            <Pressable
+              style={styles.clearAllBtn}
+              onPress={handleClearFilters}
+              accessibilityRole="button"
+              accessibilityLabel="Clear all filters"
+            >
+              <AppIcon name="refresh-cw" size={12} color="#DC2626" />
+              <Text style={styles.clearAllBtnText}>Clear Filters</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Results Counter Sub-header */}
+        <View style={styles.resultsCountBar}>
+          <Text style={styles.resultsCountText}>
+            Showing <Text style={{ fontWeight: "800", color: colors.navy[900] }}>{filteredRecords.length}</Text> of {records.length} evidence records
+          </Text>
+          {!isAuthorizedForCheckers ? (
+            <View style={styles.restrictedAuthTag}>
+              <AppIcon name="lock" size={10} color={colors.navy[600]} />
+              <Text style={styles.restrictedAuthText}>Restricted View</Text>
+            </View>
+          ) : (
+            <View style={styles.authorizedAuthTag}>
+              <AppIcon name="shield-check" size={10} color={colors.teal[700]} />
+              <Text style={styles.authorizedAuthText}>Authorized Filter</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Main List */}
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.royal[700]} />
@@ -292,26 +390,28 @@ export default function EvidenceCheckerDashboard() {
           </View>
         ) : (
           <FlatList
-            data={filteredList}
-            keyExtractor={(item) => item.record.id}
+            data={filteredRecords}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <AppIcon name="list-checks" size={40} color={colors.navy[300]} />
+                <AppIcon name="search" size={40} color={colors.navy[300]} />
                 <Text style={styles.emptyTitle}>No evidence records found</Text>
-                <Text style={styles.emptySub}>Try adjusting your search criteria or status filter.</Text>
+                <Text style={styles.emptySub}>
+                  No items match your active case search or filter criteria.
+                </Text>
+                {filterResult.hasActiveFilters ? (
+                  <Pressable style={styles.emptyClearBtn} onPress={handleClearFilters}>
+                    <Text style={styles.emptyClearBtnText}>Reset All Filters</Text>
+                  </Pressable>
+                ) : null}
               </View>
             }
-            renderItem={({ item }) => {
-              const { record, validation } = item;
+            renderItem={({ item: record }) => {
+              const validation = validateEvidenceMetadata(record);
               const ext = record.fileName.split(".").pop()?.toUpperCase() || "FILE";
               const formattedUploadDate = new Date(record.uploadDate).toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              });
-              const assignedDateSource = record.assignedAt || record.uploadDate;
-              const formattedAssignedDate = new Date(assignedDateSource).toLocaleString(undefined, {
                 dateStyle: "medium",
                 timeStyle: "short",
               });
@@ -333,7 +433,7 @@ export default function EvidenceCheckerDashboard() {
                     })
                   }
                   accessibilityRole="button"
-                  accessibilityLabel={`Review evidence ${record.id}`}
+                  accessibilityLabel={`Review evidence ${record.id} case ${record.caseInfo?.caseReference}`}
                 >
                   <View style={styles.cardHeader}>
                     <View style={styles.idContainer}>
@@ -344,7 +444,7 @@ export default function EvidenceCheckerDashboard() {
                       {isCompleted ? (
                         <View style={styles.completedTagBadge}>
                           <AppIcon name="check" size={10} color="#065F46" />
-                          <Text style={styles.completedTagText}>Completed Item</Text>
+                          <Text style={styles.completedTagText}>Completed</Text>
                         </View>
                       ) : null}
                       <StatusBadge status={record.validationStatus} />
@@ -385,18 +485,18 @@ export default function EvidenceCheckerDashboard() {
                     </View>
 
                     <View style={styles.linkRow}>
-                      <AppIcon name="calendar" size={11} color={colors.navy[600]} />
-                      <Text style={styles.linkLabel}>Assignment Date:</Text>
+                      <AppIcon name="user" size={11} color={colors.navy[600]} />
+                      <Text style={styles.linkLabel}>Assigned Checker:</Text>
                       <Text style={styles.linkValue} numberOfLines={1}>
-                        {formattedAssignedDate}
+                        {record.assignedByName || record.assignedCheckerId || "Unassigned Queue"}
                       </Text>
                     </View>
 
                     <View style={styles.linkRow}>
-                      <AppIcon name="user" size={11} color={colors.navy[600]} />
-                      <Text style={styles.linkLabel}>Reporter:</Text>
+                      <AppIcon name="calendar" size={11} color={colors.navy[600]} />
+                      <Text style={styles.linkLabel}>Assignment Date:</Text>
                       <Text style={styles.linkValue} numberOfLines={1}>
-                        {record.reporterInfo?.fullName || record.reporterId || "UNLINKED"}
+                        {record.assignedAt ? new Date(record.assignedAt).toLocaleDateString() : "Pending Assignment"}
                       </Text>
                     </View>
 
@@ -411,11 +511,7 @@ export default function EvidenceCheckerDashboard() {
 
                   {isMissingFile ? (
                     <View style={styles.missingFileWarning}>
-                      <AppIcon
-                        name="warning"
-                        size={iconSizes.xs}
-                        color={colors.errorStrong}
-                      />
+                      <AppIcon name="warning" size={iconSizes.xs} color={colors.errorStrong} />
                       <Text style={styles.missingFileText}>
                         Storage Object Missing / Deleted (HTTP 404 Error Handled)
                       </Text>
@@ -450,6 +546,205 @@ export default function EvidenceCheckerDashboard() {
             }}
           />
         )}
+
+        {/* Filter Modal Dialog (JN-232, JN-233, JN-234, JN-235) */}
+        <Modal
+          visible={filterModalVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <AppIcon name="filter" size={18} color={colors.navy[900]} />
+                  <Text style={styles.modalTitle}>Filter Evidence Records</Text>
+                </View>
+
+                <Pressable onPress={() => setFilterModalVisible(false)} hitSlop={10}>
+                  <AppIcon name="x" size={20} color={colors.navy[600]} />
+                </Pressable>
+              </View>
+
+              <ScrollView style={styles.modalBody}>
+                {/* 1. Evidence Status Filter (JN-232) */}
+                <Text style={styles.filterSectionTitle}>1. Evidence Status</Text>
+                <View style={styles.filterChipGroup}>
+                  {[
+                    { key: "all", label: "All Statuses" },
+                    { key: "pending", label: "Pending Queue" },
+                    { key: "under_review", label: "Under Review" },
+                    { key: "validated", label: "Validated" },
+                    { key: "rejected", label: "Rejected" },
+                    { key: "info_requested", label: "Info Requested" },
+                    { key: "completed", label: "Completed Items" },
+                  ].map((item) => (
+                    <Pressable
+                      key={item.key}
+                      style={[
+                        styles.modalChip,
+                        statusFilter === item.key && styles.modalChipSelected,
+                      ]}
+                      onPress={() => setStatusFilter(item.key as EvidenceStatusFilter)}
+                    >
+                      <Text
+                        style={[
+                          styles.modalChipText,
+                          statusFilter === item.key && styles.modalChipTextSelected,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* 2. Evidence Type Filter (JN-233) */}
+                <Text style={styles.filterSectionTitle}>2. Evidence File Type</Text>
+                <View style={styles.filterChipGroup}>
+                  {[
+                    { key: "all", label: "All Types", icon: "file-text" },
+                    { key: "image", label: "Photos / Images", icon: "image" },
+                    { key: "video", label: "Video Feeds", icon: "video" },
+                    { key: "audio", label: "Audio Recordings", icon: "mic" },
+                    { key: "document", label: "PDF & Documents", icon: "file-text" },
+                  ].map((item) => (
+                    <Pressable
+                      key={item.key}
+                      style={[
+                        styles.modalChip,
+                        typeFilter === item.key && styles.modalChipSelected,
+                      ]}
+                      onPress={() => setTypeFilter(item.key as EvidenceTypeFilter)}
+                    >
+                      <AppIcon
+                        name={item.icon as AppIconName}
+                        size={12}
+                        color={typeFilter === item.key ? colors.surface : colors.navy[700]}
+                      />
+                      <Text
+                        style={[
+                          styles.modalChipText,
+                          typeFilter === item.key && styles.modalChipTextSelected,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* 3. Assigned Checker Filter (JN-234 - Where Authorized) */}
+                <Text style={styles.filterSectionTitle}>
+                  3. Assigned Checker {isAuthorizedForCheckers ? "(Authorized)" : "(Restricted)"}
+                </Text>
+                {!isAuthorizedForCheckers ? (
+                  <View style={styles.authWarningBox}>
+                    <AppIcon name="lock" size={14} color={colors.navy[700]} />
+                    <Text style={styles.authWarningText}>
+                      Your account role restricts view to your assigned queue items. Administrative permissions required to view all squad members.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.filterChipGroup}>
+                    <Pressable
+                      style={[
+                        styles.modalChip,
+                        checkerFilter === "all" && styles.modalChipSelected,
+                      ]}
+                      onPress={() => setCheckerFilter("all")}
+                    >
+                      <Text
+                        style={[
+                          styles.modalChipText,
+                          checkerFilter === "all" && styles.modalChipTextSelected,
+                        ]}
+                      >
+                        All Checkers
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={[
+                        styles.modalChip,
+                        checkerFilter === "unassigned" && styles.modalChipSelected,
+                      ]}
+                      onPress={() => setCheckerFilter("unassigned")}
+                    >
+                      <Text
+                        style={[
+                          styles.modalChipText,
+                          checkerFilter === "unassigned" && styles.modalChipTextSelected,
+                        ]}
+                      >
+                        Unassigned Queue
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={[
+                        styles.modalChip,
+                        checkerFilter === "my_assigned" && styles.modalChipSelected,
+                      ]}
+                      onPress={() => setCheckerFilter("my_assigned")}
+                    >
+                      <Text
+                        style={[
+                          styles.modalChipText,
+                          checkerFilter === "my_assigned" && styles.modalChipTextSelected,
+                        ]}
+                      >
+                        Assigned to Me ({userName})
+                      </Text>
+                    </Pressable>
+
+                    {INITIAL_MOCK_CHECKERS.map((checker) => (
+                      <Pressable
+                        key={checker.id}
+                        style={[
+                          styles.modalChip,
+                          (checkerFilter === checker.id || checkerFilter === checker.fullName) &&
+                            styles.modalChipSelected,
+                        ]}
+                        onPress={() => setCheckerFilter(checker.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.modalChipText,
+                            (checkerFilter === checker.id || checkerFilter === checker.fullName) &&
+                              styles.modalChipTextSelected,
+                          ]}
+                        >
+                          {checker.fullName}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <Pressable
+                  style={styles.modalResetBtn}
+                  onPress={() => {
+                    handleClearFilters();
+                    setFilterModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalResetBtnText}>Reset All</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.modalApplyBtn}
+                  onPress={() => setFilterModalVisible(false)}
+                >
+                  <Text style={styles.modalApplyBtnText}>Apply Filters ({filteredRecords.length})</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </RoleGuard>
   );
@@ -459,31 +754,17 @@ function TabButton({
   label,
   active,
   onPress,
-  isErrorTab,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
-  isErrorTab?: boolean;
 }) {
   return (
     <Pressable
-      style={[
-        styles.tabButton,
-        active && styles.tabButtonActive,
-        active && isErrorTab && styles.tabButtonErrorActive,
-      ]}
+      style={[styles.tabButton, active && styles.tabButtonActive]}
       onPress={onPress}
     >
-      <Text
-        style={[
-          styles.tabText,
-          active && styles.tabTextActive,
-          active && isErrorTab && styles.tabTextErrorActive,
-        ]}
-      >
-        {label}
-      </Text>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
     </Pressable>
   );
 }
@@ -491,13 +772,13 @@ function TabButton({
 function StatusBadge({ status }: { status: EvidenceValidationStatus }) {
   let bg = "#FEF3C7";
   let fg = "#92400E";
-  let label = "Pending (#8)";
+  let label = "Pending";
 
   if (status === "under_review") {
     bg = "#E0F2FE";
     fg = "#0369A1";
     label = "Under Review";
-  } else if (status === "validated") {
+  } else if (status === "validated" || status === "approved") {
     bg = "#D1FAE5";
     fg = "#065F46";
     label = "Validated";
@@ -535,28 +816,46 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.navy[200], fontSize: 11.5, marginTop: 2 },
   simulatorButton: { backgroundColor: colors.royal[600], paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 6 },
   simulatorButtonText: { color: colors.surface, fontSize: 11.5, fontWeight: "700" },
-  searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.navy[800], borderRadius: 10, paddingHorizontal: 12, marginTop: 14, minHeight: 40, gap: 8 },
+  searchRowContainer: { flexDirection: "row", alignItems: "center", marginTop: 14, gap: 10 },
+  searchContainer: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: colors.navy[800], borderRadius: 10, paddingHorizontal: 12, minHeight: 42, gap: 8 },
   searchInput: { flex: 1, color: colors.surface, fontSize: 13 },
+  clearSearchBtn: { padding: 4 },
+  filterToggleBtn: { width: 42, height: 42, borderRadius: 10, backgroundColor: colors.navy[800], alignItems: "center", justifyContent: "center", position: "relative" },
+  filterToggleBtnActive: { backgroundColor: colors.royal[700] },
+  filterBadgeCount: { position: "absolute", top: -4, right: -4, backgroundColor: "#DC2626", borderRadius: 10, width: 18, height: 18, alignItems: "center", justifyContent: "center" },
+  filterBadgeCountText: { color: colors.surface, fontSize: 10, fontWeight: "800" },
   statsBar: { flexDirection: "row", backgroundColor: colors.surface, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
   statsBarInner: { flexDirection: "row", maxWidth: 640, width: "100%", alignSelf: "center" },
   statCard: { flex: 1, alignItems: "center" },
   statValue: { fontSize: 17, fontWeight: "800", color: colors.navy[800] },
   statLabel: { fontSize: 10.5, color: colors.textSecondary, marginTop: 2, textAlign: "center" },
   statDivider: { width: 1, backgroundColor: colors.border, height: "100%" },
-  tabsRow: { backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabsRowInner: { flexDirection: "row", maxWidth: 640, width: "100%", alignSelf: "center" },
-  tabButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: colors.navy[50] },
+  tabsRow: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabsRowInner: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
+  tabButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.navy[50] },
   tabButtonActive: { backgroundColor: colors.royal[700] },
-  tabButtonErrorActive: { backgroundColor: colors.error },
   tabText: { fontSize: 11.5, fontWeight: "600", color: colors.navy[700] },
   tabTextActive: { color: colors.surface },
-  tabTextErrorActive: { color: colors.surface },
+  activeFilterBanner: { backgroundColor: colors.royal[50], borderBottomWidth: 1, borderBottomColor: colors.royal[100], paddingHorizontal: 14, paddingVertical: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  activeFilterChipsContainer: { flexDirection: "row", flexWrap: "wrap", gap: 6, flex: 1, marginRight: 8 },
+  filterChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.royal[200], paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  filterChipText: { fontSize: 11, fontWeight: "700", color: colors.royal[900] },
+  clearAllBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#FEE2E2" },
+  clearAllBtnText: { fontSize: 11, fontWeight: "700", color: "#DC2626" },
+  resultsCountBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.background, maxWidth: 640, width: "100%", alignSelf: "center" },
+  resultsCountText: { fontSize: 12, color: colors.textSecondary },
+  restrictedAuthTag: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F3F4F6", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  restrictedAuthText: { fontSize: 10, fontWeight: "700", color: colors.navy[600] },
+  authorizedAuthTag: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#E6F4F1", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  authorizedAuthText: { fontSize: 10, fontWeight: "700", color: colors.teal[700] },
   listContent: { padding: 14, paddingBottom: 32, maxWidth: 640, width: "100%", alignSelf: "center" },
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
   loadingText: { marginTop: 12, fontSize: 13, color: colors.textSecondary },
   emptyContainer: { alignItems: "center", justifyContent: "center", padding: 40 },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: colors.navy[800], marginTop: 12 },
   emptySub: { fontSize: 12.5, color: colors.textSecondary, textAlign: "center", marginTop: 4 },
+  emptyClearBtn: { marginTop: 14, backgroundColor: colors.royal[700], paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  emptyClearBtnText: { color: colors.surface, fontSize: 12, fontWeight: "700" },
   evidenceCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, boxShadow: shadows.elevated, elevation: 1 },
   completedEvidenceCard: { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
@@ -591,4 +890,22 @@ const styles = StyleSheet.create({
   invalidBannerText: { color: "#B91C1C" },
   missingFileWarning: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FCA5A5", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginBottom: 10, gap: 6 },
   missingFileText: { fontSize: 11, fontWeight: "700", color: "#991B1B", flex: 1 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "flex-end" },
+  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", paddingBottom: 24 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalTitle: { fontSize: 16, fontWeight: "800", color: colors.navy[900] },
+  modalBody: { padding: 18 },
+  filterSectionTitle: { fontSize: 13, fontWeight: "800", color: colors.navy[900], marginTop: 10, marginBottom: 8 },
+  filterChipGroup: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  modalChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.navy[50], borderWidth: 1, borderColor: colors.navy[100] },
+  modalChipSelected: { backgroundColor: colors.royal[700], borderColor: colors.royal[800] },
+  modalChipText: { fontSize: 12, fontWeight: "600", color: colors.navy[700] },
+  modalChipTextSelected: { color: colors.surface, fontWeight: "700" },
+  authWarningBox: { flexDirection: "row", gap: 8, alignItems: "center", backgroundColor: "#F3F4F6", padding: 10, borderRadius: 8, marginBottom: 12 },
+  authWarningText: { fontSize: 11.5, color: colors.navy[700], flex: 1 },
+  modalFooter: { flexDirection: "row", paddingHorizontal: 18, paddingTop: 12, gap: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  modalResetBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.navy[100], alignItems: "center" },
+  modalResetBtnText: { color: colors.navy[800], fontSize: 13, fontWeight: "700" },
+  modalApplyBtn: { flex: 2, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.royal[700], alignItems: "center" },
+  modalApplyBtnText: { color: colors.surface, fontSize: 13, fontWeight: "800" },
 });

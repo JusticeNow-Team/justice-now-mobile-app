@@ -180,6 +180,136 @@ function getCategoryColor(category?: AuditCategory): { bg: string; text: string;
   }
 }
 
+function formatDetailKey(key: string): string {
+  const keyMap: Record<string, string> = {
+    code: "Status / Code",
+    reason: "Action / Change Reason",
+    statusId: "Workflow Status ID",
+    newActive: "New Active State",
+    previousActive: "Previous Active State",
+    previousStatus: "Previous Status",
+    newStatus: "New Status",
+    entityType: "Target Entity",
+    department: "Department / Unit",
+    role: "Assigned Role",
+    target_role: "Target Role",
+    ipAddress: "Origin IP Address",
+    sessionTimeoutMinutes: "Session Timeout (Min)",
+    failedLoginThreshold: "Failed Login Threshold",
+    mfaRequired: "MFA Enforcement",
+    passwordExpiryDays: "Password Expiry (Days)",
+    auditRetentionDays: "Audit Retention (Days)",
+    maintenanceMode: "Maintenance Mode",
+    allowedEmailDomains: "Allowed Email Domains",
+    evidenceBlockDirectDownload: "Block Direct Downloads",
+    categoryId: "Category ID",
+    name: "Category Name",
+    slug: "URL Identifier / Slug",
+    color: "Display Color",
+    icon: "Icon Identifier",
+    priority: "Priority Level",
+    is_active: "Active Status",
+    isActive: "Active Status",
+    userId: "User Account ID",
+    staffId: "Staff Member ID",
+    caseId: "Case Report ID",
+    evidenceId: "Evidence File ID",
+    email: "Email Address",
+    password: "Password",
+    token: "Authentication Token",
+    apiKey: "API Key",
+    secret: "Secret Key",
+    previous: "Previous State",
+    updated: "Updated State",
+    diff: "Applied Changes",
+  };
+
+  if (keyMap[key]) return keyMap[key];
+
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function renderDetailValue(key: string, value: any) {
+  if (value === null || value === undefined) {
+    return <Text style={styles.formattedValNull}>Not specified</Text>;
+  }
+
+  if (typeof value === "boolean") {
+    return (
+      <View style={[styles.statusPill, value ? styles.statusPillActive : styles.statusPillInactive]}>
+        <AppIcon name={value ? "check" : "x"} size={10} color={value ? "#15803D" : "#B91C1C"} />
+        <Text style={[styles.statusPillText, value ? styles.statusPillTextActive : styles.statusPillTextInactive]}>
+          {value ? "Active (True)" : "Inactive (False)"}
+        </Text>
+      </View>
+    );
+  }
+
+  if (typeof value === "string" && (value === "[REDACTED]" || value.includes("[REDACTED]"))) {
+    return (
+      <View style={styles.redactedBadge}>
+        <AppIcon name="lock" size={10} color={colors.error} />
+        <Text style={styles.redactedBadgeText}>Redacted for Security</Text>
+      </View>
+    );
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <Text style={styles.formattedValNull}>Empty list</Text>;
+    }
+    return (
+      <View style={styles.chipWrapRow}>
+        {value.map((item, idx) => (
+          <View key={idx} style={styles.itemChip}>
+            <Text style={styles.itemChipText}>{String(item)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  if (typeof value === "object") {
+    return (
+      <View style={styles.nestedObjectBox}>
+        {Object.entries(value).map(([nestedKey, nestedVal]) => (
+          <View key={nestedKey} style={styles.nestedRow}>
+            <Text style={styles.nestedKey}>{formatDetailKey(nestedKey)}:</Text>
+            <View style={{ flexShrink: 1 }}>{renderDetailValue(nestedKey, nestedVal)}</View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  // Identifiers, codes, status keys
+  const strVal = String(value);
+  const isIdentifier =
+    key.toLowerCase().includes("id") ||
+    key.toLowerCase().includes("code") ||
+    key === "entityType" ||
+    strVal.startsWith("stat_") ||
+    strVal.startsWith("usr_") ||
+    strVal.startsWith("cat_") ||
+    strVal.startsWith("case_");
+
+  if (isIdentifier) {
+    return (
+      <View style={styles.idChip}>
+        <Text style={styles.idChipText}>{strVal}</Text>
+      </View>
+    );
+  }
+
+  return <Text style={styles.formattedVal}>{strVal}</Text>;
+}
+
 export default function AuditLogsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -209,6 +339,7 @@ export default function AuditLogsScreen() {
 
   // Inspection modal state (AC 2 & AC 5)
   const [inspectedEvent, setInspectedEvent] = useState<AuditEvent | null>(null);
+  const [detailsViewMode, setDetailsViewMode] = useState<"formatted" | "json">("formatted");
 
   const loadAuditLogs = useCallback(async () => {
     if (!isAuthorized) {
@@ -777,11 +908,99 @@ export default function AuditLogsScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.jsonContainer}>
-                      <Text style={styles.jsonText}>
-                        {JSON.stringify(inspectedEvent.details, null, 2)}
-                      </Text>
+                    {/* View Switcher: Formatted Cards vs Technical JSON */}
+                    <View style={styles.viewModeToggleRow}>
+                      <Pressable
+                        style={[
+                          styles.viewModeTab,
+                          detailsViewMode === "formatted" && styles.viewModeTabActive,
+                        ]}
+                        onPress={() => setDetailsViewMode("formatted")}
+                      >
+                        <AppIcon
+                          name="clipboard-check"
+                          size={12}
+                          color={detailsViewMode === "formatted" ? colors.royal[700] : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.viewModeTabText,
+                            detailsViewMode === "formatted" && styles.viewModeTabTextActive,
+                          ]}
+                        >
+                          Formatted Details
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[
+                          styles.viewModeTab,
+                          detailsViewMode === "json" && styles.viewModeTabActive,
+                        ]}
+                        onPress={() => setDetailsViewMode("json")}
+                      >
+                        <AppIcon
+                          name="settings"
+                          size={12}
+                          color={detailsViewMode === "json" ? colors.royal[700] : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.viewModeTabText,
+                            detailsViewMode === "json" && styles.viewModeTabTextActive,
+                          ]}
+                        >
+                          Technical JSON
+                        </Text>
+                      </Pressable>
                     </View>
+
+                    {detailsViewMode === "formatted" ? (
+                      <View style={styles.formattedContainer}>
+                        {!inspectedEvent.details || Object.keys(inspectedEvent.details).length === 0 ? (
+                          <View style={styles.emptyDetailsBox}>
+                            <Text style={styles.emptyDetailsText}>
+                              No supplementary parameters logged for this event.
+                            </Text>
+                          </View>
+                        ) : (
+                          <>
+                            {/* Action Reason Callout if present */}
+                            {inspectedEvent.details.reason && (
+                              <View style={styles.reasonCard}>
+                                <View style={styles.reasonHeader}>
+                                  <AppIcon name="info" size={12} color={colors.royal[700]} />
+                                  <Text style={styles.reasonLabel}>Action Note / Reason</Text>
+                                </View>
+                                <Text style={styles.reasonText}>
+                                  {String(inspectedEvent.details.reason)}
+                                </Text>
+                              </View>
+                            )}
+
+                            {/* Structured Key-Value Parameters */}
+                            <View style={styles.formattedList}>
+                              {Object.entries(inspectedEvent.details)
+                                .filter(([k]) => k !== "reason")
+                                .map(([k, v]) => (
+                                  <View key={k} style={styles.formattedRow}>
+                                    <Text style={styles.formattedKey}>{formatDetailKey(k)}:</Text>
+                                    <View style={styles.formattedValContainer}>
+                                      {renderDetailValue(k, v)}
+                                    </View>
+                                  </View>
+                                ))}
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    ) : (
+                      <View style={styles.jsonContainer}>
+                        <Text style={styles.jsonText}>
+                          {JSON.stringify(inspectedEvent.details, null, 2)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   <View style={styles.modalCloseRow}>
@@ -1356,6 +1575,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 8,
   },
   sanitizedBadge: {
     flexDirection: "row",
@@ -1370,6 +1590,210 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: "700",
     color: colors.success,
+  },
+  viewModeToggleRow: {
+    flexDirection: "row",
+    backgroundColor: colors.navy[50],
+    borderRadius: 8,
+    padding: 3,
+    marginBottom: 10,
+    gap: 4,
+  },
+  viewModeTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  viewModeTabActive: {
+    backgroundColor: colors.surface,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  viewModeTabText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  viewModeTabTextActive: {
+    color: colors.royal[700],
+    fontWeight: "700",
+  },
+  formattedContainer: {
+    gap: 8,
+  },
+  emptyDetailsBox: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: colors.navy[50],
+    alignItems: "center",
+  },
+  emptyDetailsText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  reasonCard: {
+    backgroundColor: "#F0F4FF",
+    borderRadius: 8,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.royal[700],
+    marginBottom: 4,
+  },
+  reasonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 4,
+  },
+  reasonLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.royal[700],
+    textTransform: "uppercase",
+  },
+  reasonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.navy[900],
+    lineHeight: 18,
+  },
+  formattedList: {
+    backgroundColor: colors.navy[50],
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 6,
+  },
+  formattedRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E2E8F0",
+    gap: 8,
+  },
+  formattedKey: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    flexShrink: 0,
+  },
+  formattedValContainer: {
+    flexShrink: 1,
+    alignItems: "flex-end",
+  },
+  formattedVal: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.navy[800],
+    textAlign: "right",
+  },
+  formattedValNull: {
+    fontSize: 11.5,
+    fontStyle: "italic",
+    color: colors.textSecondary,
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusPillActive: {
+    backgroundColor: "#DCFCE7",
+  },
+  statusPillInactive: {
+    backgroundColor: "#FEE2E2",
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statusPillTextActive: {
+    color: "#15803D",
+  },
+  statusPillTextInactive: {
+    color: "#B91C1C",
+  },
+  redactedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+  },
+  redactedBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.error,
+  },
+  idChip: {
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  idChipText: {
+    fontSize: 11,
+    fontFamily: "monospace",
+    fontWeight: "700",
+    color: colors.royal[700],
+  },
+  chipWrapRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    justifyContent: "flex-end",
+  },
+  itemChip: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  itemChipText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  nestedObjectBox: {
+    backgroundColor: colors.surface,
+    padding: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  nestedRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 6,
+  },
+  nestedKey: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
   jsonContainer: {
     padding: 10,

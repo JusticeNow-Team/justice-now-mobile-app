@@ -1,10 +1,13 @@
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "../components/AppIcon";
 import { colors, iconSizes } from "../theme";
+
+const logoMark = require("../../assets/images/justicenow-logo-mark.png");
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -15,9 +18,9 @@ export default function SplashScreen() {
 
       <View style={styles.content}>
         <Image
-          source={require("../../assets/images/justicenow-logo-mark.png")}
+          source={logoMark}
           style={styles.logo}
-          resizeMode="contain"
+          contentFit="contain"
           accessibilityLabel="JusticeNow logo"
         />
 
@@ -71,8 +74,10 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: "100%",
+    minHeight: "100%",
     backgroundColor: colors.navy[900],
-  },
+  } as ViewStyle,
   content: {
     flex: 1,
     justifyContent: "center",

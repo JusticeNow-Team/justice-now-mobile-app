@@ -445,6 +445,39 @@ export default function AdminDashboardScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <View>
+                <Text style={styles.sectionTitle}>System Statistics Dashboard</Text>
+                <Text style={styles.sectionDescription}>
+                  Platform activity, role distribution & category metrics (JN-386 - JN-391)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/statistics" as any)}>
+                <Text style={styles.auditLink}>View</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Real-time Platform Statistics</Text>
+                  <Text style={styles.healthValue}>
+                    Users by role · Cases by status & category · Evidence verification rates
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/statistics" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
                 <Text style={styles.sectionTitle}>Workflow Statuses</Text>
                 <Text style={styles.sectionDescription}>
                   Controlled case & evidence status values (JN-273 - JN-278)
@@ -470,6 +503,72 @@ export default function AdminDashboardScreen() {
                   onPress={() => router.push("/admin/statuses" as any)}
                 >
                   <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Report Categories</Text>
+                <Text style={styles.sectionDescription}>
+                  Manage incident categories & case classifications (JN-378 - JN-384)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/categories" as any)}>
+                <Text style={styles.auditLink}>Manage</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Incident Classifications</Text>
+                  <Text style={styles.healthValue}>
+                    10 Categories configured with active-case protection & audit logging
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/categories" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Security & Access Review</Text>
+                <Text style={styles.sectionDescription}>
+                  Protected routes, RBAC, ownership, evidence privacy & secrets (JN-400 - JN-405)
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/security" as any)}>
+                <Text style={styles.auditLink}>Review</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Security Compliance Posture</Text>
+                  <Text style={styles.healthValue}>
+                    100% Verified · 6 Domains · 0 Open Defects · 12 Guarded Routes
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/security" as any)}
+                >
+                  <Text style={styles.actionPillText}>Inspect</Text>
                 </Pressable>
               </View>
             </View>
