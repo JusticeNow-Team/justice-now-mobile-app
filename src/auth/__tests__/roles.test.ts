@@ -50,7 +50,7 @@ describe("Subtask JN-129 & JN-130: Role Model and Seed Configuration", () => {
     assert.equal(config.id, "evidence_checker");
     assert.equal(config.name, "Evidence Checker");
     assert.equal(config.isStaff, true);
-    assert.equal(config.defaultRoute, "/checker");
+    assert.equal(config.defaultRoute, "/validator/dashboard");
     assert.ok(config.permissions.includes("evidence:validate"));
     assert.ok(config.permissions.includes("evidence:read:all"));
   });

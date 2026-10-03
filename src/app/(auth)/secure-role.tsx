@@ -166,6 +166,7 @@ export default function SecureRoleScreen() {
 
       const allowedStaffRoles = [
         "case_officer",
+        "evidence_checker",
         "evidence_validator",
         "system_admin",
       ];

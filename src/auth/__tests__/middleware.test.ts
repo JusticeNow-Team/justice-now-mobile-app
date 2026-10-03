@@ -17,23 +17,27 @@ describe("Subtask JN-132 & JN-133: Route and Action Authorization Middleware", (
       assert.equal(canAccessRoute(null, "/two-factor"), true);
     });
 
-    it("should allow Reporter to access /reporter routes but block /officer, /checker, /admin", () => {
+    it("should allow Reporter to access /reporter routes but block /officer, /validator, /checker, /admin", () => {
       assert.equal(canAccessRoute("reporter", "/reporter"), true);
       assert.equal(canAccessRoute("reporter", "/reporter/cases"), true);
       assert.equal(canAccessRoute("reporter", "/officer"), false);
+      assert.equal(canAccessRoute("reporter", "/validator"), false);
       assert.equal(canAccessRoute("reporter", "/checker"), false);
       assert.equal(canAccessRoute("reporter", "/admin"), false);
     });
 
-    it("should allow Case Officer to access /officer routes but block /checker, /admin", () => {
+    it("should allow Case Officer to access /officer routes but block /validator, /checker, /admin", () => {
       assert.equal(canAccessRoute("case_officer", "/officer"), true);
       assert.equal(canAccessRoute("case_officer", "/officer/cases"), true);
       assert.equal(canAccessRoute("case_officer", "/reporter"), false);
+      assert.equal(canAccessRoute("case_officer", "/validator"), false);
       assert.equal(canAccessRoute("case_officer", "/checker"), false);
       assert.equal(canAccessRoute("case_officer", "/admin"), false);
     });
 
-    it("should allow Evidence Checker to access /checker routes but block /officer, /admin", () => {
+    it("should allow Evidence Checker to access /validator routes and legacy /checker routes but block /officer, /admin", () => {
+      assert.equal(canAccessRoute("evidence_checker", "/validator"), true);
+      assert.equal(canAccessRoute("evidence_validator", "/validator/dashboard"), true);
       assert.equal(canAccessRoute("evidence_checker", "/checker"), true);
       assert.equal(canAccessRoute("evidence_validator", "/checker"), true);
       assert.equal(canAccessRoute("evidence_checker", "/officer"), false);
@@ -48,6 +52,7 @@ describe("Subtask JN-132 & JN-133: Route and Action Authorization Middleware", (
     it("should block unauthenticated or null roles from protected routes", () => {
       assert.equal(canAccessRoute(null, "/reporter"), false);
       assert.equal(canAccessRoute(null, "/officer"), false);
+      assert.equal(canAccessRoute(null, "/validator"), false);
       assert.equal(canAccessRoute(null, "/checker"), false);
       assert.equal(canAccessRoute(null, "/admin"), false);
     });

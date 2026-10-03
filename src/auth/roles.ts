@@ -72,7 +72,7 @@ export const ROLE_CONFIGS: Record<SystemRole, RoleMetadata> = {
       text: "#155C63",
       border: "#A2E0E4",
     },
-    defaultRoute: "/checker",
+    defaultRoute: "/validator/dashboard",
     isStaff: true,
     permissions: [
       "cases:read:assigned",

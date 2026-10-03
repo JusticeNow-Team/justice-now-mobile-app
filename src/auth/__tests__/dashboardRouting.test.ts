@@ -27,10 +27,13 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
       assert.equal(getRoleForDashboardRoute("/officer/evidence"), "case_officer");
     });
 
-    it("AC 3: Evidence Checker is mapped to the Evidence Checker dashboard route (/checker)", () => {
-      assert.equal(ROLE_DASHBOARD_ROUTES.evidence_checker, "/checker");
-      assert.equal(getDashboardRouteForRole("evidence_checker"), "/checker");
-      assert.equal(getDashboardRouteForRole("evidence_validator"), "/checker");
+    it("AC 3: Evidence Checker is mapped to the current Validator dashboard route (/validator/dashboard)", () => {
+      assert.equal(ROLE_DASHBOARD_ROUTES.evidence_checker, "/validator/dashboard");
+      assert.equal(getDashboardRouteForRole("evidence_checker"), "/validator/dashboard");
+      assert.equal(getDashboardRouteForRole("evidence_validator"), "/validator/dashboard");
+      assert.equal(getRoleForDashboardRoute("/validator"), "evidence_checker");
+      assert.equal(getRoleForDashboardRoute("/validator/dashboard"), "evidence_checker");
+      assert.equal(getRoleForDashboardRoute("/validator/evidence/123"), "evidence_checker");
       assert.equal(getRoleForDashboardRoute("/checker"), "evidence_checker");
       assert.equal(getRoleForDashboardRoute("/checker/evidence/123"), "evidence_checker");
     });
@@ -48,6 +51,7 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
     it("Reporter cannot manually access Officer, Checker, or Admin dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("reporter", "/reporter"), true);
       assert.equal(isRoleAuthorizedForPath("reporter", "/officer"), false);
+      assert.equal(isRoleAuthorizedForPath("reporter", "/validator"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/checker"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/admin"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/admin/roles"), false);
@@ -57,11 +61,14 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
     it("Case Officer cannot manually access Reporter, Checker, or Admin dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("case_officer", "/officer"), true);
       assert.equal(isRoleAuthorizedForPath("case_officer", "/reporter"), false);
+      assert.equal(isRoleAuthorizedForPath("case_officer", "/validator"), false);
       assert.equal(isRoleAuthorizedForPath("case_officer", "/checker"), false);
       assert.equal(isRoleAuthorizedForPath("case_officer", "/admin"), false);
     });
 
     it("Evidence Checker cannot manually access Reporter, Officer, or Admin dashboards", () => {
+      assert.equal(isRoleAuthorizedForPath("evidence_checker", "/validator"), true);
+      assert.equal(isRoleAuthorizedForPath("evidence_validator", "/validator/dashboard"), true);
       assert.equal(isRoleAuthorizedForPath("evidence_checker", "/checker"), true);
       assert.equal(isRoleAuthorizedForPath("evidence_validator", "/checker"), true);
       assert.equal(isRoleAuthorizedForPath("evidence_checker", "/reporter"), false);
@@ -74,6 +81,7 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("system_admin", "/admin/categories"), true);
       assert.equal(isRoleAuthorizedForPath("system_admin", "/reporter"), false);
       assert.equal(isRoleAuthorizedForPath("system_admin", "/officer"), false);
+      assert.equal(isRoleAuthorizedForPath("system_admin", "/validator"), false);
       assert.equal(isRoleAuthorizedForPath("system_admin", "/checker"), false);
     });
 
@@ -100,10 +108,10 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
       assert.equal(res.role, "case_officer");
     });
 
-    it("Resolves post-login redirect for Evidence Checker to /checker", () => {
+    it("Resolves post-login redirect for Evidence Checker to /validator/dashboard", () => {
       const res = resolvePostLoginRedirect("evidence_checker");
       assert.equal(res.allowed, true);
-      assert.equal(res.targetRoute, "/checker");
+      assert.equal(res.targetRoute, "/validator/dashboard");
       assert.equal(res.role, "evidence_checker");
     });
 

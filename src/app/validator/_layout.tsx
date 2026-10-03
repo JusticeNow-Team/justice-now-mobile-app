@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { hasCompletedStaffMfa } from "../../auth";
+import { normalizeRole } from "../../auth/roles";
 import { supabase } from "../../lib/supabase";
 import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
 import { colors } from "../../theme";
@@ -45,7 +46,7 @@ export default function ValidatorLayout() {
 
         if (
           profileError ||
-          profile?.role !== "evidence_validator" ||
+          normalizeRole(profile?.role) !== "evidence_checker" ||
           !profile.is_active
         ) {
           await supabase.auth.signOut();

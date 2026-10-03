@@ -33,6 +33,11 @@ export const ROUTE_AUTHORIZATION_RULES: RouteAuthorizationRule[] = [
     requiredPermissions: ["cases:read:assigned"],
   },
   {
+    pathPrefix: "/validator",
+    allowedRoles: ["evidence_checker"],
+    requiredPermissions: ["evidence:validate"],
+  },
+  {
     pathPrefix: "/checker",
     allowedRoles: ["evidence_checker"],
     requiredPermissions: ["evidence:validate"],

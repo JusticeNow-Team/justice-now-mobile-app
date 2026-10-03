@@ -111,7 +111,13 @@ describe("Jira Task JN-244: Enforce Module-Level Permissions", () => {
       assert.equal(canAccessRoute("case_officer", "/officer"), true);
     });
 
-    it("Protects direct navigation to /checker from non-checker roles", () => {
+    it("Protects direct navigation to /validator from non-checker roles", () => {
+      assert.equal(canAccessRoute("reporter", "/validator"), false);
+      assert.equal(canAccessRoute("case_officer", "/validator"), false);
+      assert.equal(canAccessRoute("evidence_checker", "/validator"), true);
+    });
+
+    it("Keeps legacy direct navigation to /checker protected by checker role", () => {
       assert.equal(canAccessRoute("reporter", "/checker"), false);
       assert.equal(canAccessRoute("case_officer", "/checker"), false);
       assert.equal(canAccessRoute("evidence_checker", "/checker"), true);

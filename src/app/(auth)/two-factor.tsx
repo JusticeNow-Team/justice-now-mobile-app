@@ -101,27 +101,7 @@ export default function TwoFactorScreen() {
       return;
     }
 
-    if (profile.role === "case_officer") {
-      router.replace("/officer");
-      return;
-    }
-
-    if (profile.role === "evidence_validator") {
-      router.replace("/validator/dashboard");
-      return;
-    }
-
-    if (profile.role === "system_admin") {
-      router.replace("/admin");
-      return;
-    }
-
-    await supabase.auth.signOut();
-    Alert.alert(
-      "Access denied",
-      "This account does not have an authorized JusticeNow staff role.",
-    );
-    router.replace("/login");
+    router.replace(redirect.targetRoute as any);
   }, [router]);
 
   const prepareMfa = useCallback(async () => {

@@ -78,7 +78,7 @@ const ROLE_CONFIGS = {
       text: "#155C63",
       border: "#A2E0E4",
     },
-    defaultRoute: "/checker",
+    defaultRoute: "/validator/dashboard",
     isStaff: true,
     permissions: [
       "cases:read:assigned",
@@ -232,6 +232,11 @@ const ROUTE_AUTHORIZATION_RULES = [
     requiredPermissions: ["cases:read:assigned"],
   },
   {
+    pathPrefix: "/validator",
+    allowedRoles: ["evidence_checker"],
+    requiredPermissions: ["evidence:validate"],
+  },
+  {
     pathPrefix: "/checker",
     allowedRoles: ["evidence_checker"],
     requiredPermissions: ["evidence:validate"],
@@ -336,7 +341,7 @@ describe("JN-129: Role Model and Role Configuration", () => {
     assert.ok(config, "Evidence Checker configuration must exist");
     assert.equal(config.name, "Evidence Checker");
     assert.equal(config.isStaff, true);
-    assert.equal(config.defaultRoute, "/checker");
+    assert.equal(config.defaultRoute, "/validator/dashboard");
   });
 
   it("Acceptance Criteria 4: System Admin role exists", () => {
@@ -516,6 +521,7 @@ describe("JN-132: Unauthorized Routes and Actions Are Blocked (Acceptance Criter
   it("Blocks unauthorized routes for Reporter", () => {
     assert.equal(canAccessRoute("reporter", "/reporter"), true);
     assert.equal(canAccessRoute("reporter", "/officer"), false);
+    assert.equal(canAccessRoute("reporter", "/validator"), false);
     assert.equal(canAccessRoute("reporter", "/checker"), false);
     assert.equal(canAccessRoute("reporter", "/admin"), false);
   });
@@ -523,11 +529,14 @@ describe("JN-132: Unauthorized Routes and Actions Are Blocked (Acceptance Criter
   it("Blocks unauthorized routes for Case Officer", () => {
     assert.equal(canAccessRoute("case_officer", "/officer"), true);
     assert.equal(canAccessRoute("case_officer", "/reporter"), false);
+    assert.equal(canAccessRoute("case_officer", "/validator"), false);
     assert.equal(canAccessRoute("case_officer", "/checker"), false);
     assert.equal(canAccessRoute("case_officer", "/admin"), false);
   });
 
   it("Blocks unauthorized routes for Evidence Checker", () => {
+    assert.equal(canAccessRoute("evidence_checker", "/validator"), true);
+    assert.equal(canAccessRoute("evidence_validator", "/validator/dashboard"), true);
     assert.equal(canAccessRoute("evidence_checker", "/checker"), true);
     assert.equal(canAccessRoute("evidence_validator", "/checker"), true);
     assert.equal(canAccessRoute("evidence_checker", "/officer"), false);
@@ -566,7 +575,7 @@ describe("JN-133: Role-Based Navigation Support (Acceptance Criteria 7 & 8)", ()
   it("Resolves correct default workspace routes for each role", () => {
     assert.equal(getRoleConfig("reporter").defaultRoute, "/reporter");
     assert.equal(getRoleConfig("case_officer").defaultRoute, "/officer");
-    assert.equal(getRoleConfig("evidence_checker").defaultRoute, "/checker");
+    assert.equal(getRoleConfig("evidence_checker").defaultRoute, "/validator/dashboard");
     assert.equal(getRoleConfig("system_admin").defaultRoute, "/admin");
   });
 
@@ -777,7 +786,7 @@ describe("JN-139 & JN-141: Category Selection & Case Record Linking (Acceptance 
 const ROLE_DASHBOARD_ROUTES = {
   reporter: "/reporter",
   case_officer: "/officer",
-  evidence_checker: "/checker",
+  evidence_checker: "/validator/dashboard",
   system_admin: "/admin",
 };
 
@@ -803,7 +812,12 @@ function getRoleForDashboardRoute(pathname) {
   const cleanPath = pathname.trim().toLowerCase();
   if (cleanPath === "/reporter" || cleanPath.startsWith("/reporter/")) return "reporter";
   if (cleanPath === "/officer" || cleanPath.startsWith("/officer/")) return "case_officer";
-  if (cleanPath === "/checker" || cleanPath.startsWith("/checker/")) return "evidence_checker";
+  if (
+    cleanPath === "/validator" ||
+    cleanPath.startsWith("/validator/") ||
+    cleanPath === "/checker" ||
+    cleanPath.startsWith("/checker/")
+  ) return "evidence_checker";
   if (cleanPath === "/admin" || cleanPath.startsWith("/admin/")) return "system_admin";
   return null;
 }
@@ -897,12 +911,12 @@ describe("JN-178 & JN-180: Role-Dashboard Route Definitions & Post-Login Redirec
     assert.equal(res.targetRoute, "/officer");
   });
 
-  it("AC 3: Evidence Checker is routed to the Evidence Checker dashboard (/checker)", () => {
-    assert.equal(getDashboardRouteForRole("evidence_checker"), "/checker");
-    assert.equal(getDashboardRouteForRole("evidence_validator"), "/checker");
+  it("AC 3: Evidence Checker is routed to the current Validator dashboard (/validator/dashboard)", () => {
+    assert.equal(getDashboardRouteForRole("evidence_checker"), "/validator/dashboard");
+    assert.equal(getDashboardRouteForRole("evidence_validator"), "/validator/dashboard");
     const res = resolvePostLoginRedirect("evidence_checker");
     assert.equal(res.allowed, true);
-    assert.equal(res.targetRoute, "/checker");
+    assert.equal(res.targetRoute, "/validator/dashboard");
   });
 
   it("AC 4: System Admin is routed to the Admin dashboard (/admin)", () => {
@@ -918,16 +932,19 @@ describe("JN-179 & AC 5: Manual Cross-Role Dashboard Access Prevention", () => {
     // Reporter
     assert.equal(isRoleAuthorizedForPath("reporter", "/reporter"), true);
     assert.equal(isRoleAuthorizedForPath("reporter", "/officer"), false);
+    assert.equal(isRoleAuthorizedForPath("reporter", "/validator"), false);
     assert.equal(isRoleAuthorizedForPath("reporter", "/checker"), false);
     assert.equal(isRoleAuthorizedForPath("reporter", "/admin"), false);
 
     // Case Officer
     assert.equal(isRoleAuthorizedForPath("case_officer", "/officer"), true);
     assert.equal(isRoleAuthorizedForPath("case_officer", "/reporter"), false);
+    assert.equal(isRoleAuthorizedForPath("case_officer", "/validator"), false);
     assert.equal(isRoleAuthorizedForPath("case_officer", "/checker"), false);
     assert.equal(isRoleAuthorizedForPath("case_officer", "/admin"), false);
 
     // Evidence Checker
+    assert.equal(isRoleAuthorizedForPath("evidence_checker", "/validator"), true);
     assert.equal(isRoleAuthorizedForPath("evidence_checker", "/checker"), true);
     assert.equal(isRoleAuthorizedForPath("evidence_checker", "/reporter"), false);
     assert.equal(isRoleAuthorizedForPath("evidence_checker", "/officer"), false);

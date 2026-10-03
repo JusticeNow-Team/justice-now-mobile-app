@@ -56,7 +56,7 @@ export interface RoleMetadata {
 export type DashboardRoute =
   | "/reporter"
   | "/officer"
-  | "/checker"
+  | "/validator/dashboard"
   | "/admin";
 
 export type AccountStatus = "active" | "inactive" | "suspended";

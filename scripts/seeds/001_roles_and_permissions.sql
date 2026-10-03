@@ -40,7 +40,7 @@ INSERT INTO public.roles (id, name, label, description, is_staff, default_route)
 VALUES
     ('reporter', 'Reporter', 'Public Reporter', 'Submits human rights reports and tracks personal cases safely.', false, '/reporter'),
     ('case_officer', 'Case Officer', 'Case Investigator / Officer', 'Reviews and investigates assigned cases.', true, '/officer'),
-    ('evidence_checker', 'Evidence Checker', 'Evidence Checker / Validator', 'Examines and validates submitted case evidence.', true, '/checker'),
+    ('evidence_checker', 'Evidence Checker', 'Evidence Checker / Validator', 'Examines and validates submitted case evidence.', true, '/validator/dashboard'),
     ('system_admin', 'System Admin', 'System Administrator', 'Manages system security, roles, users, and audits.', true, '/admin')
 ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,

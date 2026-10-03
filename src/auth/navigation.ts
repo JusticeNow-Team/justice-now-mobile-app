@@ -7,7 +7,7 @@ import { DashboardRoute, PostLoginRedirectResult, SystemRole, UserProfile } from
 export const ROLE_DASHBOARD_ROUTES: Record<SystemRole, DashboardRoute> = {
   reporter: "/reporter",
   case_officer: "/officer",
-  evidence_checker: "/checker",
+  evidence_checker: "/validator/dashboard",
   system_admin: "/admin",
 };
 
@@ -55,7 +55,12 @@ export function getRoleForDashboardRoute(pathname: string): SystemRole | null {
   if (cleanPath === "/officer" || cleanPath.startsWith("/officer/")) {
     return "case_officer";
   }
-  if (cleanPath === "/checker" || cleanPath.startsWith("/checker/")) {
+  if (
+    cleanPath === "/validator" ||
+    cleanPath.startsWith("/validator/") ||
+    cleanPath === "/checker" ||
+    cleanPath.startsWith("/checker/")
+  ) {
     return "evidence_checker";
   }
   if (cleanPath === "/admin" || cleanPath.startsWith("/admin/")) {
