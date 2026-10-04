@@ -104,6 +104,7 @@ export default function StepReviewScreen() {
             ? "Anonymous"
             : "With my identity",
         ],
+        ["Intake priority", draft.isInstantReport ? "Instant urgent review" : "Standard"],
         [
           "Identity hidden from",
           draft.hideIdentity
@@ -171,6 +172,7 @@ export default function StepReviewScreen() {
         caseReference: result.caseReference,
         submittedAt: result.submittedAt,
         reportingMode: draft.reportingMode,
+        isInstantReport: draft.isInstantReport,
         evidenceWarning,
       });
       setConfirming(false);

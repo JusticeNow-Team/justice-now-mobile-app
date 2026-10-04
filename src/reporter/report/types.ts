@@ -13,6 +13,7 @@ export interface WitnessDraft {
 
 export interface CaseDraft {
   reportingMode: ReportingMode;
+  isInstantReport: boolean;
   categories: string[];
   title: string;
   description: string;
@@ -41,6 +42,7 @@ export interface CaseDraft {
 
 export const initialCaseDraft: CaseDraft = {
   reportingMode: "identified",
+  isInstantReport: false,
   categories: [],
   title: "",
   description: "",
@@ -72,5 +74,6 @@ export interface SubmittedCase {
   caseReference: string;
   submittedAt: string;
   reportingMode: ReportingMode;
+  isInstantReport?: boolean;
   evidenceWarning?: string;
 }

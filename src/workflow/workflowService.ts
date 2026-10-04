@@ -409,7 +409,7 @@ export async function getWorkflowDashboardMetrics(
 
     const { data: evidenceData, error: evidenceError } = await supabase
       .from("case_evidence")
-      .select("id, case_id, file_name, file_type, validation_status, created_at, updated_at");
+      .select("id, case_id, file_name, evidence_type, validation_status, created_at, updated_at");
 
     if (!casesError && !evidenceError && casesData && evidenceData) {
       dataSource = "live";
@@ -430,7 +430,7 @@ export async function getWorkflowDashboardMetrics(
         caseId: row.case_id,
         caseReference: `CASE-${row.case_id?.slice(0, 8) || "REF"}`,
         fileName: row.file_name || "evidence_file.bin",
-        fileType: row.file_type || "application/octet-stream",
+        fileType: row.evidence_type || "document",
         status: (row.validation_status || "pending") as EvidenceWorkflowStatus,
         uploadedAt: row.created_at || new Date().toISOString(),
         lastUpdatedAt: row.updated_at || row.created_at || new Date().toISOString(),

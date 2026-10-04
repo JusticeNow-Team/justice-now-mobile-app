@@ -82,6 +82,12 @@ export default function ConfirmationScreen() {
                   : "With my identity"}
               </Text>
             </View>
+            {submitted.isInstantReport ? (
+              <View style={[styles.metaRow, styles.metaLast]}>
+                <Text style={styles.metaLabel}>Priority</Text>
+                <Text style={styles.metaValue}>Instant urgent review</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -95,8 +101,9 @@ export default function ConfirmationScreen() {
 
         <View style={styles.notice}>
           <Notice tone="privacy" title="Keep your reference safe">
-            You will need {submitted.caseReference} to follow this case. It is
-            also saved under My cases in your account.
+            {submitted.reportingMode === "anonymous"
+              ? `You will need ${submitted.caseReference} when contacting JusticeNow about this anonymous report. It is not linked to a reporter account.`
+              : `You will need ${submitted.caseReference} to follow this case. It is also saved under My cases in your account.`}
           </Notice>
         </View>
       </View>
@@ -107,7 +114,9 @@ export default function ConfirmationScreen() {
           variant="outline"
           onPress={() => {
             resetDraft();
-            router.replace("/reporter");
+            router.replace(
+              submitted.reportingMode === "anonymous" ? "/login" : "/reporter",
+            );
           }}
         />
       </View>

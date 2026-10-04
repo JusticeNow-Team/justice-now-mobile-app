@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppIcon, AppIconName } from "../../components/AppIcon";
@@ -39,14 +39,45 @@ const options: {
 
 export default function StepPreferenceScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    mode?: string | string[];
+    instant?: string | string[];
+  }>();
   const { draft, updateDraft } = useReport();
   const [error, setError] = useState("");
+  const initializedFromParams = useRef(false);
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const instant = Array.isArray(params.instant)
+    ? params.instant[0]
+    : params.instant;
+
+  useEffect(() => {
+    if (initializedFromParams.current) {
+      return;
+    }
+
+    if (mode === "anonymous" || instant === "true") {
+      initializedFromParams.current = true;
+      const nextIsInstant = instant === "true";
+      updateDraft({
+        reportingMode: "anonymous",
+        isInstantReport: nextIsInstant,
+        hideIdentity: true,
+        allowContact: nextIsInstant ? false : draft.allowContact,
+        discreetNotifications: true,
+      });
+    }
+  }, [draft.allowContact, instant, mode, updateDraft]);
 
   return (
     <ReportStepLayout
       step={1}
       title="How would you like to report this case?"
-      intro="Both options are investigated in the same way. Choose whichever feels safer for you."
+      intro={
+        draft.isInstantReport
+          ? "Instant reports are marked urgent and can be submitted anonymously. Share only what is safe right now."
+          : "Both options are investigated in the same way. Choose whichever feels safer for you."
+      }
       error={error}
       onContinue={() => {
         const message = validateReportStep(1, draft);

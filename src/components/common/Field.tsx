@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { colors } from "../../theme";
+import { AppIcon } from "../AppIcon";
 
 interface FieldProps {
   label: string;
@@ -26,12 +27,17 @@ export function Field({ label, hint, error, optional, children }: FieldProps) {
         {label}
         {optional ? <Text style={styles.optional}> · optional</Text> : null}
       </Text>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : <View style={styles.hintSpacer} />}
+      {hint ? (
+        <Text style={styles.hint}>{hint}</Text>
+      ) : (
+        <View style={styles.hintSpacer} />
+      )}
       {children}
       {error ? (
-        <Text style={styles.error} accessibilityRole="alert">
-          ⚠ {error}
-        </Text>
+        <View style={styles.errorRow} accessibilityRole="alert">
+          <AppIcon name="warning" size={13} color={colors.errorStrong} />
+          <Text style={styles.error}>{error}</Text>
+        </View>
       ) : null}
     </View>
   );
@@ -136,7 +142,7 @@ export function SelectInput({
         style={styles.select}
       >
         <Text style={styles.selectValue}>{selected?.label ?? ""}</Text>
-        <Text style={styles.selectChevron}>▾</Text>
+        <AppIcon name="chevron-down" size={16} color={colors.textSecondary} />
       </Pressable>
 
       <Modal
@@ -203,8 +209,14 @@ const styles = StyleSheet.create({
   hintSpacer: {
     height: 6,
   },
-  error: {
+  errorRow: {
     marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  error: {
+    flex: 1,
     fontSize: 12,
     fontWeight: "500",
     color: colors.errorStrong,
@@ -247,10 +259,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.navy[800],
     paddingRight: 8,
-  },
-  selectChevron: {
-    fontSize: 12,
-    color: colors.textSecondary,
   },
   modalBackdrop: {
     flex: 1,

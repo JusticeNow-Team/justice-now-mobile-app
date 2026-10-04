@@ -116,19 +116,19 @@ const ROLE_NAVIGATION: Record<NavigationRole, NavigationItem[]> = {
       exact: true,
     },
     {
+      label: "Cases",
+      icon: "folder-open",
+      href: "/admin/cases",
+    },
+    {
       label: "Users",
       icon: "users",
-      href: "/admin/staff",
+      href: "/admin/users",
     },
     {
       label: "Activity",
       icon: "activity",
       href: "/admin/audit",
-    },
-    {
-      label: "Alerts",
-      icon: "shield-alert",
-      href: "/admin/alerts",
     },
     {
       label: "Settings",

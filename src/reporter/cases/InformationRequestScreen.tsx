@@ -20,6 +20,7 @@ import {
   PrimaryButton,
   SectionCard,
 } from "../../components/common";
+import { AppIcon } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 import { logoutReporter } from "../login";
@@ -377,7 +378,10 @@ export default function InformationRequestScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.deadline}>
-            <Text style={styles.deadlineTitle}>🕒 {dueLabel}</Text>
+            <View style={styles.deadlineTitleRow}>
+              <AppIcon name="clock" size={15} color={colors.warning} />
+              <Text style={styles.deadlineTitle}>{dueLabel}</Text>
+            </View>
             <Text style={styles.deadlineCopy}>
               If you need more time, tell your officer — the case will not be
               closed while you are working on a reply.
@@ -555,6 +559,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: colors.warning,
+  },
+  deadlineTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   deadlineCopy: {
     marginTop: 4,

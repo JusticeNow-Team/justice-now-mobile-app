@@ -175,7 +175,7 @@ export default function AdminDashboardScreen() {
       label: "Cases awaiting review",
       value: workflowMetrics?.casesAwaitingInitialReview ?? 2,
       tone: "warn",
-      route: "/admin/workflow",
+      route: "/admin/cases",
     },
     {
       label: "Evidence awaiting verification",
@@ -220,7 +220,7 @@ export default function AdminDashboardScreen() {
           <View style={styles.identityRow}>
             <View style={styles.identity}>
               <View style={styles.logo}>
-                <AppIcon name="balance" size={18} color={colors.gold[300]} />
+                <AppIcon name="balance" size={18} color={colors.royal[700]} />
               </View>
 
               <View>
@@ -240,7 +240,7 @@ export default function AdminDashboardScreen() {
               <AppIcon
                 name="shield-alert"
                 size={20}
-                color={colors.textInverse}
+                color={colors.navy[700]}
               />
 
               <View style={styles.alertCounter}>
@@ -379,6 +379,40 @@ export default function AdminDashboardScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <View>
+                <Text style={styles.sectionTitle}>Case Officer Assignment</Text>
+                <Text style={styles.sectionDescription}>
+                  Route submitted cases to active Case Officers.
+                </Text>
+              </View>
+
+              <Pressable onPress={() => router.push("/admin/cases" as any)}>
+                <Text style={styles.auditLink}>Assign</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sectionBody}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthDetails}>
+                  <Text style={styles.healthLabel}>Assignment queue</Text>
+                  <Text style={styles.healthValue}>
+                    Send unassigned and high-priority cases into officer
+                    workspaces for investigation.
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.actionPill}
+                  onPress={() => router.push("/admin/cases" as any)}
+                >
+                  <Text style={styles.actionPillText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
                 <Text style={styles.sectionTitle}>Workflow Activity Monitoring</Text>
                 <Text style={styles.sectionDescription}>
                   Case pipeline, verification backlogs & SLA delays (JN-287 - JN-292)
@@ -403,6 +437,11 @@ export default function AdminDashboardScreen() {
                   style={styles.actionPill}
                   onPress={() => router.push("/admin/workflow" as any)}
                 >
+                  <AppIcon
+                    name="layout-dashboard"
+                    size={13}
+                    color={colors.textInverse}
+                  />
                   <Text style={styles.actionPillText}>Open Dashboard</Text>
                 </Pressable>
               </View>
@@ -615,21 +654,19 @@ export default function AdminDashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.navy[900],
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
     backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingBottom: 22,
+    padding: 16,
+    paddingBottom: 32,
     backgroundColor: colors.background,
   },
   adminHeader: {
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 28,
-    backgroundColor: colors.navy[900],
+    marginBottom: 16,
   },
   identityRow: {
     flexDirection: "row",
@@ -640,35 +677,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    flex: 1,
+    minWidth: 0,
   },
   logo: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.royal[500],
-    backgroundColor: colors.royal[700],
-  },
-  identityLabel: {
-    fontSize: 11.5,
-    fontWeight: "500",
-    color: colors.navy[300],
-  },
-  identityName: {
-    marginTop: 1,
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.textInverse,
-  },
-  alertButton: {
-    position: "relative",
     width: 40,
     height: 40,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.royal[50],
+  },
+  identityLabel: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  identityName: {
+    marginTop: 2,
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+  alertButton: {
+    position: "relative",
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   alertCounter: {
     position: "absolute",
@@ -681,7 +723,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: colors.navy[900],
+    borderColor: colors.surface,
     backgroundColor: colors.error,
   },
   alertCounterText: {
@@ -690,24 +732,23 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
   securityNotice: {
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 12,
+    marginTop: 20,
+    padding: 20,
+    borderRadius: 18,
     backgroundColor: colors.navy[800],
   },
   securityNoticeText: {
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.navy[100],
+    maxWidth: 330,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#DDE6F0",
   },
   securityNoticeStrong: {
     fontWeight: "700",
     color: colors.textInverse,
   },
   kpiSection: {
-    marginTop: -16,
-    paddingHorizontal: 16,
+    marginTop: 0,
   },
   loadingContainer: {
     height: 100,
@@ -721,25 +762,17 @@ const styles = StyleSheet.create({
   kpiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 10,
+    gap: 10,
   },
   kpiCard: {
-    width: "48.6%",
-    minHeight: 89,
-    padding: 14,
-    borderRadius: 16,
+    flexGrow: 1,
+    flexBasis: "47%",
+    minHeight: 92,
+    padding: 13,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    shadowColor: colors.navy[900],
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
   },
   kpiLabelRow: {
     flexDirection: "row",
@@ -755,25 +788,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 10.5,
     lineHeight: 14,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.35,
+    fontWeight: "600",
     color: colors.textSecondary,
   },
   kpiValue: {
     marginTop: 8,
     fontSize: 24,
     lineHeight: 27,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   sections: {
-    paddingHorizontal: 16,
     paddingTop: 20,
     gap: 12,
   },
   sectionCard: {
     overflow: "hidden",
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -791,7 +821,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   sectionDescription: {
@@ -818,7 +848,7 @@ const styles = StyleSheet.create({
   },
   warningBadgeText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.warning,
   },
   sectionBody: {
@@ -840,7 +870,7 @@ const styles = StyleSheet.create({
   },
   healthLabel: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.navy[800],
   },
   healthValue: {
@@ -872,19 +902,19 @@ const styles = StyleSheet.create({
   },
   healthBadgeText: {
     fontSize: 10.5,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   textLink: {
     paddingTop: 12,
   },
   textLinkLabel: {
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   auditLink: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.royal[700],
   },
   activityRow: {
@@ -910,7 +940,7 @@ const styles = StyleSheet.create({
   activityAction: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: "600",
+    fontWeight: "500",
     color: colors.navy[800],
   },
   activityMeta: {
@@ -921,14 +951,16 @@ const styles = StyleSheet.create({
   actionPill: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 9,
     backgroundColor: colors.royal[700],
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
   actionPillText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.textInverse,
   },
 });

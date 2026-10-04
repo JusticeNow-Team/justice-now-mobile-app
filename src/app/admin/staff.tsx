@@ -531,7 +531,7 @@ export default function AdminStaffScreen() {
                   key={account.id}
                   style={styles.userCard}
                   onPress={() =>
-                    router.push(`/admin/staff/${account.id}` as any)
+                    router.push(`/admin/users/${account.id}` as any)
                   }
                 >
                   <View style={styles.avatar}>

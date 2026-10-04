@@ -601,7 +601,7 @@ export function SettingsScreen() {
             label="User management"
             hint="Manage registered accounts"
             icon="users"
-            route="/admin/staff"
+            route="/admin/users"
           />
           <SettingsRow
             label="Roles & permissions"
@@ -614,6 +614,12 @@ export function SettingsScreen() {
             hint="Categories, statuses, languages"
             icon="settings"
             route="/admin/config"
+          />
+          <SettingsRow
+            label="System settings"
+            hint="Security, evidence, retention and platform policies"
+            icon="settings"
+            route="/admin/system-settings"
           />
         </SettingsGroup>
 
@@ -635,6 +641,27 @@ export function SettingsScreen() {
             hint="Last backup 02:00"
             icon="shield-check"
             route="/admin/backup"
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="ADVANCED TOOLS">
+          <SettingsRow
+            label="Staff administration"
+            hint="Create, suspend and audit staff accounts"
+            icon="users"
+            route="/admin/staff"
+          />
+          <SettingsRow
+            label="Role management"
+            hint="Operational role editor"
+            icon="roles"
+            route="/admin/role-management"
+          />
+          <SettingsRow
+            label="Live audit explorer"
+            hint="Search and filter audit events"
+            icon="activity"
+            route="/admin/audit-live"
           />
         </SettingsGroup>
 
@@ -685,7 +712,7 @@ export function SettingsScreen() {
         <SettingsGroup title="ACCOUNT">
           <SettingsRow
             label="Sign out"
-            icon="x"
+            icon="log-out"
             danger
             onPress={handleSignOut}
           />
@@ -1059,7 +1086,7 @@ export function ConfigurationScreen() {
             label="Case statuses"
             hint="8 statuses · 2 terminal"
             icon="activity"
-            onPress={() => unavailable("Case statuses")}
+            route="/admin/statuses"
           />
           <SettingsRow
             label="Priority levels"
@@ -1080,7 +1107,7 @@ export function ConfigurationScreen() {
             label="Retention policy"
             hint="Cases 7 years · evidence 7 years"
             icon="history"
-            onPress={() => unavailable("Retention policy")}
+            route="/admin/system-settings"
           />
         </SettingsGroup>
 
@@ -1308,7 +1335,7 @@ export function AuditScreen() {
               )
             }
           >
-            <Text style={styles.downloadIcon}>â†“</Text>
+            <AppIcon name="download" size={22} color={colors.navy[700]} />
           </Pressable>
         }
       />
@@ -1741,12 +1768,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
   },
-  downloadIcon: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.navy[700],
-  },
-
   sectionCard: {
     overflow: "hidden",
     borderRadius: 16,

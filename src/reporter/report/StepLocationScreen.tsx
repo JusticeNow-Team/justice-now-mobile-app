@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import {
@@ -12,13 +12,27 @@ import {
 import { colors } from "../../theme";
 import ReportStepLayout from "./ReportStepLayout";
 import { useReport } from "./ReportContext";
-import { districts, provinces } from "./options";
+import { districtsByProvince, provinces } from "./options";
 import { validateReportStep } from "./validation";
 
 export default function StepLocationScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useReport();
   const [error, setError] = useState("");
+  const provinceDistricts = useMemo(
+    () => districtsByProvince[draft.province] ?? [],
+    [draft.province],
+  );
+
+  useEffect(() => {
+    if (provinceDistricts.length === 0) {
+      return;
+    }
+
+    if (!provinceDistricts.includes(draft.district)) {
+      updateDraft({ district: provinceDistricts[0] });
+    }
+  }, [draft.district, provinceDistricts, updateDraft]);
 
   return (
     <ReportStepLayout
@@ -41,7 +55,8 @@ export default function StepLocationScreen() {
             value={draft.province}
             options={provinces.map((item) => ({ value: item, label: item }))}
             onChange={(province) => {
-              updateDraft({ province });
+              const nextDistrict = districtsByProvince[province]?.[0] ?? "";
+              updateDraft({ province, district: nextDistrict });
               setError("");
             }}
             accessibilityLabel="Province"
@@ -50,7 +65,10 @@ export default function StepLocationScreen() {
         <Field label="District">
           <SelectInput
             value={draft.district}
-            options={districts.map((item) => ({ value: item, label: item }))}
+            options={provinceDistricts.map((item) => ({
+              value: item,
+              label: item,
+            }))}
             onChange={(district) => {
               updateDraft({ district });
               setError("");

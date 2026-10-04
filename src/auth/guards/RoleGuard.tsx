@@ -49,6 +49,7 @@ export function RoleGuard({
             }}
             accessibilityRole="button"
           >
+            <AppIcon name="log-out" size={15} color={colors.textInverse} />
             <Text style={styles.authButtonText}>Sign Out</Text>
           </Pressable>
         </View>
@@ -168,6 +169,8 @@ const styles = StyleSheet.create({
     minHeight: 46,
     backgroundColor: colors.royal[700],
     borderRadius: 10,
+    flexDirection: "row",
+    gap: 8,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,

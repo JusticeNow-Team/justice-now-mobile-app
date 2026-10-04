@@ -111,6 +111,11 @@ export default function UnauthorizedAccessScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Go to my authorized dashboard"
               >
+                <AppIcon
+                  name="layout-dashboard"
+                  size={16}
+                  color={colors.textInverse}
+                />
                 <Text style={styles.primaryButtonText}>
                   Go to My Dashboard ({currentRoleConfig?.name || "Home"})
                 </Text>
@@ -126,6 +131,15 @@ export default function UnauthorizedAccessScreen() {
               accessibilityRole="button"
               accessibilityLabel="Sign out and return to login"
             >
+              <AppIcon
+                name="log-out"
+                size={16}
+                color={
+                  !targetRoute || isInactive
+                    ? colors.textInverse
+                    : colors.navy[800]
+                }
+              />
               <Text
                 style={[
                   styles.secondaryButtonText,
@@ -277,6 +291,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     backgroundColor: colors.royal[700],
     borderRadius: 12,
+    flexDirection: "row",
+    gap: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
@@ -294,6 +310,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    flexDirection: "row",
+    gap: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,

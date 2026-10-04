@@ -159,7 +159,7 @@ export default function EvidenceCheckerAvailabilityScreen() {
 
       let successMsg = `Evidence Checker '${selectedChecker.fullName}' status updated to ${newAvailability.toUpperCase()}.`;
       if (res.warning) {
-        successMsg += `\n\n⚠️ ${res.warning}`;
+        successMsg += `\n\nWarning: ${res.warning}`;
       }
 
       Alert.alert("Status Updated", successMsg);
@@ -384,7 +384,7 @@ export default function EvidenceCheckerAvailabilityScreen() {
                   {/* Warning if deactivating checker with active assignments */}
                   {!newIsActive && assignmentHistoryCount.active > 0 && (
                     <View style={styles.modalWarningBox}>
-                      <Text style={styles.modalWarningIcon}>⚠️</Text>
+                      <AppIcon name="warning" size={14} color="#B91C1C" />
                       <Text style={styles.modalWarningText}>
                         <Text style={styles.bold}>Caution:</Text> This checker
                         has {assignmentHistoryCount.active} active review(s).
@@ -1077,9 +1077,6 @@ const styles = StyleSheet.create({
     borderColor: "#FCA5A5",
     marginBottom: 12,
     gap: 8,
-  },
-  modalWarningIcon: {
-    fontSize: 14,
   },
   modalWarningText: {
     flex: 1,

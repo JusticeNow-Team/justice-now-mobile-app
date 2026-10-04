@@ -206,6 +206,35 @@ export default function ReporterDashboard() {
           <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.textInverse} />
         </Pressable>
 
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/reporter/report/preference",
+              params: { mode: "anonymous", instant: "true" },
+            })
+          }
+          style={styles.instantButton}
+        >
+          <View style={styles.instantIcon}>
+            <AppIcon
+              name="alert-triangle"
+              size={iconSizes.lg}
+              color={colors.warning}
+              strokeWidth={2.2}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.instantTitle}>Instant anonymous report</Text>
+
+            <Text style={styles.instantDescription}>
+              Start an urgent report with identity protection already enabled.
+            </Text>
+          </View>
+
+          <AppIcon name="chevron-right" size={iconSizes.xl} color={colors.warning} />
+        </Pressable>
+
         {/* Section */}
 
         <Text style={styles.sectionTitle}>Your JusticeNow</Text>
@@ -484,7 +513,42 @@ const styles = StyleSheet.create({
     lineHeight: 16,
 
     color: "#DCE7FF",
-  },
+  },
+
+  instantButton: {
+    marginTop: 10,
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.gold[100],
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+  },
+
+  instantIcon: {
+    width: 42,
+    height: 42,
+    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.gold[50],
+  },
+
+  instantTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+
+  instantDescription: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
 
   // -----------------------------------------------------
   // Cards

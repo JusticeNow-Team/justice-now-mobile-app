@@ -113,7 +113,10 @@ export async function submitReporterCase(
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getUser();
 
-  if (sessionError || !sessionData.user) {
+  const isAnonymous = draft.reportingMode === "anonymous";
+  const isInstant = draft.isInstantReport;
+
+  if ((sessionError || !sessionData.user) && !isAnonymous) {
     return {
       ok: false,
       reason: "unauthenticated",
@@ -122,6 +125,45 @@ export async function submitReporterCase(
   }
 
   const user = sessionData.user;
+
+  if (!user && isAnonymous) {
+    const { data, error } = await supabase.rpc("submit_anonymous_reporter_case", {
+      p_title: draft.title.trim(),
+      p_description: buildDescription(draft),
+      p_category: categoryLabels(draft.categories),
+      p_incident_date: draft.incidentDate.trim(),
+      p_district: draft.district,
+      p_priority: isInstant ? "urgent" : "medium",
+      p_submission_channel: isInstant ? "instant_anonymous" : "anonymous",
+    });
+
+    const submittedCase = Array.isArray(data) ? data[0] : data;
+
+    if (error || !submittedCase) {
+      return {
+        ok: false,
+        reason: "generic",
+        message:
+          error?.message ||
+          "JusticeNow could not save your anonymous case. Please try again.",
+      };
+    }
+
+    return {
+      ok: true,
+      id: submittedCase.id,
+      caseReference: submittedCase.case_reference,
+      submittedAt: submittedCase.created_at,
+    };
+  }
+
+  if (!user) {
+    return {
+      ok: false,
+      reason: "unauthenticated",
+      message: "Please sign in to submit a case.",
+    };
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -137,14 +179,35 @@ export async function submitReporterCase(
     };
   }
 
-  const { data, error } = await supabase.rpc("submit_reporter_case", {
+  const enhancedArgs = {
     p_title: draft.title.trim(),
     p_description: buildDescription(draft),
     p_category: categoryLabels(draft.categories),
     p_incident_date: draft.incidentDate.trim(),
     p_district: draft.district,
-    p_is_anonymous: draft.reportingMode === "anonymous",
-  });
+    p_is_anonymous: isAnonymous,
+    p_priority: isInstant ? "urgent" : "medium",
+    p_submission_channel: isInstant ? "instant" : "standard",
+  };
+
+  let { data, error } = await supabase.rpc(
+    "submit_reporter_case_v2",
+    enhancedArgs,
+  );
+
+  if (error && !isInstant) {
+    const fallback = await supabase.rpc("submit_reporter_case", {
+      p_title: enhancedArgs.p_title,
+      p_description: enhancedArgs.p_description,
+      p_category: enhancedArgs.p_category,
+      p_incident_date: enhancedArgs.p_incident_date,
+      p_district: enhancedArgs.p_district,
+      p_is_anonymous: enhancedArgs.p_is_anonymous,
+    });
+
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   const submittedCase = Array.isArray(data) ? data[0] : data;
 

@@ -90,9 +90,14 @@ Seed files live in `scripts/seeds/` and should be applied in numeric order:
 005_audit_events_immutable.sql
 006_evidence_assignment.sql
 007_case_withdrawal_review.sql
+008_checker_availability.sql
+009_workflow_status_config.sql
+010_anonymous_instant_messages.sql
+011_system_settings.sql
+012_admin_case_assignments.sql
 ```
 
-These scripts define roles, permissions, categories, staff management, audit controls, evidence assignment and validation workflows, and case withdrawal review support.
+These scripts define roles, permissions, categories, staff management, audit controls, evidence assignment and validation workflows, checker availability, workflow statuses, anonymous reporting/messages, case withdrawal review support, admin system settings, and admin case-to-officer assignments.
 
 ## Authentication Notes
 

@@ -33,15 +33,19 @@ export const provinces = [
   "Sabaragamuwa Province",
 ];
 
-export const districts = [
-  "Colombo",
-  "Gampaha",
-  "Kalutara",
-  "Kandy",
-  "Galle",
-  "Batticaloa",
-  "Jaffna",
-];
+export const districtsByProvince: Record<string, string[]> = {
+  "Western Province": ["Colombo", "Gampaha", "Kalutara"],
+  "Central Province": ["Kandy", "Matale", "Nuwara Eliya"],
+  "Southern Province": ["Galle", "Matara", "Hambantota"],
+  "Northern Province": ["Jaffna", "Kilinochchi", "Mannar", "Mullaitivu", "Vavuniya"],
+  "Eastern Province": ["Batticaloa", "Ampara", "Trincomalee"],
+  "North Western Province": ["Kurunegala", "Puttalam"],
+  "North Central Province": ["Anuradhapura", "Polonnaruwa"],
+  "Uva Province": ["Badulla", "Monaragala"],
+  "Sabaragamuwa Province": ["Ratnapura", "Kegalle"],
+};
+
+export const districts = Object.values(districtsByProvince).flat();
 
 export const ageOptions = [
   "Under 12",

@@ -28,7 +28,6 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<LoginErrors>({});
   const [formError, setFormError] = useState("");
   const [staffPrompt, setStaffPrompt] = useState(false);
-  const [infoMessage, setInfoMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const clearFieldError = (field: keyof LoginErrors) => {
@@ -44,7 +43,6 @@ export default function LoginScreen() {
   const handleSignIn = async () => {
     setFormError("");
     setStaffPrompt(false);
-    setInfoMessage("");
 
     const nextErrors = validateReporterLogin({ email, password });
     setErrors(nextErrors);
@@ -101,7 +99,6 @@ export default function LoginScreen() {
               clearFieldError("email");
               setFormError("");
               setStaffPrompt(false);
-              setInfoMessage("");
             }}
             placeholder="you@example.com"
             keyboardType="email-address"
@@ -203,19 +200,12 @@ export default function LoginScreen() {
         variant="outline"
         icon="circle"
         onPress={() =>
-          setInfoMessage(
-            "Anonymous reporting will be connected when we implement the case reporting flow."
-          )
+          router.push({
+            pathname: "/reporter/report/preference",
+            params: { mode: "anonymous" },
+          })
         }
       />
-
-      {infoMessage ? (
-        <View style={styles.privacyWrap}>
-          <Notice tone="info" title="Coming soon">
-            {infoMessage}
-          </Notice>
-        </View>
-      ) : null}
 
       <View style={styles.privacyWrap}>
         <Notice tone="privacy">

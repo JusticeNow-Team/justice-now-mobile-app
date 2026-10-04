@@ -12,10 +12,7 @@ export function ReportFlow({ children }: { children: ReactNode }) {
     const guard = async () => {
       const result = await getReporterProfile();
 
-      if (
-        !result.ok &&
-        (result.reason === "unauthenticated" || result.reason === "forbidden")
-      ) {
+      if (!result.ok && result.reason === "forbidden") {
         await logoutReporter().catch(() => undefined);
         router.replace("/login");
       }

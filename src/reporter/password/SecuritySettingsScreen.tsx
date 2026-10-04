@@ -116,6 +116,7 @@ export default function SecuritySettingsScreen() {
             <PrimaryButton
               title="Sign out of all other devices"
               variant="destructive"
+              icon="log-out"
               onPress={() => comingSoon("Sign out of all other devices")}
             />
           </View>

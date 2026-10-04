@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +21,11 @@ import {
   SectionCard,
 } from "../../components/common";
 import { colors } from "../../theme";
+import {
+  CaseMessage,
+  getCaseMessages,
+  sendCaseMessage,
+} from "../../messages/caseMessages";
 import { logoutReporter } from "../login";
 import { profileInitials } from "../profile/types";
 import { formatCaseDate, formatCaseDateTime } from "./filterReporterCases";
@@ -40,7 +46,13 @@ import {
 import ReporterStatusBadge from "./ReporterStatusBadge";
 import WithdrawalRequestDialog from "./WithdrawalRequestDialog";
 
-type DetailTab = "overview" | "progress" | "requests" | "evidence" | "activity";
+type DetailTab =
+  | "overview"
+  | "progress"
+  | "requests"
+  | "messages"
+  | "evidence"
+  | "activity";
 
 function splitDescription(value: string | null) {
   if (!value) {
@@ -104,6 +116,10 @@ export default function CaseDetailScreen() {
   const [informationRequests, setInformationRequests] = useState<
     ReporterInformationRequest[]
   >([]);
+  const [messages, setMessages] = useState<CaseMessage[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messagesError, setMessagesError] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [withdrawalRequest, setWithdrawalRequest] =
     useState<ReporterWithdrawalRequest | null>(null);
   const [withdrawalOpen, setWithdrawalOpen] = useState(false);
@@ -145,6 +161,15 @@ export default function CaseDetailScreen() {
         setHistory(result.history);
         setInformationRequests(result.informationRequests);
         setWithdrawalRequest(result.withdrawalRequest);
+
+        const messageResult = await getCaseMessages(result.detail.id);
+        if (messageResult.ok) {
+          setMessages(messageResult.messages);
+          setMessagesError("");
+        } else {
+          setMessages([]);
+          setMessagesError(messageResult.message);
+        }
       } catch {
         setErrorMessage(
           "JusticeNow could not load this case. Please try again.",
@@ -199,6 +224,38 @@ export default function CaseDetailScreen() {
     }
   };
 
+  const submitCaseMessage = async () => {
+    if (!detail || sendingMessage) {
+      return;
+    }
+
+    try {
+      setSendingMessage(true);
+      setMessagesError("");
+
+      const result = await sendCaseMessage({
+        caseId: detail.id,
+        body: messageDraft,
+        reporterVisible: true,
+      });
+
+      if (!result.ok) {
+        setMessagesError(result.message);
+        return;
+      }
+
+      setMessageDraft("");
+      const nextMessages = await getCaseMessages(detail.id);
+      if (nextMessages.ok) {
+        setMessages(nextMessages.messages);
+      } else {
+        setMessagesError(nextMessages.message);
+      }
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   const description = splitDescription(detail?.description ?? null);
   const openInformationRequest = informationRequests.find(
     (request) => request.status === "sent"
@@ -227,6 +284,11 @@ export default function CaseDetailScreen() {
       id: "requests",
       label: "Requests",
       count: informationRequests.length,
+    },
+    {
+      id: "messages",
+      label: "Messages",
+      count: messages.length,
     },
     {
       id: "evidence",
@@ -600,6 +662,61 @@ export default function CaseDetailScreen() {
             </View>
           ) : null}
 
+          {tab === "messages" ? (
+            <View style={styles.stack}>
+              <SectionCard
+                title="Secure messages"
+                description="Case messages stay inside JusticeNow and are visible to authorised case staff."
+              >
+                {messagesError ? (
+                  <Notice tone="caution" title="Messages unavailable">
+                    {messagesError}
+                  </Notice>
+                ) : null}
+
+                {messages.length === 0 && !messagesError ? (
+                  <Text style={styles.officerRole}>
+                    No case messages have been sent yet.
+                  </Text>
+                ) : (
+                  messages.map((message) => (
+                    <View key={message.id} style={styles.messageBubble}>
+                      <Text style={styles.messageAuthor}>
+                        {message.senderRole === "reporter"
+                          ? "You"
+                          : "JusticeNow staff"}
+                      </Text>
+                      <Text style={styles.messageBody}>{message.body}</Text>
+                      <Text style={styles.messageTime}>
+                        {formatCaseDateTime(message.createdAt)}
+                      </Text>
+                    </View>
+                  ))
+                )}
+
+                <View style={styles.messageComposer}>
+                  <TextInput
+                    value={messageDraft}
+                    onChangeText={setMessageDraft}
+                    placeholder="Write a secure message..."
+                    placeholderTextColor={colors.textSoft}
+                    multiline
+                    maxLength={2000}
+                    textAlignVertical="top"
+                    style={styles.messageInput}
+                    editable={!sendingMessage}
+                  />
+                  <PrimaryButton
+                    title="Send message"
+                    icon="message-square"
+                    loading={sendingMessage}
+                    onPress={() => void submitCaseMessage()}
+                  />
+                </View>
+              </SectionCard>
+            </View>
+          ) : null}
+
           {tab === "evidence" ? (
             <View style={styles.stack}>
               {evidence.length === 0 ? (
@@ -926,6 +1043,44 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     lineHeight: 17,
     color: colors.navy[800],
+  },
+  messageBubble: {
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.royal[50],
+  },
+  messageAuthor: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.royal[700],
+  },
+  messageBody: {
+    marginTop: 4,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.navy[800],
+  },
+  messageTime: {
+    marginTop: 6,
+    fontSize: 10.5,
+    color: colors.textSoft,
+  },
+  messageComposer: {
+    marginTop: 12,
+    gap: 10,
+  },
+  messageInput: {
+    minHeight: 96,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.navy[800],
+    backgroundColor: colors.surface,
   },
   evidenceCard: {
     padding: 14,

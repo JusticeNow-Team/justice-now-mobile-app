@@ -17,6 +17,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import { supabase } from "../../lib/supabase";
+import {
+  CaseMessage,
+  getCaseMessages,
+  sendCaseMessage,
+} from "../../messages/caseMessages";
 import { colors, iconSizes } from "../../theme";
 
 type CaseStatus =
@@ -110,7 +115,13 @@ type WithdrawalRequestRecord = {
   reviewer_name: string | null;
 };
 
-type CaseDetailsTab = "overview" | "requests" | "evidence" | "notes" | "activity";
+type CaseDetailsTab =
+  | "overview"
+  | "requests"
+  | "messages"
+  | "evidence"
+  | "notes"
+  | "activity";
 
 const STATUS_OPTIONS: {
   value: CaseStatus;
@@ -143,6 +154,11 @@ const CASE_DETAILS_TABS: {
   {
     value: "requests",
     label: "Requests",
+    icon: "message-square",
+  },
+  {
+    value: "messages",
+    label: "Messages",
     icon: "message-square",
   },
   {
@@ -207,10 +223,15 @@ export default function CaseDetailsScreen() {
   >([]);
   const [withdrawalReason, setWithdrawalReason] = useState("");
   const [newNote, setNewNote] = useState("");
+  const [messages, setMessages] = useState<CaseMessage[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messagesError, setMessagesError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [reviewingAssignment, setReviewingAssignment] = useState(false);
   const [reviewingWithdrawal, setReviewingWithdrawal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeTab, setActiveTab] = useState<CaseDetailsTab>("overview");
@@ -405,6 +426,15 @@ export default function CaseDetailsScreen() {
           setInformationRequests(records);
         }
 
+        const messageResult = await getCaseMessages(caseId);
+        if (messageResult.ok) {
+          setMessages(messageResult.messages);
+          setMessagesError("");
+        } else {
+          setMessages([]);
+          setMessagesError(messageResult.message);
+        }
+
         const { data: withdrawalData, error: withdrawalError } =
           await supabase.rpc("get_officer_case_withdrawal_requests", {
             p_case_id: caseId,
@@ -504,6 +534,38 @@ export default function CaseDetailsScreen() {
     }
   };
 
+  const sendReporterMessage = async () => {
+    if (!caseId || sendingMessage) {
+      return;
+    }
+
+    try {
+      setSendingMessage(true);
+      setMessagesError("");
+
+      const result = await sendCaseMessage({
+        caseId,
+        body: messageDraft,
+        reporterVisible: true,
+      });
+
+      if (!result.ok) {
+        setMessagesError(result.message);
+        return;
+      }
+
+      setMessageDraft("");
+      const nextMessages = await getCaseMessages(caseId);
+      if (nextMessages.ok) {
+        setMessages(nextMessages.messages);
+      } else {
+        setMessagesError(nextMessages.message);
+      }
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   const performStatusUpdate = async (nextStatus: CaseStatus) => {
     if (!caseId) {
       return;
@@ -582,6 +644,92 @@ export default function CaseDetailsScreen() {
       {
         text: "Update",
         onPress: () => void performStatusUpdate(nextStatus),
+      },
+    ]);
+  };
+
+  const reviewAssignment = (
+    decision: "accepted" | "rejected",
+  ) => {
+    if (!caseId || reviewingAssignment) {
+      return;
+    }
+
+    const actionLabel = decision === "accepted" ? "accept" : "reject";
+    const confirmation =
+      decision === "accepted"
+        ? "Accept this case and move it into under review?"
+        : "Reject this assignment and return the case to the admin assignment queue?";
+
+    const performReview = async () => {
+      try {
+        setReviewingAssignment(true);
+
+        const { error } = await supabase.rpc("review_case_assignment", {
+          p_case_id: caseId,
+          p_decision: decision,
+        });
+
+        if (error) {
+          const message = `Unable to ${actionLabel} assignment: ${error.message}`;
+
+          if (Platform.OS === "web") {
+            window.alert(message);
+          } else {
+            Alert.alert("Assignment review failed", message);
+          }
+
+          return;
+        }
+
+        await loadWorkspace(false);
+
+        const message =
+          decision === "accepted"
+            ? "Case accepted. It is now under review."
+            : "Assignment rejected. The case was returned to the assignment queue.";
+
+        if (Platform.OS === "web") {
+          window.alert(message);
+        } else {
+          Alert.alert("Assignment reviewed", message);
+        }
+
+        if (decision === "rejected") {
+          router.replace("/officer/cases");
+        }
+      } catch (error) {
+        console.error("ASSIGNMENT REVIEW ERROR:", error);
+
+        const message = "JusticeNow could not review this assignment.";
+
+        if (Platform.OS === "web") {
+          window.alert(message);
+        } else {
+          Alert.alert("Review failed", message);
+        }
+      } finally {
+        setReviewingAssignment(false);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm(confirmation)) {
+        void performReview();
+      }
+
+      return;
+    }
+
+    Alert.alert("Review case assignment", confirmation, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: decision === "accepted" ? "Accept" : "Reject",
+        style: decision === "accepted" ? "default" : "destructive",
+        onPress: () => void performReview(),
       },
     ]);
   };
@@ -823,6 +971,70 @@ export default function CaseDetailsScreen() {
 
         {activeTab === "overview" ? (
           <>
+        {caseData.status === "assigned" || caseData.status === "submitted" ? (
+          <>
+            <Text style={styles.sectionTitle}>Assignment review</Text>
+
+            <View style={styles.assignmentReviewCard}>
+              <View style={styles.assignmentReviewHeader}>
+                <View style={styles.assignmentReviewIcon}>
+                  <AppIcon
+                    name="clipboard-check"
+                    size={iconSizes.md}
+                    color={colors.royal[700]}
+                  />
+                </View>
+
+                <View style={styles.assignmentReviewText}>
+                  <Text style={styles.assignmentReviewTitle}>
+                    New case assignment
+                  </Text>
+
+                  <Text style={styles.assignmentReviewDescription}>
+                    Accept this case to begin initial review, or reject it so a
+                    System Admin can route it to another officer.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.assignmentReviewActions}>
+                <Pressable
+                  onPress={() => reviewAssignment("rejected")}
+                  disabled={reviewingAssignment}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.assignmentRejectButton,
+                    pressed && styles.pressed,
+                    reviewingAssignment && styles.disabledButton,
+                  ]}
+                >
+                  <Text style={styles.assignmentRejectText}>Reject</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => reviewAssignment("accepted")}
+                  disabled={reviewingAssignment}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.assignmentAcceptButton,
+                    pressed && styles.pressed,
+                    reviewingAssignment && styles.disabledButton,
+                  ]}
+                >
+                  {reviewingAssignment ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.textInverse}
+                    />
+                  ) : (
+                    <Text style={styles.assignmentAcceptText}>Accept case</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </>
+        ) : null}
+
         {withdrawalRequests.some((item) =>
           ["requested", "pending"].includes(item.status),
         ) ? (
@@ -1305,6 +1517,117 @@ export default function CaseDetailsScreen() {
           </>
         ) : null}
 
+        {activeTab === "messages" ? (
+          <>
+            <Text style={styles.sectionTitle}>Secure case messages</Text>
+
+            <View style={styles.sectionCard}>
+              <Text style={styles.statusHelp}>
+                Reporter-visible messages are separate from internal
+                investigation notes.
+              </Text>
+
+              {messagesError ? (
+                <View style={styles.errorNotice}>
+                  <Text style={styles.errorNoticeTitle}>
+                    Messages unavailable
+                  </Text>
+                  <Text style={styles.errorNoticeText}>{messagesError}</Text>
+                </View>
+              ) : null}
+
+              {messages.length === 0 && !messagesError ? (
+                <View style={styles.emptyCard}>
+                  <AppIcon
+                    name="message-square"
+                    size={iconSizes.xl}
+                    color={colors.royal[700]}
+                  />
+                  <Text style={styles.emptyTitle}>No secure messages</Text>
+                  <Text style={styles.emptyText}>
+                    Messages sent by the Reporter or case staff will appear
+                    here.
+                  </Text>
+                </View>
+              ) : (
+                messages.map((message) => (
+                  <View key={message.id} style={styles.caseMessageCard}>
+                    <View style={styles.caseMessageHeader}>
+                      <Text style={styles.caseMessageAuthor}>
+                        {message.senderRole === "reporter"
+                          ? "Reporter"
+                          : "Case staff"}
+                      </Text>
+                      <Text style={styles.caseMessageDate}>
+                        {formatDateTime(message.createdAt)}
+                      </Text>
+                    </View>
+                    <Text style={styles.caseMessageBody}>{message.body}</Text>
+                  </View>
+                ))
+              )}
+
+              {caseData.reporter_id ? (
+                <View style={styles.caseMessageComposer}>
+                  <Text style={styles.noteLabel}>Message to Reporter</Text>
+                  <TextInput
+                    value={messageDraft}
+                    onChangeText={setMessageDraft}
+                    placeholder="Write a secure, reporter-visible message..."
+                    placeholderTextColor={colors.textSoft}
+                    multiline
+                    maxLength={2000}
+                    textAlignVertical="top"
+                    editable={!sendingMessage}
+                    style={styles.caseMessageInput}
+                  />
+                  <View style={styles.noteBottomRow}>
+                    <Text style={styles.characterCount}>
+                      {messageDraft.length}/2000
+                    </Text>
+                    <Pressable
+                      onPress={() => void sendReporterMessage()}
+                      disabled={sendingMessage}
+                      accessibilityRole="button"
+                      style={[
+                        styles.saveNoteButton,
+                        sendingMessage && styles.disabledButton,
+                      ]}
+                    >
+                      {sendingMessage ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.textInverse}
+                        />
+                      ) : (
+                        <Text style={styles.saveNoteText}>Send message</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.securityNotice}>
+                  <AppIcon
+                    name="lock"
+                    size={iconSizes.md}
+                    color={colors.teal[800]}
+                    style={styles.securityIcon}
+                  />
+                  <View style={styles.securityContent}>
+                    <Text style={styles.securityTitle}>
+                      Anonymous no-account report
+                    </Text>
+                    <Text style={styles.securityText}>
+                      This case has no reporter account attached, so direct
+                      in-app replies are not available.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </>
+        ) : null}
+
         {activeTab === "evidence" ? (
           <>
         <Text style={styles.sectionTitle}>Case evidence</Text>
@@ -1476,7 +1799,7 @@ export default function CaseDetailsScreen() {
 
                   <View style={styles.historyContent}>
                     <Text style={styles.historyTitle}>
-                      {formatStatus(item.old_status)} â†’{" "}
+                      {formatStatus(item.old_status)} to{" "}
                       {formatStatus(item.new_status)}
                     </Text>
 
@@ -1904,6 +2227,74 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: colors.textSecondary,
   },
+  assignmentReviewCard: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: colors.royal[100],
+    borderRadius: 14,
+    backgroundColor: colors.royal[50],
+  },
+  assignmentReviewHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 11,
+  },
+  assignmentReviewIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  assignmentReviewText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  assignmentReviewTitle: {
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: colors.navy[800],
+  },
+  assignmentReviewDescription: {
+    marginTop: 4,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.textSecondary,
+  },
+  assignmentReviewActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 13,
+  },
+  assignmentRejectButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  assignmentRejectText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.error,
+  },
+  assignmentAcceptButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: colors.royal[700],
+  },
+  assignmentAcceptText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.textInverse,
+  },
   withdrawalCard: {
     padding: 15,
     borderWidth: 1,
@@ -2289,6 +2680,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: colors.navy[700],
+  },
+  errorNotice: {
+    marginTop: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#F4C7C3",
+    borderRadius: 12,
+    backgroundColor: "#FFF2F1",
+  },
+  errorNoticeTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.error,
+  },
+  errorNoticeText: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  caseMessageCard: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.royal[50],
+  },
+  caseMessageHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  caseMessageAuthor: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.royal[700],
+  },
+  caseMessageDate: {
+    fontSize: 10,
+    color: colors.textSoft,
+  },
+  caseMessageBody: {
+    marginTop: 5,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.navy[800],
+  },
+  caseMessageComposer: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  caseMessageInput: {
+    minHeight: 104,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.navy[200],
+    borderRadius: 11,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.navy[800],
+    backgroundColor: colors.background,
   },
   emptyCard: {
     padding: 20,
