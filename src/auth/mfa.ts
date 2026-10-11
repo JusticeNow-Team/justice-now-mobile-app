@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 
-export const STAFF_MFA_TEMPORARILY_DISABLED = true;
+export const STAFF_MFA_TEMPORARILY_DISABLED = false;
 
 export async function hasCompletedStaffMfa() {
   if (STAFF_MFA_TEMPORARILY_DISABLED) {

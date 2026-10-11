@@ -117,8 +117,23 @@ let localVerificationHistory: VerificationHistoryItem[] =
       decidedAt: new Date(Date.now() - (index + 1) * 24 * 60 * 60 * 1000).toISOString(),
     }));
 
+function hasLocalOnlyBackend() {
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+
+  return !supabaseUrl || supabaseUrl.includes("placeholder");
+}
+
+function isMissingRpcError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    FALLBACK_ERROR_CODES.has(String((error as { code?: unknown }).code))
+  );
+}
+
 function shouldUseLocalFallback(error: unknown) {
-  return Boolean(error) || process.env.EXPO_PUBLIC_SUPABASE_URL?.includes("placeholder") === true;
+  return hasLocalOnlyBackend() || isMissingRpcError(error);
 }
 
 function warnUsingLocalFallback(scope: string, error: unknown) {
@@ -129,7 +144,7 @@ function warnUsingLocalFallback(scope: string, error: unknown) {
         ? String((error as { message?: unknown }).message)
         : String(error || "No backend response.");
 
-  console.warn(`Using local validator fallback for ${scope}:`, message);
+  console.warn(`Validator service issue while trying to ${scope}:`, message);
 }
 
 function getLocalAssignedEvidence() {
@@ -282,7 +297,11 @@ export async function getMyAssignedEvidence() {
 
     if (error) {
       warnUsingLocalFallback("assigned evidence", error);
-      return getLocalAssignedEvidence();
+      if (shouldUseLocalFallback(error)) {
+        return getLocalAssignedEvidence();
+      }
+
+      throw new Error(error.message || "Assigned evidence could not be loaded.");
     }
 
     const rows = ((data ?? []) as EvidenceRow[]).map(mapEvidence);
@@ -290,7 +309,13 @@ export async function getMyAssignedEvidence() {
     return rows.length > 0 ? rows : getLocalAssignedEvidence();
   } catch (error) {
     warnUsingLocalFallback("assigned evidence", error);
-    return getLocalAssignedEvidence();
+    if (shouldUseLocalFallback(error)) {
+      return getLocalAssignedEvidence();
+    }
+
+    throw error instanceof Error
+      ? error
+      : new Error("Assigned evidence could not be loaded.");
   }
 }
 
@@ -315,19 +340,35 @@ export async function getEvidenceAssignmentDetail(assignmentId: string) {
 
     if (error) {
       warnUsingLocalFallback("assignment detail", error);
-      return getLocalAssignedEvidence()[0];
+      if (shouldUseLocalFallback(error)) {
+        return getLocalAssignedEvidence()[0];
+      }
+
+      throw new Error(
+        error.message || "This evidence assignment could not be loaded.",
+      );
     }
 
     const row = (Array.isArray(data) ? data[0] : data) as EvidenceRow | null;
 
     if (!row) {
-      return getLocalAssignedEvidence()[0];
+      if (hasLocalOnlyBackend()) {
+        return getLocalAssignedEvidence()[0];
+      }
+
+      throw new Error("This active evidence assignment could not be found.");
     }
 
     return mapEvidence(row);
   } catch (error) {
     warnUsingLocalFallback("assignment detail", error);
-    return getLocalAssignedEvidence()[0];
+    if (shouldUseLocalFallback(error)) {
+      return getLocalAssignedEvidence()[0];
+    }
+
+    throw error instanceof Error
+      ? error
+      : new Error("This evidence assignment could not be loaded.");
   }
 }
 
@@ -346,6 +387,8 @@ export async function startEvidenceReview(assignmentId: string) {
       warnUsingLocalFallback("start review", error);
       if (assignmentId.startsWith(`${LOCAL_ASSIGNMENT_PREFIX}-`)) {
         markLocalReviewStarted(assignmentId);
+      } else if (!shouldUseLocalFallback(error)) {
+        throw new Error(error.message || "Evidence review could not be started.");
       }
       return;
     }
@@ -353,6 +396,10 @@ export async function startEvidenceReview(assignmentId: string) {
     warnUsingLocalFallback("start review", error);
     if (assignmentId.startsWith(`${LOCAL_ASSIGNMENT_PREFIX}-`)) {
       markLocalReviewStarted(assignmentId);
+    } else if (!shouldUseLocalFallback(error)) {
+      throw error instanceof Error
+        ? error
+        : new Error("Evidence review could not be started.");
     }
   }
 }
@@ -407,8 +454,10 @@ export async function submitEvidenceDecision(
       warnUsingLocalFallback("submit decision", error);
       if (input.assignmentId.startsWith(`${LOCAL_ASSIGNMENT_PREFIX}-`)) {
         saveLocalDecision(input);
+        return { ok: true, source: "local-fallback" };
       }
-      return { ok: true, source: "local-fallback" };
+
+      throw new Error(error.message || "The evidence decision was not saved.");
     }
 
     return data;
@@ -416,8 +465,12 @@ export async function submitEvidenceDecision(
     warnUsingLocalFallback("submit decision", error);
     if (input.assignmentId.startsWith(`${LOCAL_ASSIGNMENT_PREFIX}-`)) {
       saveLocalDecision(input);
+      return { ok: true, source: "local-fallback" };
     }
-    return { ok: true, source: "local-fallback" };
+
+    throw error instanceof Error
+      ? error
+      : new Error("The evidence decision was not saved.");
   }
 }
 

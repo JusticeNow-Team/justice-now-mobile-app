@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../../auth";
 import { AppIcon } from "../../components/AppIcon";
+import { useAppConfirm } from "../../components/common";
 import {
   canDeactivateStaff,
   checkDuplicateStaffEmail,
@@ -110,6 +110,7 @@ function formatLastActive(staff: StaffAccount) {
 
 export default function AdminStaffScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
   const { user } = useAuth();
 
   const [staff, setStaff] = useState<StaffAccount[]>([]);
@@ -352,7 +353,7 @@ export default function AdminStaffScreen() {
     }
   };
 
-  const requestStatusUpdate = (account: StaffAccount) => {
+  const requestStatusUpdate = async (account: StaffAccount) => {
     const activate = !account.isActive;
 
     if (!activate) {
@@ -371,27 +372,16 @@ export default function AdminStaffScreen() {
       ? `Activate ${account.fullName}'s account?`
       : `Suspend ${account.fullName}'s account? They will be unable to sign in.`;
 
-    if (Platform.OS === "web") {
-      if (window.confirm(message)) {
-        void executeStatusUpdate(account, activate);
-      }
+    const confirmed = await confirm({
+      title: activate ? "Activate account" : "Suspend account",
+      message,
+      confirmLabel: activate ? "Activate" : "Suspend",
+      danger: !activate,
+    });
 
-      return;
+    if (confirmed) {
+      void executeStatusUpdate(account, activate);
     }
-
-    Alert.alert(activate ? "Activate account" : "Suspend account", message, [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: activate ? "Activate" : "Suspend",
-        style: activate ? "default" : "destructive",
-        onPress: () => {
-          void executeStatusUpdate(account, activate);
-        },
-      },
-    ]);
   };
 
   return (

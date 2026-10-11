@@ -1,8 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -16,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon } from "../../components/AppIcon";
+import { DateField, useAppFeedback } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -59,6 +59,7 @@ function todayIsoDate() {
 
 export default function RequestInformationScreen() {
   const router = useRouter();
+  const { showFeedback } = useAppFeedback();
 
   const params = useLocalSearchParams<{
     caseId?: string | string[];
@@ -84,6 +85,10 @@ export default function RequestInformationScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const minimumDueDate = useMemo(
+    () => new Date(`${todayIsoDate()}T00:00:00`),
+    [],
+  );
 
   const loadRequestWorkspace = useCallback(async () => {
     if (!caseId) {
@@ -224,10 +229,11 @@ export default function RequestInformationScreen() {
 
   const addRequestedItem = () => {
     if (requestedItems.length >= 10) {
-      Alert.alert(
-        "Item limit reached",
-        "A request can contain up to 10 information items.",
-      );
+      showFeedback({
+        tone: "warning",
+        title: "Item limit reached",
+        message: "A request can contain up to 10 information items.",
+      });
       return;
     }
 
@@ -286,7 +292,11 @@ export default function RequestInformationScreen() {
     const validationError = validateRequest(status);
 
     if (validationError) {
-      Alert.alert("Check request", validationError);
+      showFeedback({
+        tone: "warning",
+        title: "Check request",
+        message: validationError,
+      });
       return;
     }
 
@@ -317,6 +327,7 @@ export default function RequestInformationScreen() {
         due_date: dueDate || null,
         send_reminder: sendReminder,
         status,
+        sent_at: status === "sent" ? new Date().toISOString() : null,
       };
 
       if (requestId) {
@@ -347,33 +358,48 @@ export default function RequestInformationScreen() {
         setRequestId(data.id);
       }
 
-      if (status === "draft") {
-        Alert.alert(
-          "Draft saved",
-          "The information request was saved securely and has not been sent to the Reporter.",
+      if (status === "sent") {
+        const { error: statusError } = await supabase.rpc(
+          "update_officer_case_status",
+          {
+            p_case_id: caseId,
+            p_status: "awaiting_information",
+          },
         );
+
+        if (statusError) {
+          throw statusError;
+        }
+      }
+
+      if (status === "draft") {
+        showFeedback({
+          tone: "success",
+          title: "Draft saved",
+          message:
+            "The information request was saved securely and has not been sent to the Reporter.",
+        });
         return;
       }
 
-      Alert.alert(
-        "Request sent",
-        "The Reporter received a discreet notification. The request is now part of the case record.",
-        [
-          {
-            text: "Return to case",
-            onPress: () => router.back(),
-          },
-        ],
-      );
+      showFeedback({
+        tone: "success",
+        title: "Request sent",
+        message:
+          "The Reporter received a discreet notification. The request is now part of the case record.",
+      });
+      router.back();
     } catch (error) {
       console.error("SAVE INFORMATION REQUEST ERROR:", error);
 
-      Alert.alert(
-        status === "sent" ? "Unable to send request" : "Unable to save draft",
-        error instanceof Error
-          ? error.message
-          : "JusticeNow could not save the information request.",
-      );
+      showFeedback({
+        tone: "error",
+        title: status === "sent" ? "Unable to send request" : "Unable to save draft",
+        message:
+          error instanceof Error
+            ? error.message
+            : "JusticeNow could not save the information request.",
+      });
     } finally {
       setSaving(false);
     }
@@ -555,16 +581,14 @@ export default function RequestInformationScreen() {
 
             <Text style={styles.label}>Response due by</Text>
 
-            <TextInput
+            <DateField
               value={dueDate}
-              onChangeText={setDueDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textSoft}
-              keyboardType="numbers-and-punctuation"
-              autoCapitalize="none"
-              maxLength={10}
-              editable={!saving}
-              style={styles.input}
+              onChange={setDueDate}
+              placeholder="Select response due date"
+              minimumDate={minimumDueDate}
+              disabled={saving}
+              accessibilityLabel="Response due date"
+              style={styles.dateField}
             />
 
             <Text style={styles.fieldHint}>
@@ -767,6 +791,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.navy[800],
     backgroundColor: colors.surface,
+  },
+  dateField: {
+    marginBottom: 14,
   },
   messageInput: {
     minHeight: 120,

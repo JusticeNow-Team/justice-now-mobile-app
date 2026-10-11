@@ -165,10 +165,6 @@ begin
     raise exception 'You must be signed in to view withdrawal requests.';
   end if;
 
-  if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
-    raise exception 'Multi-factor authentication is required.';
-  end if;
-
   if not exists (
     select 1
     from public.profiles as officer

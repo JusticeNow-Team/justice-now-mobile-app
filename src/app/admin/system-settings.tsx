@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth";
 import { normalizeRole } from "../../auth/roles";
 import { AppIcon } from "../../components/AppIcon";
+import { useAppConfirm } from "../../components/common";
 import {
   getSystemSettings,
   SETTINGS_LIMITS,
@@ -50,6 +50,7 @@ function formatTime(isoString?: string): string {
 
 export default function AdminSettingsScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
   const { user, signOut } = useAuth();
 
   const userRole = normalizeRole(user?.role);
@@ -260,25 +261,19 @@ export default function AdminSettingsScreen() {
     setSuccessMessage("");
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     const message = "Administrator sessions end immediately when you sign out.";
 
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(`Sign out?\n\n${message}`);
-      if (confirmed) {
-        void signOut().then(() => router.replace("/login"));
-      }
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Sign out?",
+      message,
+      confirmLabel: "Sign out",
+      danger: true,
+    });
 
-    Alert.alert("Sign out?", message, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: () => void signOut().then(() => router.replace("/login")),
-      },
-    ]);
+    if (confirmed) {
+      void signOut().then(() => router.replace("/login"));
+    }
   };
 
   return (

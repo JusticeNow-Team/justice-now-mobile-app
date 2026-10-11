@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { View } from "react-native";
 
 import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
+import StaffNotificationAlert from "../../notifications/StaffNotificationAlert";
 
 export default function OfficerLayout() {
   return (
@@ -11,6 +12,8 @@ export default function OfficerLayout() {
           headerShown: false,
         }}
       />
+
+      <StaffNotificationAlert />
 
       <RoleBottomNavigation role="case_officer" />
     </View>

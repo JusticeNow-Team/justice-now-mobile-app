@@ -223,26 +223,20 @@ export async function getReporterCaseDetail(
 
   let officer: ReporterOfficerPublic | null = null;
 
-  const { data: assignment } = await supabase
-    .from("case_assignments")
-    .select("assigned_officer_id, is_active")
-    .eq("case_id", caseId)
-    .eq("is_active", true)
-    .maybeSingle();
+  const { data: officerRows } = await supabase.rpc(
+    "get_reporter_case_officer_public",
+    {
+      p_case_id: caseId,
+    },
+  );
 
-  if (assignment?.assigned_officer_id) {
-    const { data: officerProfile } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", assignment.assigned_officer_id)
-      .maybeSingle();
+  const officerRow = Array.isArray(officerRows) ? officerRows[0] : officerRows;
 
-    if (officerProfile?.role === "case_officer") {
-      officer = {
-        fullName: officerProfile.full_name || "Assigned investigator",
-        roleLabel: "Assigned investigator",
-      };
-    }
+  if (officerRow?.full_name) {
+    officer = {
+      fullName: officerRow.full_name,
+      roleLabel: officerRow.role_label || "Assigned investigator",
+    };
   }
 
   const { data: evidenceRows } = await supabase

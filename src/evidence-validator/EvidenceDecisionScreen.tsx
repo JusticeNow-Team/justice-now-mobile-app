@@ -2,7 +2,6 @@ import { Href, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon, AppIconName } from "../components/AppIcon";
+import { useAppConfirm, useAppFeedback } from "../components/common";
 import { colors, iconSizes } from "../theme";
 import { getEvidenceAssignmentDetail, submitEvidenceDecision } from "./api";
 import {
@@ -105,6 +105,8 @@ const REASONS: Record<EvidenceDecision, string[]> = {
 
 export default function EvidenceDecisionScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
+  const { showFeedback } = useAppFeedback();
 
   const params = useLocalSearchParams<{
     id?: string | string[];
@@ -126,6 +128,7 @@ export default function EvidenceDecisionScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -169,6 +172,12 @@ export default function EvidenceDecisionScreen() {
     () => (reason === "Other" ? otherReason.trim() : reason.trim()),
     [otherReason, reason],
   );
+  const needsReporterMessage =
+    decision === "replacement_requested" || decision === "rejected";
+  const reasonReady = finalReason.length >= 5;
+  const reporterMessageReady =
+    !needsReporterMessage || reporterMessage.trim().length >= 10;
+  const canSubmit = reasonReady && reporterMessageReady && !saving;
 
   const detailHref = assignmentId
     ? (`/validator/evidence/${assignmentId}` as Href)
@@ -182,7 +191,7 @@ export default function EvidenceDecisionScreen() {
   };
 
   const saveDecision = async () => {
-    if (!assignmentId || finalReason.length < 3) {
+    if (!assignmentId || !canSubmit) {
       return;
     }
 
@@ -197,49 +206,57 @@ export default function EvidenceDecisionScreen() {
         reporterMessage,
       });
 
-      Alert.alert(
-        "Decision recorded",
-        "The evidence decision was saved to the audit trail.",
-        [
-          {
-            text: "Back to queue",
-            onPress: () => router.replace("/validator/queue" as Href),
-          },
-        ],
-      );
+      showFeedback({
+        tone: "success",
+        title: "Decision recorded",
+        message: "The evidence decision was saved to the audit trail.",
+      });
+      router.replace("/validator/queue" as Href);
     } catch (error) {
-      Alert.alert(
-        "Decision not saved",
-        error instanceof Error ? error.message : "Please try again.",
-      );
+      showFeedback({
+        tone: "error",
+        title: "Decision not saved",
+        message: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const confirmDecision = () => {
-    if (finalReason.length < 3) {
-      Alert.alert(
-        "Reason required",
-        "Choose or enter a reason for this decision.",
-      );
+  const confirmDecision = async () => {
+    setSubmitAttempted(true);
+
+    if (!reasonReady) {
+      showFeedback({
+        tone: "warning",
+        title: "Reason required",
+        message: "Choose or enter a reason with at least 5 characters.",
+      });
       return;
     }
 
-    Alert.alert(
-      "Submit evidence decision?",
-      "This creates a permanent audit entry and completes the assignment.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Submit",
-          onPress: () => void saveDecision(),
-        },
-      ],
-    );
+    if (!reporterMessageReady) {
+      showFeedback({
+        tone: "warning",
+        title: "Reporter explanation needed",
+        message:
+          "For rejected or replacement decisions, add a short plain-language message for the reporter.",
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: "Submit evidence decision?",
+      message:
+        "This creates a permanent audit entry, completes the assignment, and returns you to the validation queue.",
+      confirmLabel: "Submit",
+      cancelLabel: "Review",
+      danger: decision === "rejected",
+    });
+
+    if (confirmed) {
+      void saveDecision();
+    }
   };
 
   if (loading) {
@@ -264,6 +281,24 @@ export default function EvidenceDecisionScreen() {
         showsVerticalScrollIndicator={false}
       >
         {errorMessage ? <ErrorCard message={errorMessage} /> : null}
+
+        <View style={styles.progressCard}>
+          <View style={styles.progressIcon}>
+            <AppIcon
+              name="shield-check"
+              color={colors.royal[700]}
+              size={iconSizes.md}
+            />
+          </View>
+
+          <View style={styles.progressCopy}>
+            <Text style={styles.progressTitle}>Decision checklist</Text>
+            <Text style={styles.progressText}>
+              Pick an outcome, choose a reason, then submit. Rejections and
+              replacement requests also need a reporter-facing explanation.
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.options}>
           {DECISIONS.map((option) => {
@@ -381,6 +416,12 @@ export default function EvidenceDecisionScreen() {
               style={styles.textArea}
             />
           ) : null}
+
+          {submitAttempted && !reasonReady ? (
+            <Text style={styles.fieldError}>
+              Add a reason with at least 5 characters.
+            </Text>
+          ) : null}
         </SectionCard>
 
         <SectionCard
@@ -415,6 +456,19 @@ export default function EvidenceDecisionScreen() {
           />
 
           <Text style={styles.counter}>{reporterMessage.length} / 400</Text>
+
+          {needsReporterMessage ? (
+            <Text style={styles.requiredHint}>
+              Required for rejected or replacement decisions.
+            </Text>
+          ) : null}
+
+          {submitAttempted && !reporterMessageReady ? (
+            <Text style={styles.fieldError}>
+              Add at least 10 characters so the reporter knows what happens
+              next.
+            </Text>
+          ) : null}
         </SectionCard>
 
         <View style={styles.privacyCard}>
@@ -444,11 +498,11 @@ export default function EvidenceDecisionScreen() {
         </Pressable>
 
         <Pressable
-          disabled={saving || finalReason.length < 3}
-          onPress={confirmDecision}
+          disabled={saving}
+          onPress={() => void confirmDecision()}
           style={({ pressed }) => [
             styles.submitButton,
-            (saving || finalReason.length < 3) && styles.disabled,
+            !canSubmit && styles.disabled,
             pressed && styles.pressed,
           ]}
         >
@@ -485,6 +539,43 @@ const styles = StyleSheet.create({
 
   disabled: {
     opacity: 0.45,
+  },
+
+  progressCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.royal[100],
+    borderRadius: 14,
+    backgroundColor: colors.royal[50],
+  },
+
+  progressIcon: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+
+  progressCopy: {
+    flex: 1,
+  },
+
+  progressTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+
+  progressText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textSecondary,
   },
 
   options: {
@@ -617,6 +708,20 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     textAlign: "right",
     color: colors.textSoft,
+  },
+
+  requiredHint: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.warning,
+  },
+
+  fieldError: {
+    marginTop: 6,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.errorStrong,
   },
 
   privacyCard: {

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
+import { useAppFeedback } from "../../components/common";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { colors, iconSizes } from "../../theme";
 
@@ -36,6 +36,7 @@ function shortStaffId(value?: string) {
 
 export default function OfficerProfileRoute() {
   const router = useRouter();
+  const { showFeedback } = useAppFeedback();
   const { user, role, isLoading, signOut, refreshProfile } = useAuth();
 
   const [showSignOut, setShowSignOut] = useState(false);
@@ -80,11 +81,7 @@ export default function OfficerProfileRoute() {
       const message =
         error instanceof Error ? error.message : "Please try again.";
 
-      if (Platform.OS === "web") {
-        window.alert(`Could not sign out: ${message}`);
-      } else {
-        Alert.alert("Could not sign out", message);
-      }
+      showFeedback({ tone: "error", title: "Could not sign out", message });
     } finally {
       setSigningOut(false);
     }

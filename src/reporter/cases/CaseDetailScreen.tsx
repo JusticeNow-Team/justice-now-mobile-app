@@ -101,11 +101,15 @@ export default function CaseDetailScreen() {
 
   const params = useLocalSearchParams<{
     id?: string | string[];
+    tab?: string | string[];
   }>();
 
   const caseId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const initialTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
 
-  const [tab, setTab] = useState<DetailTab>("overview");
+  const [tab, setTab] = useState<DetailTab>(
+    initialTab === "messages" ? "messages" : "overview",
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");

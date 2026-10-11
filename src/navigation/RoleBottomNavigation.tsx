@@ -1,8 +1,10 @@
-import { Href, usePathname, useRouter } from "expo-router";
+import { Href, useFocusEffect, usePathname, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppIcon, AppIconName } from "../components/AppIcon";
+import { supabase } from "../lib/supabase";
 import { colors, iconSizes } from "../theme";
 
 export type NavigationRole =
@@ -170,6 +172,13 @@ function isCurrentPath(pathname: string, item: NavigationItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
+function shouldShowStaffBadge(role: NavigationRole, item: NavigationItem) {
+  return (
+    (role === "case_officer" && item.href === "/officer/messages") ||
+    (role === "evidence_validator" && item.href === "/validator/notifications")
+  );
+}
+
 export default function RoleBottomNavigation({
   role,
 }: {
@@ -178,6 +187,87 @@ export default function RoleBottomNavigation({
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  const staffNotificationsEnabled =
+    role === "case_officer" || role === "evidence_validator";
+
+  const loadUnreadNotifications = useCallback(async () => {
+    if (!staffNotificationsEnabled) {
+      setUnreadNotifications(0);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setUnreadNotifications(0);
+      return;
+    }
+
+    const { count, error } = await supabase
+      .from("officer_notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("officer_id", user.id)
+      .eq("is_read", false);
+
+    if (!error) {
+      setUnreadNotifications(count ?? 0);
+    }
+  }, [staffNotificationsEnabled]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadUnreadNotifications();
+    }, [loadUnreadNotifications]),
+  );
+
+  useEffect(() => {
+    if (!staffNotificationsEnabled) {
+      return undefined;
+    }
+
+    let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const start = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || !mounted) {
+        return;
+      }
+
+      channel = supabase
+        .channel(`staff-notification-badge-${role}-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "officer_notifications",
+            filter: `officer_id=eq.${user.id}`,
+          },
+          () => {
+            void loadUnreadNotifications();
+          },
+        )
+        .subscribe();
+    };
+
+    void start();
+
+    return () => {
+      mounted = false;
+
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [loadUnreadNotifications, role, staffNotificationsEnabled]);
 
   const shouldHide = HIDDEN_PREFIXES[role].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -200,6 +290,8 @@ export default function RoleBottomNavigation({
       <View style={styles.navigationRow}>
         {ROLE_NAVIGATION[role].map((item) => {
           const active = isCurrentPath(pathname, item);
+          const showBadge =
+            unreadNotifications > 0 && shouldShowStaffBadge(role, item);
 
           const iconColor =
             active || item.prominent ? colors.royal[700] : colors.textSecondary;
@@ -229,7 +321,21 @@ export default function RoleBottomNavigation({
                   />
                 </View>
               ) : (
-                <AppIcon name={item.icon} color={iconColor} size={iconSizes.nav} />
+                <View style={styles.iconSlot}>
+                  <AppIcon
+                    name={item.icon}
+                    color={iconColor}
+                    size={iconSizes.nav}
+                  />
+
+                  {showBadge ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               )}
 
               <Text
@@ -283,6 +389,34 @@ const styles = StyleSheet.create({
 
   pressed: {
     opacity: 0.65,
+  },
+
+  iconSlot: {
+    width: iconSizes.nav + 16,
+    height: iconSizes.nav + 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 2,
+    minWidth: 17,
+    height: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.surface,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.error,
+  },
+
+  badgeText: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: colors.surface,
   },
 
   prominentButton: {

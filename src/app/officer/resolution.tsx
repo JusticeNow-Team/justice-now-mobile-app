@@ -1,8 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "../../components/AppIcon";
+import { useAppFeedback } from "../../components/common";
 import { colors, iconSizes } from "../../theme";
 
 type ResolutionOutcome = "resolved" | "escalated" | "closed";
@@ -49,6 +48,7 @@ function firstParam(value?: string | string[]) {
 
 export default function OfficerResolutionScreen() {
   const router = useRouter();
+  const { showFeedback } = useAppFeedback();
   const params = useLocalSearchParams<{
     caseId?: string | string[];
     reference?: string | string[];
@@ -69,11 +69,7 @@ export default function OfficerResolutionScreen() {
           ? "Closure notes have been prepared for this case."
           : "Resolution notes have been prepared for this case.";
 
-    if (Platform.OS === "web") {
-      window.alert(message);
-    } else {
-      Alert.alert("Resolution prepared", message);
-    }
+    showFeedback({ tone: "success", title: "Resolution prepared", message });
 
     router.back();
   };

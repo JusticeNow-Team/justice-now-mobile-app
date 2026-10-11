@@ -104,17 +104,6 @@ export default function ReporterDashboard() {
   };
 
   // -------------------------------------------------------
-  // Placeholder Actions
-  // -------------------------------------------------------
-
-  const comingSoon = (feature: string) => {
-    Alert.alert(
-      feature,
-      `${feature} will be connected in the next Reporter module step.`,
-    );
-  };
-
-  // -------------------------------------------------------
   // Loading
   // -------------------------------------------------------
 
@@ -207,12 +196,7 @@ export default function ReporterDashboard() {
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/reporter/report/preference",
-              params: { mode: "anonymous", instant: "true" },
-            })
-          }
+          onPress={() => router.push("/reporter/report/instant" as any)}
           style={styles.instantButton}
         >
           <View style={styles.instantIcon}>
@@ -225,10 +209,10 @@ export default function ReporterDashboard() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.instantTitle}>Instant anonymous report</Text>
+            <Text style={styles.instantTitle}>Emergency instant report</Text>
 
             <Text style={styles.instantDescription}>
-              Start an urgent report with identity protection already enabled.
+              One tap captures location, date and time, then submits urgently.
             </Text>
           </View>
 
@@ -260,7 +244,7 @@ export default function ReporterDashboard() {
         {/* Support */}
 
         <Pressable
-          onPress={() => comingSoon("Support Services")}
+          onPress={() => router.push("/reporter/support" as any)}
           style={styles.card}
         >
           <View style={styles.cardIconTeal}>
@@ -268,7 +252,9 @@ export default function ReporterDashboard() {
           </View>
 
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>Support Services</Text>
+            <Text style={[styles.cardTitle, styles.softCardTitle]}>
+              Support Services
+            </Text>
 
             <Text style={styles.cardDescription}>
               Find legal, counselling and emergency support.
@@ -281,7 +267,7 @@ export default function ReporterDashboard() {
         {/* Rights */}
 
         <Pressable
-          onPress={() => comingSoon("Know Your Rights")}
+          onPress={() => router.push("/reporter/rights" as any)}
           style={styles.card}
         >
           <View style={styles.cardIconGold}>
@@ -289,7 +275,9 @@ export default function ReporterDashboard() {
           </View>
 
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>Know Your Rights</Text>
+            <Text style={[styles.cardTitle, styles.softCardTitle]}>
+              Know Your Rights
+            </Text>
 
             <Text style={styles.cardDescription}>
               Access simple information about human rights and available
@@ -637,6 +625,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
 
     color: colors.navy[800],
+  },
+
+  softCardTitle: {
+    fontWeight: "500",
   },
 
   cardDescription: {

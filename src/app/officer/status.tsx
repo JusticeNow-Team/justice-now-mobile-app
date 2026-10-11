@@ -2,8 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "../../components/AppIcon";
+import { useAppFeedback } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -52,6 +51,7 @@ function firstParam(value?: string | string[]) {
 
 export default function OfficerStatusScreen() {
   const router = useRouter();
+  const { showFeedback } = useAppFeedback();
   const params = useLocalSearchParams<{
     caseId?: string | string[];
     reference?: string | string[];
@@ -78,11 +78,11 @@ export default function OfficerStatusScreen() {
 
       if (error) {
         const message = `Unable to update status: ${error.message}`;
-        if (Platform.OS === "web") {
-          window.alert(message);
-        } else {
-          Alert.alert("Unable to update status", error.message);
-        }
+        showFeedback({
+          tone: "error",
+          title: "Unable to update status",
+          message,
+        });
         return;
       }
 
@@ -93,11 +93,7 @@ export default function OfficerStatusScreen() {
           ? error.message
           : "JusticeNow could not update this case.";
 
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Update failed", message);
-      }
+      showFeedback({ tone: "error", title: "Update failed", message });
     } finally {
       setSaving(false);
     }

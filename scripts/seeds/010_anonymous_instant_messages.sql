@@ -89,6 +89,8 @@ declare
   v_profile public.profiles%rowtype;
   v_case_id uuid;
   v_reference text;
+  v_priority public.cases.priority%type;
+  v_submission_channel public.cases.submission_channel%type;
 begin
   if v_user_id is null then
     raise exception 'Authentication is required for identified reporter submissions.';
@@ -111,6 +113,9 @@ begin
   if p_submission_channel not in ('standard', 'instant', 'anonymous', 'instant_anonymous') then
     raise exception 'Invalid submission channel.';
   end if;
+
+  v_priority := p_priority;
+  v_submission_channel := p_submission_channel;
 
   v_reference := 'JN-' || to_char(now(), 'YYYYMMDD') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 
@@ -137,8 +142,8 @@ begin
     nullif(trim(p_district), ''),
     'submitted',
     p_is_anonymous,
-    p_priority,
-    p_submission_channel
+    v_priority,
+    v_submission_channel
   )
   returning cases.id into v_case_id;
 
@@ -158,7 +163,7 @@ begin
     'Reporter submitted the case securely.',
     v_user_id,
     true,
-    jsonb_build_object('priority', p_priority, 'submission_channel', p_submission_channel)
+    jsonb_build_object('priority', v_priority::text, 'submission_channel', v_submission_channel::text)
   );
 
   return query
@@ -189,6 +194,8 @@ as $$
 declare
   v_case_id uuid;
   v_reference text;
+  v_priority public.cases.priority%type;
+  v_submission_channel public.cases.submission_channel%type;
 begin
   if p_priority not in ('low', 'medium', 'high', 'urgent') then
     raise exception 'Invalid case priority.';
@@ -197,6 +204,9 @@ begin
   if p_submission_channel not in ('anonymous', 'instant_anonymous') then
     raise exception 'Anonymous reports must use an anonymous submission channel.';
   end if;
+
+  v_priority := p_priority;
+  v_submission_channel := p_submission_channel;
 
   v_reference := 'JN-' || to_char(now(), 'YYYYMMDD') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 
@@ -223,8 +233,8 @@ begin
     nullif(trim(p_district), ''),
     'submitted',
     true,
-    p_priority,
-    p_submission_channel
+    v_priority,
+    v_submission_channel
   )
   returning cases.id into v_case_id;
 
@@ -246,7 +256,7 @@ begin
     end,
     'An anonymous reporter submitted the case securely.',
     false,
-    jsonb_build_object('priority', p_priority, 'submission_channel', p_submission_channel)
+    jsonb_build_object('priority', v_priority::text, 'submission_channel', v_submission_channel::text)
   );
 
   return query

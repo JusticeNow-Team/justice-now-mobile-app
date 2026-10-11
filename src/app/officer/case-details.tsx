@@ -3,7 +3,6 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
+import { useAppConfirm, useAppFeedback } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import {
   CaseMessage,
@@ -204,12 +204,16 @@ function parseInformationAnswers(value: unknown): InformationAnswer[] {
 
 export default function CaseDetailsScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
+  const { showFeedback } = useAppFeedback();
 
   const params = useLocalSearchParams<{
     id?: string | string[];
+    tab?: string | string[];
   }>();
 
   const caseId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const initialTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
 
   const [caseData, setCaseData] = useState<JusticeCase | null>(null);
   const [notes, setNotes] = useState<InvestigationNote[]>([]);
@@ -234,7 +238,9 @@ export default function CaseDetailsScreen() {
   const [reviewingAssignment, setReviewingAssignment] = useState(false);
   const [reviewingWithdrawal, setReviewingWithdrawal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<CaseDetailsTab>("overview");
+  const [activeTab, setActiveTab] = useState<CaseDetailsTab>(
+    initialTab === "messages" ? "messages" : "overview",
+  );
 
   const verifySecureSession = useCallback(async () => {
     const mfa = await hasCompletedStaffMfa();
@@ -438,10 +444,18 @@ export default function CaseDetailsScreen() {
         const { data: withdrawalData, error: withdrawalError } =
           await supabase.rpc("get_officer_case_withdrawal_requests", {
             p_case_id: caseId,
-          });
+        });
 
         if (withdrawalError) {
-          console.error("WITHDRAWAL REQUEST ERROR:", withdrawalError);
+          const isMfaReadGate =
+            withdrawalError.message
+              ?.toLowerCase()
+              .includes("multi-factor authentication") ?? false;
+
+          if (!isMfaReadGate) {
+            console.error("WITHDRAWAL REQUEST ERROR:", withdrawalError);
+          }
+
           setWithdrawalRequests([]);
         } else {
           setWithdrawalRequests(
@@ -476,7 +490,30 @@ export default function CaseDetailsScreen() {
     void loadWorkspace(false);
   };
 
+  const isAssignmentPending =
+    caseData?.status === "assigned" || caseData?.status === "submitted";
+  const visibleTabs = isAssignmentPending
+    ? CASE_DETAILS_TABS.filter((tab) => tab.value === "overview")
+    : CASE_DETAILS_TABS;
+  const currentTab: CaseDetailsTab = isAssignmentPending
+    ? "overview"
+    : activeTab;
+
+  const showAssignmentLockedMessage = () => {
+    showFeedback({
+      tone: "warning",
+      title: "Case not accepted",
+      message:
+        "Accept this case before using investigation actions, messages, evidence, notes, or status updates.",
+    });
+  };
+
   const addNote = async () => {
+    if (isAssignmentPending) {
+      showAssignmentLockedMessage();
+      return;
+    }
+
     const cleanNote = newNote.trim();
 
     if (cleanNote.length < 3) {
@@ -535,6 +572,11 @@ export default function CaseDetailsScreen() {
   };
 
   const sendReporterMessage = async () => {
+    if (isAssignmentPending) {
+      showAssignmentLockedMessage();
+      return;
+    }
+
     if (!caseId || sendingMessage) {
       return;
     }
@@ -567,6 +609,11 @@ export default function CaseDetailsScreen() {
   };
 
   const performStatusUpdate = async (nextStatus: CaseStatus) => {
+    if (isAssignmentPending) {
+      showAssignmentLockedMessage();
+      return;
+    }
+
     if (!caseId) {
       return;
     }
@@ -580,11 +627,11 @@ export default function CaseDetailsScreen() {
       });
 
       if (error) {
-        if (Platform.OS === "web") {
-          window.alert(`Unable to update status: ${error.message}`);
-        } else {
-          Alert.alert("Unable to update status", error.message);
-        }
+        showFeedback({
+          tone: "error",
+          title: "Unable to update status",
+          message: error.message,
+        });
 
         return;
       }
@@ -593,27 +640,24 @@ export default function CaseDetailsScreen() {
 
       const message = `Case status changed to ${formatStatus(nextStatus)}.`;
 
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Status updated", message);
-      }
+      showFeedback({ tone: "success", title: "Status updated", message });
     } catch (error) {
       console.error("STATUS UPDATE ERROR:", error);
 
       const message = "JusticeNow could not update the case status.";
 
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Update failed", message);
-      }
+      showFeedback({ tone: "error", title: "Update failed", message });
     } finally {
       setUpdatingStatus(false);
     }
   };
 
-  const updateStatus = (nextStatus: CaseStatus) => {
+  const updateStatus = async (nextStatus: CaseStatus) => {
+    if (isAssignmentPending) {
+      showAssignmentLockedMessage();
+      return;
+    }
+
     if (!caseId || !caseData || updatingStatus) {
       return;
     }
@@ -626,29 +670,19 @@ export default function CaseDetailsScreen() {
       caseData.status,
     )}" to "${formatStatus(nextStatus)}"?`;
 
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(message);
+    const confirmed = await confirm({
+      title: "Update case status",
+      message,
+      confirmLabel: "Update",
+    });
 
-      if (confirmed) {
-        void performStatusUpdate(nextStatus);
-      }
-
-      return;
+    if (confirmed) {
+      void performStatusUpdate(nextStatus);
     }
 
-    Alert.alert("Update case status", message, [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Update",
-        onPress: () => void performStatusUpdate(nextStatus),
-      },
-    ]);
   };
 
-  const reviewAssignment = (
+  const reviewAssignment = async (
     decision: "accepted" | "rejected",
   ) => {
     if (!caseId || reviewingAssignment) {
@@ -673,11 +707,11 @@ export default function CaseDetailsScreen() {
         if (error) {
           const message = `Unable to ${actionLabel} assignment: ${error.message}`;
 
-          if (Platform.OS === "web") {
-            window.alert(message);
-          } else {
-            Alert.alert("Assignment review failed", message);
-          }
+          showFeedback({
+            tone: "error",
+            title: "Assignment review failed",
+            message,
+          });
 
           return;
         }
@@ -689,11 +723,11 @@ export default function CaseDetailsScreen() {
             ? "Case accepted. It is now under review."
             : "Assignment rejected. The case was returned to the assignment queue.";
 
-        if (Platform.OS === "web") {
-          window.alert(message);
-        } else {
-          Alert.alert("Assignment reviewed", message);
-        }
+        showFeedback({
+          tone: decision === "accepted" ? "success" : "info",
+          title: "Assignment reviewed",
+          message,
+        });
 
         if (decision === "rejected") {
           router.replace("/officer/cases");
@@ -703,52 +737,45 @@ export default function CaseDetailsScreen() {
 
         const message = "JusticeNow could not review this assignment.";
 
-        if (Platform.OS === "web") {
-          window.alert(message);
-        } else {
-          Alert.alert("Review failed", message);
-        }
+        showFeedback({ tone: "error", title: "Review failed", message });
       } finally {
         setReviewingAssignment(false);
       }
     };
 
-    if (Platform.OS === "web") {
-      if (window.confirm(confirmation)) {
-        void performReview();
-      }
+    const confirmed = await confirm({
+      title: "Review case assignment",
+      message: confirmation,
+      confirmLabel: decision === "accepted" ? "Accept" : "Reject",
+      danger: decision === "rejected",
+    });
 
-      return;
+    if (confirmed) {
+      void performReview();
     }
 
-    Alert.alert("Review case assignment", confirmation, [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: decision === "accepted" ? "Accept" : "Reject",
-        style: decision === "accepted" ? "default" : "destructive",
-        onPress: () => void performReview(),
-      },
-    ]);
   };
 
   const reviewWithdrawalRequest = async (
     requestId: string,
     decision: "approved" | "rejected",
   ) => {
+    if (isAssignmentPending) {
+      showAssignmentLockedMessage();
+      return;
+    }
+
     const cleanReason = withdrawalReason.trim();
 
     if (cleanReason.length < 10) {
       const message =
         "Add a clear decision reason before approving or rejecting this withdrawal request.";
 
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Decision reason required", message);
-      }
+      showFeedback({
+        tone: "warning",
+        title: "Decision reason required",
+        message,
+      });
 
       return;
     }
@@ -772,11 +799,7 @@ export default function CaseDetailsScreen() {
         if (error) {
           const message = `Unable to review withdrawal request: ${error.message}`;
 
-          if (Platform.OS === "web") {
-            window.alert(message);
-          } else {
-            Alert.alert("Review failed", message);
-          }
+          showFeedback({ tone: "error", title: "Review failed", message });
 
           return;
         }
@@ -789,46 +812,34 @@ export default function CaseDetailsScreen() {
             ? "Withdrawal approved. The case has been closed and the Reporter was informed."
             : "Withdrawal rejected. The case remains active and the Reporter was informed.";
 
-        if (Platform.OS === "web") {
-          window.alert(message);
-        } else {
-          Alert.alert("Withdrawal reviewed", message);
-        }
+        showFeedback({
+          tone: "success",
+          title: "Withdrawal reviewed",
+          message,
+        });
       } catch (error) {
         console.error("WITHDRAWAL REVIEW ERROR:", error);
 
         const message =
           "JusticeNow could not submit the withdrawal decision. Please try again.";
 
-        if (Platform.OS === "web") {
-          window.alert(message);
-        } else {
-          Alert.alert("Review failed", message);
-        }
+        showFeedback({ tone: "error", title: "Review failed", message });
       } finally {
         setReviewingWithdrawal(false);
       }
     };
 
-    if (Platform.OS === "web") {
-      if (window.confirm(confirmation)) {
-        void performReview();
-      }
+    const confirmed = await confirm({
+      title: "Review withdrawal request",
+      message: confirmation,
+      confirmLabel: decision === "approved" ? "Approve" : "Reject",
+      danger: decision === "rejected",
+    });
 
-      return;
+    if (confirmed) {
+      void performReview();
     }
 
-    Alert.alert("Review withdrawal request", confirmation, [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: decision === "approved" ? "Approve" : "Reject",
-        style: decision === "approved" ? "default" : "destructive",
-        onPress: () => void performReview(),
-      },
-    ]);
   };
 
   if (loading) {
@@ -934,8 +945,8 @@ export default function CaseDetailsScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabList}
         >
-          {CASE_DETAILS_TABS.map((tab) => {
-            const active = activeTab === tab.value;
+          {visibleTabs.map((tab) => {
+            const active = currentTab === tab.value;
 
             return (
               <Pressable
@@ -969,9 +980,9 @@ export default function CaseDetailsScreen() {
           })}
         </ScrollView>
 
-        {activeTab === "overview" ? (
+        {currentTab === "overview" ? (
           <>
-        {caseData.status === "assigned" || caseData.status === "submitted" ? (
+        {isAssignmentPending ? (
           <>
             <Text style={styles.sectionTitle}>Assignment review</Text>
 
@@ -1035,7 +1046,7 @@ export default function CaseDetailsScreen() {
           </>
         ) : null}
 
-        {withdrawalRequests.some((item) =>
+        {!isAssignmentPending && withdrawalRequests.some((item) =>
           ["requested", "pending"].includes(item.status),
         ) ? (
           <>
@@ -1186,6 +1197,8 @@ export default function CaseDetailsScreen() {
           </Text>
         </View>
 
+        {!isAssignmentPending ? (
+          <>
         <Text style={styles.sectionTitle}>Officer actions</Text>
 
         <View style={styles.actionGrid}>
@@ -1199,20 +1212,6 @@ export default function CaseDetailsScreen() {
                 params: {
                   caseId: caseData.id,
                   reference: caseData.case_reference,
-                },
-              })
-            }
-          />
-
-          <ActionTile
-            icon="message-square"
-            title="Request information"
-            description="Ask the reporter for structured follow-up details."
-            onPress={() =>
-              router.push({
-                pathname: "/officer/request-information",
-                params: {
-                  caseId: caseData.id,
                 },
               })
             }
@@ -1289,9 +1288,24 @@ export default function CaseDetailsScreen() {
           </>
         )}
           </>
+        ) : (
+          <View style={styles.assignmentLockedCard}>
+            <AppIcon name="lock" size={iconSizes.md} color={colors.teal[800]} />
+            <View style={styles.assignmentLockedText}>
+              <Text style={styles.assignmentLockedTitle}>
+                Investigation actions locked
+              </Text>
+              <Text style={styles.assignmentLockedDescription}>
+                Accept this assignment to unlock requests, messages, evidence,
+                notes, status updates, and resolution tools.
+              </Text>
+            </View>
+          </View>
+        )}
+          </>
         ) : null}
 
-        {activeTab === "requests" ? (
+        {currentTab === "requests" ? (
           <>
         <Text style={styles.sectionTitle}>Information request history</Text>
 
@@ -1517,7 +1531,7 @@ export default function CaseDetailsScreen() {
           </>
         ) : null}
 
-        {activeTab === "messages" ? (
+        {currentTab === "messages" ? (
           <>
             <Text style={styles.sectionTitle}>Secure case messages</Text>
 
@@ -1628,7 +1642,7 @@ export default function CaseDetailsScreen() {
           </>
         ) : null}
 
-        {activeTab === "evidence" ? (
+        {currentTab === "evidence" ? (
           <>
         <Text style={styles.sectionTitle}>Case evidence</Text>
 
@@ -1679,7 +1693,7 @@ export default function CaseDetailsScreen() {
                 <Pressable
                   key={option.value}
                   disabled={updatingStatus}
-                  onPress={() => updateStatus(option.value)}
+                  onPress={() => void updateStatus(option.value)}
                   accessibilityRole="button"
                   accessibilityState={{
                     selected: active,
@@ -1713,7 +1727,7 @@ export default function CaseDetailsScreen() {
           </>
         ) : null}
 
-        {activeTab === "notes" ? (
+        {currentTab === "notes" ? (
           <>
         <Text style={styles.sectionTitle}>Investigation notes</Text>
 
@@ -1782,7 +1796,7 @@ export default function CaseDetailsScreen() {
           </>
         ) : null}
 
-        {activeTab === "activity" ? (
+        {currentTab === "activity" ? (
           <>
         <Text style={styles.sectionTitle}>Status history</Text>
 
@@ -2294,6 +2308,31 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "600",
     color: colors.textInverse,
+  },
+  assignmentLockedCard: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.teal[100],
+    borderRadius: 14,
+    backgroundColor: colors.teal[50],
+  },
+  assignmentLockedText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  assignmentLockedTitle: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: colors.teal[800],
+  },
+  assignmentLockedDescription: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
   withdrawalCard: {
     padding: 15,

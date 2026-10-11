@@ -3,7 +3,6 @@ import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +22,7 @@ import {
   useAuth,
 } from "../auth";
 import { AppIcon, AppIconName } from "../components/AppIcon";
+import { useAppConfirm } from "../components/common";
 import {
   getStaffAccountById,
   getStaffAccounts,
@@ -541,6 +541,7 @@ function HealthRow({
 
 export function SettingsScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
   const { user, signOut } = useAuth();
 
   const [policies, setPolicies] = useState({
@@ -562,30 +563,19 @@ export function SettingsScreen() {
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     const message = "Administrator sessions end immediately when you sign out.";
 
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(`Sign out?\n\n${message}`);
+    const confirmed = await confirm({
+      title: "Sign out?",
+      message,
+      confirmLabel: "Sign out",
+      danger: true,
+    });
 
-      if (confirmed) {
-        void performSignOut();
-      }
-
-      return;
+    if (confirmed) {
+      void performSignOut();
     }
-
-    Alert.alert("Sign out?", message, [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: () => void performSignOut(),
-      },
-    ]);
   };
 
   return (

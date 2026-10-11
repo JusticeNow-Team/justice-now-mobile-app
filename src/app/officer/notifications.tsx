@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, usePathname, useRouter } from "expo-router";
 
 import { useCallback, useMemo, useState } from "react";
 
@@ -30,6 +30,8 @@ type NotificationType =
   | "evidence_verified"
   | "evidence_rejected"
   | "case_update"
+  | "case_message"
+  | "evidence_message"
   | "security";
 
 type OfficerNotification = {
@@ -38,6 +40,9 @@ type OfficerNotification = {
   officer_id: string;
 
   case_id: string | null;
+  evidence_id: string | null;
+  assignment_id: string | null;
+  message_id: string | null;
 
   notification_type: NotificationType;
 
@@ -68,6 +73,7 @@ type FilterType = "all" | "unread" | "cases" | "evidence";
 
 export default function OfficerNotificationsScreen() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [notifications, setNotifications] = useState<OfficerNotification[]>([]);
 
@@ -123,6 +129,9 @@ export default function OfficerNotificationsScreen() {
                 id,
                 officer_id,
                 case_id,
+                evidence_id,
+                assignment_id,
+                message_id,
                 notification_type,
                 title,
                 message,
@@ -140,10 +149,6 @@ export default function OfficerNotificationsScreen() {
           .order("created_at", {
             ascending: false,
           });
-
-        console.log("OFFICER NOTIFICATIONS:", data);
-
-        console.log("NOTIFICATION ERROR:", error);
 
         if (error) {
           setErrorMessage(error.message);
@@ -202,13 +207,16 @@ export default function OfficerNotificationsScreen() {
           return !item.is_read;
 
         case "cases":
-          return item.notification_type === "case_assignment";
+          return ["case_assignment", "case_message"].includes(
+            item.notification_type,
+          );
 
         case "evidence":
           return [
             "new_evidence",
             "evidence_verified",
             "evidence_rejected",
+            "evidence_message",
           ].includes(item.notification_type);
 
         case "all":
@@ -267,12 +275,39 @@ export default function OfficerNotificationsScreen() {
     await markRead(notification);
 
     if (notification.case_id) {
+      if (notification.notification_type === "evidence_message") {
+        if (pathname.startsWith("/validator") && notification.assignment_id) {
+          router.push(`/validator/evidence/${notification.assignment_id}` as any);
+          return;
+        }
+
+        if (notification.evidence_id) {
+          router.push({
+            pathname: "/officer/evidence-messages" as any,
+            params: {
+              caseId: notification.case_id,
+              evidenceId: notification.evidence_id,
+              caseReference:
+                notification.cases?.case_reference ?? "Case evidence",
+              title: notification.cases?.title ?? "Evidence thread",
+            },
+          });
+          return;
+        }
+      }
+
       router.push({
         pathname: "/officer/case-details",
 
-        params: {
-          id: notification.case_id,
-        },
+        params:
+          notification.notification_type === "case_message"
+            ? {
+                id: notification.case_id,
+                tab: "messages",
+              }
+            : {
+                id: notification.case_id,
+              },
       });
 
       return;
@@ -609,6 +644,10 @@ function getNotificationIcon(type: NotificationType): AppIconName {
 
     case "evidence_rejected":
       return "alert-triangle";
+
+    case "case_message":
+    case "evidence_message":
+      return "message-square";
 
     case "security":
       return "lock";

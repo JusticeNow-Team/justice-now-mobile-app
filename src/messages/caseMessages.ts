@@ -3,8 +3,12 @@ import { supabase } from "../lib/supabase";
 export type CaseMessage = {
   id: string;
   caseId: string;
+  evidenceId: string | null;
   senderId: string | null;
-  senderRole: "reporter" | "case_officer" | "system_admin";
+  senderRole: "reporter" | "case_officer" | "evidence_checker" | "system_admin";
+  recipientId: string | null;
+  recipientRole: "reporter" | "case_officer" | "evidence_checker" | "system_admin" | null;
+  conversationType: "reporter_officer" | "officer_checker";
   body: string;
   reporterVisible: boolean;
   createdAt: string;
@@ -14,8 +18,17 @@ export type CaseMessage = {
 type CaseMessageRow = {
   id: string;
   case_id: string;
+  evidence_id: string | null;
   sender_id: string | null;
-  sender_role: "reporter" | "case_officer" | "system_admin";
+  sender_role: "reporter" | "case_officer" | "evidence_checker" | "system_admin";
+  recipient_id: string | null;
+  recipient_role:
+    | "reporter"
+    | "case_officer"
+    | "evidence_checker"
+    | "system_admin"
+    | null;
+  conversation_type: "reporter_officer" | "officer_checker";
   body: string;
   reporter_visible: boolean;
   created_at: string;
@@ -30,8 +43,12 @@ function mapMessage(row: CaseMessageRow): CaseMessage {
   return {
     id: row.id,
     caseId: row.case_id,
+    evidenceId: row.evidence_id ?? null,
     senderId: row.sender_id,
     senderRole: row.sender_role,
+    recipientId: row.recipient_id ?? null,
+    recipientRole: row.recipient_role ?? null,
+    conversationType: row.conversation_type ?? "reporter_officer",
     body: row.body,
     reporterVisible: row.reporter_visible,
     createdAt: row.created_at,
@@ -41,9 +58,11 @@ function mapMessage(row: CaseMessageRow): CaseMessage {
 
 export async function getCaseMessages(
   caseId: string,
+  evidenceId?: string | null,
 ): Promise<CaseMessageResult> {
   const { data, error } = await supabase.rpc("get_my_case_messages", {
     p_case_id: caseId,
+    p_evidence_id: evidenceId ?? null,
   });
 
   if (error) {
@@ -63,6 +82,7 @@ export async function getCaseMessages(
 
 export async function sendCaseMessage(input: {
   caseId: string;
+  evidenceId?: string | null;
   body: string;
   reporterVisible?: boolean;
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
@@ -80,6 +100,7 @@ export async function sendCaseMessage(input: {
     p_case_id: input.caseId,
     p_body: body,
     p_reporter_visible: input.reporterVisible ?? true,
+    p_evidence_id: input.evidenceId ?? null,
   });
 
   if (error || !data) {

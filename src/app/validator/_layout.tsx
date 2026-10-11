@@ -6,6 +6,7 @@ import { hasCompletedStaffMfa } from "../../auth";
 import { normalizeRole } from "../../auth/roles";
 import { supabase } from "../../lib/supabase";
 import RoleBottomNavigation from "../../navigation/RoleBottomNavigation";
+import StaffNotificationAlert from "../../notifications/StaffNotificationAlert";
 import { colors } from "../../theme";
 
 export default function ValidatorLayout() {
@@ -96,6 +97,8 @@ export default function ValidatorLayout() {
           }}
         />
       </View>
+
+      <StaffNotificationAlert />
 
       <RoleBottomNavigation role="evidence_validator" />
     </View>

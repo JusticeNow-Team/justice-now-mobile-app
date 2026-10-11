@@ -321,7 +321,7 @@ begin
   from public.profiles as checker
   left join public.evidence_assignments as assignment
     on assignment.evidence_checker_id = checker.id
-  where checker.role::text = 'evidence_validator'
+  where checker.role::text in ('evidence_checker', 'evidence_validator')
     and checker.is_active = true
   group by checker.id, checker.full_name
   order by 3 asc, checker.full_name asc;
@@ -452,7 +452,7 @@ begin
   into v_checker_name
   from public.profiles as checker
   where checker.id = p_checker_id
-    and checker.role::text = 'evidence_validator'
+    and checker.role::text in ('evidence_checker', 'evidence_validator')
     and checker.is_active = true;
 
   if v_checker_name is null then
@@ -570,7 +570,7 @@ begin
     select 1
     from public.profiles as checker
     where checker.id = v_checker_id
-      and checker.role::text = 'evidence_validator'
+      and checker.role::text in ('evidence_checker', 'evidence_validator')
       and checker.is_active = true
   ) then
     raise exception 'Only an active Evidence Validator can view this queue.';
@@ -676,7 +676,7 @@ begin
     select 1
     from public.profiles as checker
     where checker.id = v_checker_id
-      and checker.role::text = 'evidence_validator'
+      and checker.role::text in ('evidence_checker', 'evidence_validator')
       and checker.is_active = true
   ) then
     raise exception 'Only an active Evidence Validator can start this review.';
@@ -771,7 +771,7 @@ begin
     select 1
     from public.profiles as checker
     where checker.id = v_checker_id
-      and checker.role::text = 'evidence_validator'
+      and checker.role::text in ('evidence_checker', 'evidence_validator')
       and checker.is_active = true
   ) then
     raise exception 'Only an active Evidence Validator can submit this decision.';
@@ -956,7 +956,7 @@ begin
     select 1
     from public.profiles as checker
     where checker.id = v_checker_id
-      and checker.role::text = 'evidence_validator'
+      and checker.role::text in ('evidence_checker', 'evidence_validator')
       and checker.is_active = true
   ) then
     raise exception 'Only an active Evidence Validator can view this history.';

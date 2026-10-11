@@ -1,1 +1,3 @@
-// Deprecated directory route - replaced by src/app/validator/evidence/[id].tsx
+import EvidenceDetailScreen from "../../../../evidence-validator/EvidenceDetailScreen";
+
+export default EvidenceDetailScreen;

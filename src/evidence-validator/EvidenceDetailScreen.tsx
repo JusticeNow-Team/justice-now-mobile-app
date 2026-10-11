@@ -7,17 +7,23 @@ import {
 } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon, AppIconName } from "../components/AppIcon";
+import { useAppFeedback } from "../components/common";
+import {
+  CaseMessage,
+  getCaseMessages,
+  sendCaseMessage,
+} from "../messages/caseMessages";
 import { colors, iconSizes } from "../theme";
 import {
   createEvidenceSignedUrl,
@@ -52,6 +58,7 @@ type CheckResult = "passed" | "warning" | "failed";
 
 export default function EvidenceDetailScreen() {
   const router = useRouter();
+  const { showFeedback } = useAppFeedback();
 
   const params = useLocalSearchParams<{
     id?: string | string[];
@@ -68,6 +75,10 @@ export default function EvidenceDetailScreen() {
   const [checked, setChecked] = useState(CHECKLIST.map(() => false));
 
   const [errorMessage, setErrorMessage] = useState("");
+  const [messages, setMessages] = useState<CaseMessage[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messagesError, setMessagesError] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!assignmentId) {
@@ -90,6 +101,19 @@ export default function EvidenceDetailScreen() {
       }
 
       setItem(detail);
+
+      const messageResult = await getCaseMessages(
+        detail.caseId,
+        detail.evidenceId,
+      );
+
+      if (messageResult.ok) {
+        setMessages(messageResult.messages);
+        setMessagesError("");
+      } else {
+        setMessages([]);
+        setMessagesError(messageResult.message);
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -175,14 +199,79 @@ export default function EvidenceDetailScreen() {
         await Linking.openURL(url);
       }
     } catch (error) {
-      Alert.alert(
-        "Preview unavailable",
-        error instanceof Error
-          ? error.message
-          : "The secure preview could not be opened.",
-      );
+      showFeedback({
+        tone: "error",
+        title: "Preview unavailable",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The secure preview could not be opened.",
+      });
     } finally {
       setPreviewing(false);
+    }
+  };
+
+  const submitEvidenceMessage = async () => {
+    if (!item || sendingMessage) {
+      return;
+    }
+
+    if (messageDraft.trim().length < 2) {
+      showFeedback({
+        tone: "warning",
+        title: "Message is empty",
+        message: "Write a short note before sending it to the Case Officer.",
+      });
+      return;
+    }
+
+    try {
+      setSendingMessage(true);
+      setMessagesError("");
+
+      const result = await sendCaseMessage({
+        caseId: item.caseId,
+        evidenceId: item.evidenceId,
+        body: messageDraft,
+        reporterVisible: false,
+      });
+
+      if (!result.ok) {
+        setMessagesError(result.message);
+        showFeedback({
+          tone: "error",
+          title: "Message not sent",
+          message: result.message,
+        });
+        return;
+      }
+
+      setMessageDraft("");
+      showFeedback({
+        tone: "success",
+        title: "Message sent",
+        message: "The Case Officer can now see this evidence thread update.",
+      });
+
+      const nextMessages = await getCaseMessages(item.caseId, item.evidenceId);
+
+      if (nextMessages.ok) {
+        setMessages(nextMessages.messages);
+      } else {
+        setMessagesError(nextMessages.message);
+      }
+    } catch (error) {
+      showFeedback({
+        tone: "error",
+        title: "Message not sent",
+        message:
+          error instanceof Error
+            ? error.message
+            : "JusticeNow could not send this message.",
+      });
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -206,6 +295,7 @@ export default function EvidenceDetailScreen() {
 
   const allChecked = checked.every(Boolean);
   const isImage = item.mimeType?.startsWith("image/");
+  const canSendMessage = messageDraft.trim().length >= 2 && !sendingMessage;
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -361,6 +451,69 @@ export default function EvidenceDetailScreen() {
             value={item.isAnonymous ? "Anonymous" : "Identity protected"}
             last
           />
+        </SectionCard>
+
+        <SectionCard
+          title="Officer messages"
+          description="Use this evidence thread for questions that should stay between the Case Officer and Evidence Checker."
+        >
+          {messagesError ? (
+            <View style={styles.messageError}>
+              <Text style={styles.messageErrorText}>{messagesError}</Text>
+            </View>
+          ) : null}
+
+          {messages.length === 0 && !messagesError ? (
+            <Text style={styles.bodyText}>
+              No officer/checker messages have been sent for this evidence yet.
+            </Text>
+          ) : (
+            messages.map((message) => (
+              <View key={message.id} style={styles.threadMessageCard}>
+                <View style={styles.threadMessageTop}>
+                  <Text style={styles.threadMessageAuthor}>
+                    {message.senderRole === "case_officer"
+                      ? "Case Officer"
+                      : message.senderRole === "evidence_checker"
+                        ? "Evidence Checker"
+                        : "JusticeNow staff"}
+                  </Text>
+                  <Text style={styles.threadMessageDate}>
+                    {formatDateTime(message.createdAt)}
+                  </Text>
+                </View>
+                <Text style={styles.threadMessageBody}>{message.body}</Text>
+              </View>
+            ))
+          )}
+
+          <View style={styles.threadComposer}>
+            <TextInput
+              value={messageDraft}
+              onChangeText={setMessageDraft}
+              placeholder="Write a message to the Case Officer..."
+              placeholderTextColor={colors.textSoft}
+              multiline
+              maxLength={2000}
+              textAlignVertical="top"
+              editable={!sendingMessage}
+              style={styles.threadInput}
+            />
+            <Pressable
+              disabled={sendingMessage}
+              onPress={() => void submitEvidenceMessage()}
+              style={({ pressed }) => [
+                styles.threadSendButton,
+                !canSendMessage && styles.disabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.threadSendText}>
+                {sendingMessage ? "Sending..." : "Send message"}
+              </Text>
+              <AppIcon name="message-square" color={colors.surface} size={iconSizes.sm} />
+            </Pressable>
+          </View>
         </SectionCard>
 
         <SectionCard
@@ -664,6 +817,87 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 19,
     color: colors.textSecondary,
+  },
+
+  messageError: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.gold[200],
+    borderRadius: 10,
+    backgroundColor: colors.gold[50],
+  },
+
+  messageErrorText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.warning,
+  },
+
+  threadMessageCard: {
+    marginBottom: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.royal[50],
+  },
+
+  threadMessageTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  threadMessageAuthor: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.royal[700],
+  },
+
+  threadMessageDate: {
+    fontSize: 10,
+    color: colors.textSoft,
+  },
+
+  threadMessageBody: {
+    marginTop: 5,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.navy[800],
+  },
+
+  threadComposer: {
+    marginTop: 12,
+    gap: 10,
+  },
+
+  threadInput: {
+    minHeight: 88,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.navy[800],
+    backgroundColor: colors.surface,
+  },
+
+  threadSendButton: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 10,
+    backgroundColor: colors.royal[700],
+  },
+
+  threadSendText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: colors.surface,
   },
 
   automatedRow: {

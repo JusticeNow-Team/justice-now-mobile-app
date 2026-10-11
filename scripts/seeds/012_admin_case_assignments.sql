@@ -112,6 +112,40 @@ create policy "System Admins can read case officers"
 grant execute on function public.is_current_user_system_admin() to authenticated;
 grant execute on function public.is_active_case_officer(uuid) to authenticated;
 
+drop function if exists public.get_reporter_case_officer_public(uuid);
+
+create function public.get_reporter_case_officer_public(p_case_id uuid)
+returns table (
+  officer_id uuid,
+  full_name text,
+  role_label text
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select
+    officer.id,
+    coalesce(nullif(trim(officer.full_name), ''), 'Assigned investigator') as full_name,
+    'Assigned investigator'::text as role_label
+  from public.cases as case_record
+  join public.case_assignments as assignment
+    on assignment.case_id = case_record.id
+   and assignment.is_active = true
+  join public.profiles as officer
+    on officer.id = assignment.assigned_officer_id
+   and officer.role::text = 'case_officer'
+   and officer.is_active = true
+  where case_record.id = p_case_id
+    and case_record.reporter_id = auth.uid()
+    and case_record.status::text not in ('submitted', 'assigned')
+  order by assignment.assigned_at desc
+  limit 1;
+$$;
+
+grant execute on function public.get_reporter_case_officer_public(uuid) to authenticated;
+
 drop function if exists public.assign_case_to_officer(uuid, uuid);
 
 create function public.assign_case_to_officer(

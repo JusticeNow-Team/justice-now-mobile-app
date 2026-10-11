@@ -198,7 +198,7 @@ export default function LoginScreen() {
       <PrimaryButton
         title="Continue as anonymous reporter"
         variant="outline"
-        icon="circle"
+        icon="eye-off"
         onPress={() =>
           router.push({
             pathname: "/reporter/report/preference",

@@ -6,7 +6,6 @@ import {
     ActivityIndicator,
     Alert,
     Linking,
-    Platform,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -20,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
+import { useAppConfirm, useAppFeedback } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -100,6 +100,8 @@ type ReviewFilter = "all" | ValidationStatus;
 
 export default function EvidenceReviewScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
+  const { showFeedback } = useAppFeedback();
 
   const params = useLocalSearchParams<{
     caseId?: string | string[];
@@ -355,30 +357,14 @@ export default function EvidenceReviewScreen() {
     const actionLabel = formatCaseAction(action);
     const confirmMessage = getActionConfirmation(action);
 
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(confirmMessage);
+    const confirmed = await confirm({
+      title: "Confirm case action",
+      message: confirmMessage,
+      confirmLabel: actionLabel,
+    });
 
-      if (!confirmed) {
-        return;
-      }
-    } else {
-      const confirmed = await new Promise<boolean>((resolve) => {
-        Alert.alert("Confirm case action", confirmMessage, [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => resolve(false),
-          },
-          {
-            text: actionLabel,
-            onPress: () => resolve(true),
-          },
-        ]);
-      });
-
-      if (!confirmed) {
-        return;
-      }
+    if (!confirmed) {
+      return;
     }
 
     try {
@@ -402,22 +388,14 @@ export default function EvidenceReviewScreen() {
 
       const message = `${actionLabel} recorded. The case timeline and Reporter update were created.`;
 
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Action recorded", message);
-      }
+      showFeedback({ tone: "success", title: "Action recorded", message });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "JusticeNow could not record this case action.";
 
-      if (Platform.OS === "web") {
-        window.alert(message);
-      } else {
-        Alert.alert("Action failed", message);
-      }
+      showFeedback({ tone: "error", title: "Action failed", message });
     } finally {
       setActingDecisionId(null);
     }
@@ -679,7 +657,34 @@ export default function EvidenceReviewScreen() {
                     Assign to Evidence Checker
                   </Text>
                 </Pressable>
-              ) : null}
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Message Evidence Checker about ${item.title}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/officer/evidence-messages" as any,
+                      params: {
+                        caseId: item.case_id,
+                        evidenceId: item.id,
+                        title: item.title,
+                        caseReference: item.cases?.case_reference ?? "Case",
+                      },
+                    })
+                  }
+                  style={styles.assignmentButton}
+                >
+                  <AppIcon
+                    name="message-square"
+                    size={16}
+                    color={colors.royal[700]}
+                  />
+
+                  <Text style={styles.assignmentButtonText}>
+                    Message Evidence Checker
+                  </Text>
+                </Pressable>
+              )}
             </View>
           );
         })}

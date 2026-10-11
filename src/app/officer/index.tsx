@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -15,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
+import { useAppConfirm, useAppFeedback } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../theme";
 
@@ -78,6 +78,8 @@ const INITIAL_STATS: DashboardStats = {
 
 export default function OfficerDashboardScreen() {
   const router = useRouter();
+  const { confirm } = useAppConfirm();
+  const { showFeedback } = useAppFeedback();
 
   const [officerName, setOfficerName] = useState("Case Officer");
   const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
@@ -342,11 +344,11 @@ export default function OfficerDashboardScreen() {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      if (Platform.OS === "web") {
-        window.alert(`Unable to sign out: ${error.message}`);
-      } else {
-        Alert.alert("Unable to sign out", error.message);
-      }
+      showFeedback({
+        tone: "error",
+        title: "Unable to sign out",
+        message: error.message,
+      });
 
       return;
     }
@@ -354,34 +356,17 @@ export default function OfficerDashboardScreen() {
     router.replace("/login");
   };
 
-  const signOut = () => {
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(
-        "Do you want to sign out of the JusticeNow staff workspace?",
-      );
+  const signOut = async () => {
+    const confirmed = await confirm({
+      title: "Sign out",
+      message: "Do you want to sign out of the JusticeNow staff workspace?",
+      confirmLabel: "Sign out",
+      danger: true,
+    });
 
-      if (confirmed) {
-        void completeSignOut();
-      }
-
-      return;
+    if (confirmed) {
+      void completeSignOut();
     }
-
-    Alert.alert(
-      "Sign out",
-      "Do you want to sign out of the JusticeNow staff workspace?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Sign out",
-          style: "destructive",
-          onPress: () => void completeSignOut(),
-        },
-      ],
-    );
   };
 
   if (loading) {

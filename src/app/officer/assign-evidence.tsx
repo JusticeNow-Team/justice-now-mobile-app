@@ -2,8 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
-    Platform,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -16,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { hasCompletedStaffMfa } from "../../auth";
 import { AppIcon, AppIconName } from "../../components/AppIcon";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { AppFeedbackTone, useAppFeedback } from "../../components/common";
 import { supabase } from "../../lib/supabase";
 import { colors, iconSizes } from "../../theme";
 
@@ -58,6 +57,7 @@ function firstParam(value?: string | string[]) {
 
 export default function AssignEvidenceScreen() {
   const router = useRouter();
+  const { showFeedback } = useAppFeedback();
   const params = useLocalSearchParams<{
     caseId?: string | string[];
     evidenceId?: string | string[];
@@ -299,13 +299,12 @@ export default function AssignEvidenceScreen() {
     }
   };
 
-  const showMessage = (title: string, message: string) => {
-    if (Platform.OS === "web") {
-      window.alert(`${title}\n\n${message}`);
-      return;
-    }
-
-    Alert.alert(title, message);
+  const showMessage = (
+    title: string,
+    message: string,
+    tone: AppFeedbackTone = "info",
+  ) => {
+    showFeedback({ title, message, tone });
   };
 
   const requestAssignment = () => {
@@ -313,6 +312,7 @@ export default function AssignEvidenceScreen() {
       showMessage(
         "Selection required",
         "Select one evidence item and one Evidence Checker.",
+        "warning",
       );
       return;
     }
@@ -321,6 +321,7 @@ export default function AssignEvidenceScreen() {
       showMessage(
         "Evidence unavailable",
         "Only pending evidence without an active assignment can be assigned.",
+        "warning",
       );
       return;
     }
@@ -341,7 +342,7 @@ export default function AssignEvidenceScreen() {
       });
 
       if (error) {
-        showMessage("Assignment failed", error.message);
+        showMessage("Assignment failed", error.message, "error");
         return;
       }
 
@@ -351,11 +352,13 @@ export default function AssignEvidenceScreen() {
       showMessage(
         "Evidence assigned",
         "The Evidence Checker can now see this item in the validation queue.",
+        "success",
       );
     } catch (error) {
       showMessage(
         "Assignment failed",
         error instanceof Error ? error.message : "Please try again.",
+        "error",
       );
     } finally {
       setAssigning(false);
