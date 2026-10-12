@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 import { ClarificationRequestRecord, ControlledDownloadLog, EvidenceRecord, EvidenceValidationStatus, StatusHistoryRecord } from "./types";
 import { validateStatusTransition, createStatusHistoryEntry } from "./statusTransitionService";
 

@@ -19,13 +19,13 @@ import {
 } from "../types";
 
 describe("Final Security & Access Review - Static Contract Verification (JN-400 to JN-405)", () => {
-  it("CANONICAL_PROTECTED_ROUTES defines all 12 protected routes across 5 portals (JN-400)", () => {
-    assert.equal(CANONICAL_PROTECTED_ROUTES.length, 12);
+  it("CANONICAL_PROTECTED_ROUTES defines all 11 protected routes across 4 portals (JN-400)", () => {
+    assert.equal(CANONICAL_PROTECTED_ROUTES.length, 11);
     assert.ok(CANONICAL_PROTECTED_ROUTES.every((r) => r.authRequired === true));
     assert.ok(CANONICAL_PROTECTED_ROUTES.some((r) => r.route === "/admin"));
     assert.ok(CANONICAL_PROTECTED_ROUTES.some((r) => r.route === "/admin/security"));
     assert.ok(CANONICAL_PROTECTED_ROUTES.some((r) => r.route === "/officer"));
-    assert.ok(CANONICAL_PROTECTED_ROUTES.some((r) => r.route === "/checker"));
+    assert.ok(CANONICAL_PROTECTED_ROUTES.some((r) => r.route === "/validator"));
     assert.ok(CANONICAL_PROTECTED_ROUTES.some((r) => r.route === "/reporter"));
   });
 

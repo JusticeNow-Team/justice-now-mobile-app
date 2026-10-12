@@ -60,7 +60,7 @@ export interface SecurityReviewSummary {
 
 export interface ProtectedRouteDefinition {
   route: string;
-  portal: "admin" | "officer" | "checker" | "validator" | "reporter";
+  portal: "admin" | "officer" | "validator" | "reporter";
   requiredRoles: SystemRole[];
   authRequired: boolean;
   guardComponent: string;
@@ -139,14 +139,6 @@ export const CANONICAL_PROTECTED_ROUTES: ProtectedRouteDefinition[] = [
     authRequired: true,
     guardComponent: "RoleGuard",
     description: "Case Officer Investigation & Queue Portal",
-  },
-  {
-    route: "/checker",
-    portal: "checker",
-    requiredRoles: ["evidence_checker"],
-    authRequired: true,
-    guardComponent: "RoleGuard",
-    description: "Evidence Verification Queue & Review Workspace",
   },
   {
     route: "/validator",

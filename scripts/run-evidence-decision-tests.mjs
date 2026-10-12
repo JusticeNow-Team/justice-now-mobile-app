@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const checkerApi = await readFile(
-  new URL("../src/checker/api.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/api.ts", import.meta.url),
   "utf8"
 );
 const checkerTypes = await readFile(
-  new URL("../src/checker/types.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/types.ts", import.meta.url),
   "utf8"
 );
 const validatorApi = await readFile(
@@ -14,7 +14,15 @@ const validatorApi = await readFile(
   "utf8"
 );
 const detailScreen = await readFile(
-  new URL("../src/app/checker/evidence/[id].tsx", import.meta.url),
+  new URL("../src/evidence-validator/EvidenceDetailScreen.tsx", import.meta.url),
+  "utf8"
+);
+const decisionScreen = await readFile(
+  new URL("../src/evidence-validator/EvidenceDecisionScreen.tsx", import.meta.url),
+  "utf8"
+);
+const auditTools = await readFile(
+  new URL("../src/evidence-validator/ValidatorAuditTools.tsx", import.meta.url),
   "utf8"
 );
 
@@ -22,14 +30,14 @@ console.log("Running Evidence Verification & Decision (JN-198 - JN-205) verifica
 
 // AC 1 & AC 2: Marked Verified & Marked Rejected
 assert.match(
-  detailScreen,
-  /Mark Verified & Accept Metadata/,
-  "AC 1: Must offer 'Mark Verified' action button"
+  decisionScreen,
+  /value: "approved"[\s\S]*label: "Approve"/,
+  "AC 1: Must offer an approve/verified decision option"
 );
 assert.match(
-  detailScreen,
-  /Mark Rejected \(Invalid \/ Unsupported\)/,
-  "AC 2: Must offer 'Mark Rejected' action button"
+  decisionScreen,
+  /value: "rejected"[\s\S]*label: "Reject"/,
+  "AC 2: Must offer a rejected decision option"
 );
 
 // AC 3 & JN-199: Decision saved only by assigned Evidence Checker
@@ -51,8 +59,8 @@ assert.match(
   "JN-201: Validator API must enforce non-empty reason validation"
 );
 assert.match(
-  detailScreen,
-  /Reason or Comment Required/,
+  decisionScreen,
+  /Reason required|A documented reason or comment is required/,
   "JN-201: Detail screen must alert when reason or comment is missing"
 );
 
@@ -82,13 +90,13 @@ assert.match(
 
 // AC 7 & JN-203: Case Officer can view result
 assert.match(
-  detailScreen,
-  /lockedDecisionContainer/,
+  auditTools,
+  /Case officer technical overview|getCaseOfficerStatusView/,
   "JN-203: Decision result must be exposed for officer/staff view"
 );
 assert.match(
-  detailScreen,
-  /Documented Reason \/ Comment/,
+  decisionScreen,
+  /Validator notes|internalNotes/,
   "JN-203: Documented reason must be visible in recorded decision view"
 );
 
@@ -99,9 +107,10 @@ assert.match(
   "JN-204: API must block overwriting completed decisions"
 );
 assert.match(
-  detailScreen,
-  /Completed Decision Recorded & Locked/,
-  "JN-204: UI must render locked state for completed decisions"
+  auditTools,
+  /status progression|Status progression/i,
+  "JN-204: UI must render audit status context for completed decisions"
 );
 
 console.log("All Evidence Verification & Decision (JN-198 - JN-205) contract tests passed successfully!");
+

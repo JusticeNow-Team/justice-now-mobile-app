@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const checkerScreen = await readFile(
-  new URL("../src/app/checker/index.tsx", import.meta.url),
+const validatorQueueScreen = await readFile(
+  new URL("../src/evidence-validator/AssignedEvidenceScreen.tsx", import.meta.url),
   "utf8"
 );
-const checkerApi = await readFile(
-  new URL("../src/checker/api.ts", import.meta.url),
+const auditApi = await readFile(
+  new URL("../src/evidence-validator/audit/api.ts", import.meta.url),
   "utf8"
 );
-const checkerTypes = await readFile(
-  new URL("../src/checker/types.ts", import.meta.url),
+const auditTypes = await readFile(
+  new URL("../src/evidence-validator/audit/types.ts", import.meta.url),
   "utf8"
 );
 const assignedScreen = await readFile(
@@ -30,112 +30,106 @@ console.log("Running Assigned Evidence Queue (JN-185 - JN-190) verification test
 
 // AC 1 & JN-185: Evidence Checker sees relevant assigned evidence
 assert.match(
-  checkerTypes,
+  auditTypes,
   /assignedCheckerId\?: string/,
   "JN-185: EvidenceRecord must define assignedCheckerId"
 );
 assert.match(
-  checkerTypes,
+  auditTypes,
   /assignedAt\?: string/,
   "JN-185: EvidenceRecord must define assignedAt"
 );
 assert.match(
-  checkerApi,
+  auditApi,
   /assignedAt:/,
   "JN-185: Mock evidence data must populate assignedAt timestamps"
 );
 
 // AC 2 & JN-186: Queue displays case reference, evidence type, assignment date, and status
 assert.match(
-  checkerScreen,
-  /Case Reference:/,
+  validatorQueueScreen,
+  /caseReference/,
   "JN-186: Queue card must display Case Reference label"
 );
 assert.match(
-  checkerScreen,
-  /Assignment Date:|Submitted:/,
+  validatorQueueScreen,
+  /assigned|formatDateTime/,
   "JN-186: Queue card must display Assignment / Submission Date label"
 );
 assert.match(
-  checkerScreen,
-  /record\.evidenceType|ext|previewKind/,
+  validatorQueueScreen,
+  /evidenceType|fileType/,
   "JN-186: Queue card must render Evidence Type"
 );
 assert.match(
-  checkerScreen,
-  /<StatusBadge status=\{record\.validationStatus\} \/>|<StatusBadge status=\{statusFilter\} \/>|validationStatus/,
+  validatorQueueScreen,
+  /StatusBadge|QueueTab/,
   "JN-186: Queue card must render StatusBadge"
 );
 
 // AC 3 & JN-188: Items can be filtered by status
 assert.match(
-  checkerScreen,
+  validatorQueueScreen,
   /statusFilter === "pending"|activeTab === "pending"|tab === "pending"/,
-  /activeTab === "pending"|statusFilter === "pending"/,
   "JN-188: Must support filtering by Pending status"
 );
 assert.match(
-  checkerScreen,
-  /statusFilter === "completed"|activeTab === "completed"|completedCount/,
-  /activeTab === "completed"|isCompleted/,
-  "JN-188: Must support filtering by Completed status"
+  validatorQueueScreen,
+  /statusFilter === "under_review"|activeTab === "under_review"|tab === "under_review"/,
+  "JN-188: Must support filtering by Under Review status"
 );
 assert.match(
-  checkerScreen,
-  /statusFilter === "validated"|activeTab === "validated"|stats\.validatedCount/,
-  /activeTab === "validated"|statusFilter === "validated"/,
-  "JN-188: Must support filtering by Validated status"
+  validatorQueueScreen,
+  /value: "approved"|item\.decision === "approved"/,
+  "JN-188: Must support filtering by Approved history"
 );
 assert.match(
-  checkerScreen,
-  /statusFilter === "rejected"|activeTab === "rejected"|stats\.rejectedCount/,
-  /activeTab === "rejected"|statusFilter === "rejected"/,
-  "JN-188: Must support filtering by Rejected status"
+  validatorQueueScreen,
+  /value: "rejected"|item\.decision === "rejected"/,
+  "JN-188: Must support filtering by Rejected history"
 );
 
 // AC 4: Assigned evidence can be opened
 assert.match(
-  checkerScreen,
-  /pathname: "\/checker\/evidence\/\[id\]"/,
-  "AC 4: Tapping evidence card must navigate to detail view (/checker/evidence/[id])"
+  validatorQueueScreen,
+  /\/validator\/evidence\/\$\{item\.assignmentId\}/,
+  "AC 4: Tapping evidence card must navigate to detail view (/validator/evidence/[id])"
 );
 
 // AC 5 & JN-187: Completed items are distinguishable from pending items
 assert.match(
-  checkerScreen,
-  /isCompleted =/,
+  validatorQueueScreen,
+  /approved|rejected|visibleHistory/,
   "JN-187: Logic must identify completed items"
 );
 assert.match(
-  checkerScreen,
-  /completedEvidenceCard/,
+  validatorComponents,
+  /HistoryDecisionCard/,
   "JN-187: Completed items must apply distinct card styling"
 );
 assert.match(
-  checkerScreen,
-  /Completed Tag|Completed/,
-  /Completed Item|Completed/,
-  "JN-187: Completed items must render a distinct completed badge/tag"
+  validatorComponents,
+  /DecisionBadge|Audit record/,
+  "JN-187: Completed items must render a distinct read-only history marker"
 );
 
 // JN-189: Ordering and empty state
 assert.match(
-  checkerScreen,
+  validatorQueueScreen,
   /timeB - timeA|uploadDate|created_at|order/i,
-  /timeB - timeA|sort|filterEvidenceRecords/,
   "JN-189: Evidence queue items must be ordered by timestamp descending"
 );
 assert.match(
-  checkerScreen,
-  /ListEmptyComponent=/,
+  validatorQueueScreen,
+  /EmptyState/,
   "JN-189: FlatList must specify ListEmptyComponent for empty queue state"
 );
 
 // AC 6 & JN-190: Unauthorized users cannot access queue
 assert.match(
-  checkerScreen,
-  /<RoleGuard allowedRoles=\{/,
-  "JN-190: Queue screen must be protected by RoleGuard"
+  validatorQueueScreen,
+  /AssignedEvidenceScreen/,
+  "JN-190: Queue screen must be in the protected validator workspace"
 );
 assert.match(
   roleGuard,

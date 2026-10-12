@@ -57,9 +57,7 @@ export function getRoleForDashboardRoute(pathname: string): SystemRole | null {
   }
   if (
     cleanPath === "/validator" ||
-    cleanPath.startsWith("/validator/") ||
-    cleanPath === "/checker" ||
-    cleanPath.startsWith("/checker/")
+    cleanPath.startsWith("/validator/")
   ) {
     return "evidence_checker";
   }

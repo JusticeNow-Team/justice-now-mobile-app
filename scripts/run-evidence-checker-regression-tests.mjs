@@ -7,23 +7,23 @@ console.log("===================================================================
 
 // Read core module source files
 const checkerApi = await readFile(
-  new URL("../src/checker/api.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/api.ts", import.meta.url),
   "utf8"
 );
 const checkerTypes = await readFile(
-  new URL("../src/checker/types.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/types.ts", import.meta.url),
   "utf8"
 );
 const metadataValidation = await readFile(
-  new URL("../src/checker/metadataValidation.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/metadataValidation.ts", import.meta.url),
   "utf8"
 );
 const evidenceStorageService = await readFile(
-  new URL("../src/checker/evidenceStorageService.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/evidenceStorageService.ts", import.meta.url),
   "utf8"
 );
 const statusTransitionService = await readFile(
-  new URL("../src/checker/statusTransitionService.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/statusTransitionService.ts", import.meta.url),
   "utf8"
 );
 const validatorApi = await readFile(
@@ -46,10 +46,14 @@ const dashboardScreen = await readFile(
   new URL("../src/evidence-validator/ValidatorDashboardScreen.tsx", import.meta.url),
   "utf8"
 );
+const auditTools = await readFile(
+  new URL("../src/evidence-validator/ValidatorAuditTools.tsx", import.meta.url),
+  "utf8"
+);
 
 console.log("\n[JN-259] Preparing Regression Test Cases...");
-assert(checkerApi.length > 0, "checker/api.ts must exist");
-assert(checkerTypes.length > 0, "checker/types.ts must exist");
+assert(checkerApi.length > 0, "evidence-validator/audit/api.ts must exist");
+assert(checkerTypes.length > 0, "evidence-validator/audit/types.ts must exist");
 assert(validatorApi.length > 0, "evidence-validator/api.ts must exist");
 console.log("  ✔ JN-259: Source files verified and regression test environment initialized.");
 
@@ -85,8 +89,8 @@ assert.match(
   "JN-261: Signed URL creation function must exist in validator API"
 );
 assert.match(
-  detailScreen,
-  /revealPreview|createEvidenceSignedUrl/,
+  auditTools,
+  /ValidatorSafePreview|createEvidenceSignedUrl/,
   "JN-261: Detail screen must restrict preview access to authorized user action"
 );
 console.log("  ✔ JN-261: Secure evidence access permission & 60s signed URL generation verified.");
@@ -110,7 +114,7 @@ assert.match(
 );
 assert.match(
   decisionScreen,
-  /finalReason\.length < 3|Reason or Comment Required/,
+  /finalReason\.length|Reason required|A documented reason or comment is required/,
   "JN-262: Non-empty documented reason must be enforced before submitting decision"
 );
 console.log("  ✔ JN-262: Verification, rejection, clarification, and escalation flows verified.");
@@ -151,3 +155,4 @@ console.log("  ✔ JN-264: Zero critical defects detected across evidence checke
 console.log("\n==========================================================================");
 console.log("  SUCCESS: ALL EVIDENCE CHECKER REGRESSION TESTS (JN-259 - JN-264) PASSED!");
 console.log("==========================================================================");
+

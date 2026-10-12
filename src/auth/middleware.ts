@@ -38,11 +38,6 @@ export const ROUTE_AUTHORIZATION_RULES: RouteAuthorizationRule[] = [
     requiredPermissions: ["evidence:validate"],
   },
   {
-    pathPrefix: "/checker",
-    allowedRoles: ["evidence_checker"],
-    requiredPermissions: ["evidence:validate"],
-  },
-  {
     pathPrefix: "/admin",
     allowedRoles: ["system_admin"],
     requiredPermissions: ["admin:system:configure"],

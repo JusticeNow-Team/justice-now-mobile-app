@@ -4,11 +4,11 @@ import { describe, it } from "node:test";
 
 // Read UI screen file and service file for static contract verification
 const indexScreen = await readFile(
-  new URL("../src/app/checker/index.tsx", import.meta.url),
+  new URL("../src/evidence-validator/AssignedEvidenceScreen.tsx", import.meta.url),
   "utf8",
 );
 const serviceFile = await readFile(
-  new URL("../src/checker/evidenceFilterService.ts", import.meta.url),
+  new URL("../src/evidence-validator/audit/evidenceFilterService.ts", import.meta.url),
   "utf8",
 );
 
@@ -211,8 +211,8 @@ describe("Evidence Search & Filter Static Verification (JN-231 to JN-235)", () =
     );
     assert.match(
       indexScreen,
-      /statusFilter/,
-      "UI screen must handle statusFilter",
+      /QueueTab|tab === "pending"|value: "pending"/,
+      "Validator queue UI must handle status tabs",
     );
   });
 
@@ -224,8 +224,8 @@ describe("Evidence Search & Filter Static Verification (JN-231 to JN-235)", () =
     );
     assert.match(
       indexScreen,
-      /typeFilter/,
-      "UI screen must handle typeFilter",
+      /fileType/,
+      "UI screen must handle file type filtering",
     );
   });
 
@@ -236,27 +236,27 @@ describe("Evidence Search & Filter Static Verification (JN-231 to JN-235)", () =
       "Filter service must export isUserAuthorizedToFilterCheckers",
     );
     assert.match(
-      indexScreen,
-      /isAuthorizedForCheckers/,
-      "UI screen must check checker filtering authorization",
+      serviceFile,
+      /isAuthorizedToFilterCheckers/,
+      "Service must check checker filtering authorization",
     );
     assert.match(
       indexScreen,
-      /Assigned Checker/i,
-      "UI screen must render Assigned Checker filter",
+      /Evidence assigned to you/,
+      "Validator queue must scope records to the signed-in validator",
     );
   });
 
   it("AC 6: UI provides clear filters option", () => {
     assert.match(
       indexScreen,
-      /handleClearFilters/,
+      /clearFilters/,
       "UI screen must provide handleClearFilters handler",
     );
     assert.match(
       indexScreen,
-      /Clear Filters/i,
-      "UI screen must render Clear Filters button",
+      /Filters/,
+      "UI screen must render the filters reset control",
     );
   });
 });

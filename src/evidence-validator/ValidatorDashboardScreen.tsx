@@ -205,6 +205,34 @@ export default function ValidatorDashboardScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.auditToolsWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open metadata rules simulator"
+            onPress={() => router.push("/validator/simulator" as Href)}
+            style={({ pressed }) => [
+              styles.auditToolsCard,
+              cardShadow,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.auditToolsIcon}>
+              <AppIcon name="test-tube" color={colors.royal[700]} size={18} />
+            </View>
+
+            <View style={styles.auditToolsCopy}>
+              <Text style={styles.auditToolsTitle}>Metadata rules simulator</Text>
+
+              <Text style={styles.auditToolsText}>
+                Test file type, size, storage, preview, and access-control
+                checks before recording evidence decisions.
+              </Text>
+            </View>
+
+            <AppIcon name="chevron-right" color={colors.navy[300]} size={16} />
+          </Pressable>
+        </View>
+
         {errorMessage ? (
           <View style={styles.horizontalPadding}>
             <ErrorCard message={errorMessage} />
@@ -454,6 +482,50 @@ const styles = StyleSheet.create({
 
   horizontalPadding: {
     paddingHorizontal: 16,
+  },
+
+  auditToolsWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+
+  auditToolsCard: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.royal[100],
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+  },
+
+  auditToolsIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: colors.royal[50],
+  },
+
+  auditToolsCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  auditToolsTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: colors.navy[800],
+  },
+
+  auditToolsText: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
 
   queueList: {

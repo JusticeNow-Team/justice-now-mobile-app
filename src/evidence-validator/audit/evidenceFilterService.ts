@@ -1,5 +1,5 @@
-import { hasPermission } from "../auth/permissions";
-import { SystemRole } from "../auth/types";
+import { hasPermission } from "../../auth/permissions";
+import { SystemRole } from "../../auth/types";
 import { EvidenceRecord } from "./types";
 
 export type EvidenceStatusFilter =

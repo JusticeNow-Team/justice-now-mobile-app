@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { INITIAL_MOCK_EVIDENCE } from "../checker/api";
+import { INITIAL_MOCK_EVIDENCE } from "./audit/api";
 import {
     AssignmentStatus,
     EvidenceDecision,

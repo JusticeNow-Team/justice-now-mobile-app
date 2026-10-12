@@ -177,11 +177,10 @@ describe("Final Security & Access Review - Acceptance Criteria Tests (JN-400 to 
       "/admin/settings",
       "/admin/security",
       "/officer",
-      "/checker",
       "/validator",
       "/reporter",
     ];
-    assert.equal(routes.length, 12);
+    assert.equal(routes.length, 11);
   });
 
   it("AC 2 & JN-401: Role permissions and boundaries are tested across all 4 roles", () => {

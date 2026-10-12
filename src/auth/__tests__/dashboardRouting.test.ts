@@ -34,8 +34,6 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
       assert.equal(getRoleForDashboardRoute("/validator"), "evidence_checker");
       assert.equal(getRoleForDashboardRoute("/validator/dashboard"), "evidence_checker");
       assert.equal(getRoleForDashboardRoute("/validator/evidence/123"), "evidence_checker");
-      assert.equal(getRoleForDashboardRoute("/checker"), "evidence_checker");
-      assert.equal(getRoleForDashboardRoute("/checker/evidence/123"), "evidence_checker");
     });
 
     it("AC 4: System Admin is mapped to the Admin dashboard route (/admin)", () => {
@@ -48,29 +46,25 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
   });
 
   describe("Subtask JN-179 & AC 5: Manual Cross-Role Dashboard Navigation is Blocked", () => {
-    it("Reporter cannot manually access Officer, Checker, or Admin dashboards", () => {
+    it("Reporter cannot manually access Officer, Validator, or Admin dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("reporter", "/reporter"), true);
       assert.equal(isRoleAuthorizedForPath("reporter", "/officer"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/validator"), false);
-      assert.equal(isRoleAuthorizedForPath("reporter", "/checker"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/admin"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/admin/roles"), false);
       assert.equal(isRoleAuthorizedForPath("reporter", "/admin/categories"), false);
     });
 
-    it("Case Officer cannot manually access Reporter, Checker, or Admin dashboards", () => {
+    it("Case Officer cannot manually access Reporter, Validator, or Admin dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("case_officer", "/officer"), true);
       assert.equal(isRoleAuthorizedForPath("case_officer", "/reporter"), false);
       assert.equal(isRoleAuthorizedForPath("case_officer", "/validator"), false);
-      assert.equal(isRoleAuthorizedForPath("case_officer", "/checker"), false);
       assert.equal(isRoleAuthorizedForPath("case_officer", "/admin"), false);
     });
 
     it("Evidence Checker cannot manually access Reporter, Officer, or Admin dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("evidence_checker", "/validator"), true);
       assert.equal(isRoleAuthorizedForPath("evidence_validator", "/validator/dashboard"), true);
-      assert.equal(isRoleAuthorizedForPath("evidence_checker", "/checker"), true);
-      assert.equal(isRoleAuthorizedForPath("evidence_validator", "/checker"), true);
       assert.equal(isRoleAuthorizedForPath("evidence_checker", "/reporter"), false);
       assert.equal(isRoleAuthorizedForPath("evidence_checker", "/officer"), false);
       assert.equal(isRoleAuthorizedForPath("evidence_checker", "/admin"), false);
@@ -82,7 +76,6 @@ describe("Jira Task JN-177: Route Users to Role-Based Dashboards", () => {
       assert.equal(isRoleAuthorizedForPath("system_admin", "/reporter"), false);
       assert.equal(isRoleAuthorizedForPath("system_admin", "/officer"), false);
       assert.equal(isRoleAuthorizedForPath("system_admin", "/validator"), false);
-      assert.equal(isRoleAuthorizedForPath("system_admin", "/checker"), false);
     });
 
     it("Public and authentication routes are always accessible to all users", () => {

@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import {
   Href,
   useFocusEffect,
@@ -7,7 +6,6 @@ import {
 } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,7 +24,6 @@ import {
 } from "../messages/caseMessages";
 import { colors, iconSizes } from "../theme";
 import {
-  createEvidenceSignedUrl,
   getEvidenceAssignmentDetail,
   startEvidenceReview,
 } from "./api";
@@ -44,6 +41,10 @@ import {
   StatusBadge,
   ValidatorHeader,
 } from "./components";
+import {
+  ValidatorAuditSummary,
+  ValidatorSafePreview,
+} from "./ValidatorAuditTools";
 import { ValidatorEvidenceItem } from "./types";
 
 const CHECKLIST = [
@@ -69,8 +70,6 @@ export default function EvidenceDetailScreen() {
   const [item, setItem] = useState<ValidatorEvidenceItem | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [previewing, setPreviewing] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState("");
 
   const [checked, setChecked] = useState(CHECKLIST.map(() => false));
 
@@ -183,35 +182,6 @@ export default function EvidenceDetailScreen() {
     }[];
   }, [item]);
 
-  const revealPreview = async () => {
-    if (!item) {
-      return;
-    }
-
-    try {
-      setPreviewing(true);
-
-      const url = await createEvidenceSignedUrl(item, 60);
-
-      if (item.mimeType?.startsWith("image/")) {
-        setPreviewUrl(url);
-      } else {
-        await Linking.openURL(url);
-      }
-    } catch (error) {
-      showFeedback({
-        tone: "error",
-        title: "Preview unavailable",
-        message:
-          error instanceof Error
-            ? error.message
-            : "The secure preview could not be opened.",
-      });
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
   const submitEvidenceMessage = async () => {
     if (!item || sendingMessage) {
       return;
@@ -294,7 +264,6 @@ export default function EvidenceDetailScreen() {
   }
 
   const allChecked = checked.every(Boolean);
-  const isImage = item.mimeType?.startsWith("image/");
   const canSendMessage = messageDraft.trim().length >= 2 && !sendingMessage;
 
   return (
@@ -335,55 +304,7 @@ export default function EvidenceDetailScreen() {
           </View>
         </View>
 
-        <View style={[styles.previewCard, cardShadow]}>
-          {previewUrl && isImage ? (
-            <Image
-              source={{ uri: previewUrl }}
-              contentFit="contain"
-              style={styles.previewImage}
-            />
-          ) : (
-            <View style={styles.previewHidden}>
-              <View style={styles.previewIcon}>
-                <AppIcon name="eye-off" color={colors.navy[200]} size={iconSizes.xl} />
-              </View>
-
-              <Text style={styles.previewTitle}>Sensitive preview hidden</Text>
-
-              <Text style={styles.previewText}>
-                Reveal only when you are ready to review this evidence.
-              </Text>
-
-              <Pressable
-                disabled={previewing}
-                onPress={() => void revealPreview()}
-                style={({ pressed }) => [
-                  styles.revealButton,
-                  previewing && styles.disabled,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <AppIcon name="eye-off" color={colors.surface} size={iconSizes.sm} />
-
-                <Text style={styles.revealButtonText}>
-                  {previewing
-                    ? "Preparing preview..."
-                    : isImage
-                      ? "Reveal preview"
-                      : "Open secure preview"}
-                </Text>
-              </Pressable>
-            </View>
-          )}
-
-          <View style={styles.previewFooter}>
-            <AppIcon name="lock" color={colors.navy[300]} size={iconSizes.xs} />
-
-            <Text style={styles.previewFooterText}>
-              Temporary signed access · expires after 60 seconds
-            </Text>
-          </View>
-        </View>
+        <ValidatorSafePreview item={item} />
 
         <SectionCard title="File information">
           <DetailRow
@@ -465,7 +386,7 @@ export default function EvidenceDetailScreen() {
 
           {messages.length === 0 && !messagesError ? (
             <Text style={styles.bodyText}>
-              No officer/checker messages have been sent for this evidence yet.
+              No officer/validator messages have been sent for this evidence yet.
             </Text>
           ) : (
             messages.map((message) => (
@@ -530,6 +451,8 @@ export default function EvidenceDetailScreen() {
             />
           ))}
         </SectionCard>
+
+        <ValidatorAuditSummary item={item} />
 
         <View style={styles.duplicateCard}>
           <AppIcon name="info" color={colors.warning} size={iconSizes.sm} />

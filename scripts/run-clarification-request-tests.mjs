@@ -7,9 +7,10 @@ console.log("Covers: JN-214, JN-215, JN-216, JN-217, JN-218, JN-219, JN-220");
 console.log("===============================================================\n");
 
 async function runTests() {
-  const typesContent = await readFile(new URL("../src/checker/types.ts", import.meta.url), "utf8");
-  const apiContent = await readFile(new URL("../src/checker/api.ts", import.meta.url), "utf8");
-  const detailScreenContent = await readFile(new URL("../src/app/checker/evidence/[id].tsx", import.meta.url), "utf8");
+  const typesContent = await readFile(new URL("../src/evidence-validator/audit/types.ts", import.meta.url), "utf8");
+  const apiContent = await readFile(new URL("../src/evidence-validator/audit/api.ts", import.meta.url), "utf8");
+  const detailScreenContent = await readFile(new URL("../src/evidence-validator/EvidenceDetailScreen.tsx", import.meta.url), "utf8");
+  const decisionScreenContent = await readFile(new URL("../src/evidence-validator/EvidenceDecisionScreen.tsx", import.meta.url), "utf8");
 
   // --------------------------------------------------------------------------
   // TEST 1 (JN-214 & JN-215): Clarification / Replacement Operation & Validation
@@ -33,7 +34,7 @@ async function runTests() {
   // --------------------------------------------------------------------------
   console.log("Test 3 (JN-217): Verifying Reporter-facing message format...");
   assert.match(typesContent, /reporterInstructions: string/, "JN-217: Request must include reporterInstructions field");
-  assert.match(detailScreenContent, /Instructions or feedback visible to the Reporter|publicFeedback/, "JN-217: Detail screen must offer instructions/feedback input");
+  assert.match(decisionScreenContent, /Explanation for the reporter|reporterMessage/, "JN-217: Decision screen must offer reporter-facing instructions/feedback input");
   console.log("  PASSED: JN-217 Reporter instructions verified.\n");
 
   // --------------------------------------------------------------------------
@@ -66,3 +67,4 @@ runTests().catch((err) => {
   console.error("Test execution failed:", err);
   process.exit(1);
 });
+

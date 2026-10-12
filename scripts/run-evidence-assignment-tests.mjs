@@ -37,7 +37,7 @@ const requirements = [
   ],
   [
     "active Evidence Validator enforcement",
-    /checker\.role::text = 'evidence_validator'[\s\S]*checker\.is_active = true/,
+    /checker\.role::text in \('evidence_checker', 'evidence_validator'\)[\s\S]*checker\.is_active = true/,
   ],
   [
     "active Case Officer ownership enforcement",

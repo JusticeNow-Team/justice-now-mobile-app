@@ -8,9 +8,10 @@ console.log("==========================================================\n");
 
 async function runTests() {
   // Read source files for static contract analysis
-  const typesContent = await readFile(new URL("../src/checker/types.ts", import.meta.url), "utf8");
-  const apiContent = await readFile(new URL("../src/checker/api.ts", import.meta.url), "utf8");
-  const detailScreenContent = await readFile(new URL("../src/app/checker/evidence/[id].tsx", import.meta.url), "utf8");
+  const typesContent = await readFile(new URL("../src/evidence-validator/audit/types.ts", import.meta.url), "utf8");
+  const apiContent = await readFile(new URL("../src/evidence-validator/audit/api.ts", import.meta.url), "utf8");
+  const detailScreenContent = await readFile(new URL("../src/evidence-validator/EvidenceDetailScreen.tsx", import.meta.url), "utf8");
+  const decisionScreenContent = await readFile(new URL("../src/evidence-validator/EvidenceDecisionScreen.tsx", import.meta.url), "utf8");
 
   // --------------------------------------------------------------------------
   // TEST 1 (JN-207): Comment & Reason Schema Definition
@@ -47,8 +48,8 @@ async function runTests() {
   // TEST 4 (JN-210): Display Comments to Case Officer
   // --------------------------------------------------------------------------
   console.log("Test 4 (JN-210): Verifying decision comments exposed to Case Officer view...");
-  assert.match(detailScreenContent, /lockedReasonBox|officerNotesBox/, "JN-210: Detail screen must render internal notes for Case Officer view");
-  assert.match(detailScreenContent, /Internal Comment for Case Officer/, "JN-210: Must provide dedicated internal comment field for Case Officer");
+  assert.match(detailScreenContent, /Officer messages|Case officer technical overview/, "JN-210: Detail screen must render Case Officer-facing context");
+  assert.match(decisionScreenContent, /Validator notes|internalNotes/, "JN-210: Must provide dedicated internal notes field for Case Officer");
   console.log("  PASSED: JN-210 Case Officer comment visibility verified.\n");
 
   // --------------------------------------------------------------------------
@@ -56,7 +57,7 @@ async function runTests() {
   // --------------------------------------------------------------------------
   console.log("Test 5 (JN-211): Verifying separation of public feedback from internal notes...");
   assert.match(apiContent, /publicFeedback\?:/, "JN-211: API must separate public feedback from internal notes");
-  assert.match(detailScreenContent, /Public Feedback for Reporter/, "JN-211: Detail screen must offer separate Public Feedback input");
+  assert.match(decisionScreenContent, /Explanation for the reporter|reporterMessage/, "JN-211: Decision screen must offer separate reporter explanation input");
   console.log("  PASSED: JN-211 public and internal feedback separation verified.\n");
 
   // --------------------------------------------------------------------------
@@ -72,3 +73,4 @@ runTests().catch((err) => {
   console.error("Test execution failed:", err);
   process.exit(1);
 });
+
