@@ -23,6 +23,7 @@
     "node_modules",
     "scripts",
     "supabase",
-    "**/__tests__"
+    "**/__tests__",
+    "reporter-unit-testings"
   ]
 }
